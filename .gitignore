@@ -1,0 +1,24 @@
+# datasets are fetched with scripts/fetch_data.sh, never committed
+data/raw/
+data/processed/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# node
+node_modules/
+.next/
+
+# secrets and local config
+.env
+.env.*
+!.env.example
+
+# os / editor
+.DS_Store
+.vscode/
+.idea/
