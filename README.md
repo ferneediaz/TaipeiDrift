@@ -9,6 +9,7 @@ The challenge is not chosen yet. This repository currently holds the shared envi
 - [docs/challenges.md](docs/challenges.md): the nine challenges, condensed
 - [docs/pitches.md](docs/pitches.md): the three candidates, with demo, approach, roles and plan
 - [docs/kickoff.md](docs/kickoff.md): questions for the organisers and a team-forming checklist
+- [docs/playbook.md](docs/playbook.md): timeline, idea filter, demo script, slide skeleton and working rules
 - [data/README.md](data/README.md): datasets, formats and licences
 - [session-notes/handoff.md](session-notes/handoff.md): current state and next step
 
