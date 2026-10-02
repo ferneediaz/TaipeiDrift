@@ -87,6 +87,19 @@ Done when: the same Mid-Air flight is run in sunny and in foggy conditions, and 
 
 Done when: one chart shows the curves for at least three conditions, and one sentence states the time to reach 50 m of error for each.
 
+## The method behind position fixes and the filter
+
+We take two ideas from the paper "Season-invariant GNSS-denied visual localization for UAVs" (Kinnari, Verdoja, Kyrki, 2022).
+
+- Matching: for a guessed position, cut the square of map the camera should see, compare it with the camera view, and get a similarity score. A further step turns the score into a probability that the match is right. That step is the core of our integrity check.
+- Monte Carlo localization: keep a thousand guesses of the position. Move each by the measured movement, weigh each by its match probability, keep the good ones. The spread of the guesses is the uncertainty.
+
+The paper applies directly if we use ALTO, which has an aerial map. Its reported accuracy is 26 to 31 m on real flights, and it assumes a movement error of about 2 percent of distance flown, which is the bar for our camera speed.
+
+- Explanation with worked numbers, and which sections to read: [method.md](method.md)
+- Paper: [arXiv 2110.01967](https://arxiv.org/abs/2110.01967), and the earlier one it builds on: [arXiv 2103.14381](https://arxiv.org/abs/2103.14381)
+- Both PDFs: [research/](../research/)
+
 ## Checks to run on the data before building on it
 
 1. Scale. On one Mid-Air flight, compare speed from image motion times barometer height with the true speed. The barometer gives height above the start point, and Mid-Air flies low over hilly ground, so this may be off by a large factor. If it is, the camera speed needs another source of scale.
@@ -291,6 +304,7 @@ From the participant page. Remove this section before the repository is made pub
 ## Background
 
 - [brief.md](brief.md): what the challenge asks for
+- [method.md](method.md): how image matching and the particle filter work, with worked numbers
 - [landscape.md](landscape.md): existing products and their limits
 - [experiments.md](experiments.md): earlier measurements on Taiwan imagery and elevation, made before the dataset was chosen
 - [challenge-2-research.md](challenge-2-research.md): papers, data sources, reading list
