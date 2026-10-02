@@ -247,7 +247,7 @@ From the participant page. Remove this section before the repository is made pub
 
 | Mentor | Field | Most useful for |
 |---|---|---|
-| Milosch Meriac | GNSS security, RF localisation, signal processing, acoustics, embedded hardware | Challenges 2 and 7, sensor hardware and cost |
+| Milosch Meriac, CTO at [Bitqan Systems Design](https://bitqan.ae/about.html) | GNSS security, RF localisation, signal processing, acoustics, embedded hardware | Challenges 2 and 7, sensor hardware and cost |
 | MC (@minmax) | Sensor data and systems integration, maritime | Challenges 2 and 6 |
 | Wenteng Chang | Multi-UAV task allocation, replanning, human-in-the-loop, demo and pitch | Challenge 3, pitch structure |
 | Oleksandr Kulyniak | Current warfare challenges | Reality check for any idea |
