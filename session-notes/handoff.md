@@ -22,19 +22,13 @@ Choose the challenge as a team of six, then start building.
 
 - First experiments in `experiments/` with results in `docs/experiments.md`: camera fixes, terrain matching and a water crossing, on real elevation and imagery.
 
-## Proposal on the table
+## Plan
 
-Challenge 2. Build three parts, all on open map data (see `docs/landscape.md`):
-
-1. A navigator: dead reckoning, a particle filter over position and wind, terrain fixes, camera fixes, sun compass for the cold start.
-2. An integrity check that tests every fix against the filter and reports when the estimate should not be trusted.
-3. A navigability map of Taiwan and the Strait showing expected position error along a route.
-
-The team has not confirmed this yet. Research scripts for the navigator's parts exist in `experiments/`.
+The single plan is `docs/PLAN.md`: Challenge 2, with a navigator, an integrity check and a navigability map, all on open map data. It has roles, shared conventions, a timeline with gates and the demo script. The team has not confirmed it yet. Research scripts for the navigator's parts exist in `experiments/`.
 
 ## Open issues
 
-- The team has not voted yet.
+- The team has not confirmed the plan yet.
 - The second item the mentor named for the cold start, besides the position of the sun, is not known. Ask him again.
 - Challenge 2 data: aerial images are available; the flight simulator over them is not built. The organiser dataset has not been seen.
 - No stereo microphone for direction finding in Challenge 7. Ask whether one can be borrowed.
@@ -45,4 +39,4 @@ The team has not confirmed this yet. Research scripts for the navigator's parts 
 
 ## Next exact step
 
-Team reads `docs/challenge-decision.md` and votes. Then follow "First hour after choosing" in `docs/playbook.md`. If Challenge 2 is chosen, build the gate test first: simulated flight frames and speed from optical flow against the true speed.
+Team reads `docs/PLAN.md`, confirms or changes it, and writes names into the roles table. Then set up the code structure and get the dead-reckoning baseline plot running, which is the Friday 23:00 gate.

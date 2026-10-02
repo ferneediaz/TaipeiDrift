@@ -2,11 +2,12 @@
 
 Repository of team Taipei Drift for the Taiwan Defense Tech Hackathon 2026, organised by EDTH and the Unmanned Vehicles R&D Center at National Taiwan University, 2 to 4 October 2026 in Taipei.
 
-The challenge is not chosen yet. This repository currently holds the shared environment, the datasets and the briefing documents. No product code has been written.
+We are working on Challenge 2, navigation without GNSS. The plan is proposed and awaits the team's confirmation. The repository holds the shared environment, the datasets, the research and first experiment scripts. Product code has not been started.
 
 ## Contents
 
-- [docs/challenge-decision.md](docs/challenge-decision.md): **start here**, the briefing for choosing our challenge, with links to data, tools and earlier entries
+- [docs/PLAN.md](docs/PLAN.md): **start here**, the plan: what we build, roles, timeline, demo
+- [docs/challenge-decision.md](docs/challenge-decision.md): how the nine challenges compared, with links to data, tools and earlier entries
 - [docs/challenges.md](docs/challenges.md): the nine challenges, condensed
 - [docs/landscape.md](docs/landscape.md): existing products, their limits, and the proposal for what we build
 - [docs/experiments.md](docs/experiments.md): first experiments on real Taiwan data, laser against camera, and crossing water

@@ -4,27 +4,11 @@ For each candidate challenge: the target user, the two-minute demo, and a plan f
 
 Demo Day starts Sunday at 13:00. All plans assume a code freeze on Sunday at 10:00.
 
-## Challenge 2: navigation without GPS
+## Challenge 2: navigation without GNSS
 
-### Target user
+This is the challenge we are working on. Its plan has moved to [PLAN.md](PLAN.md).
 
-Operators of small drones that must keep flying a route while GPS is jammed or spoofed.
-
-### Demo
-
-1. A map shows the true path and the dead-reckoning estimate drifting away from it.
-2. Switch on camera speed (optical flow with altitude) and the sun compass. The drift slows visibly.
-3. Switch on map matching. The estimate snaps back to the true path at each fix and its uncertainty shrinks.
-4. An error-over-time plot shows all three runs. One headline number: position error before and after.
-5. Turn up the noise or switch a sensor off live, and show where the method stops working.
-
-### Weekend plan
-
-- Friday evening: simulated flight over an aerial image produces frames, altitude and a true path. Speed from optical flow is compared with the true speed. This is the 22:00 gate.
-- Saturday morning: sun-compass heading and the filter that combines the sources, each tested against the true path.
-- Saturday afternoon: map matching for position fixes, noise and failure experiments, a second image or real footage for validation.
-- Saturday evening: animated map, fallback video, slide draft.
-- Sunday until 10:00: bug fixes, slides, rehearsal.
+The sections below are kept for the challenges we did not choose.
 
 ## Challenge 7: acoustic drone detection
 
