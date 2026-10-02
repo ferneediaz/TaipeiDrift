@@ -52,7 +52,7 @@ Research on Friday evening, after the first experiments in [experiments.md](expe
 
 ## What we should build
 
-This proposal became the plan in [PLAN.md](PLAN.md), which adds roles, timeline and demo.
+This was the proposal on Friday evening. The current plan is in [PLAN.md](PLAN.md). It keeps the navigator and the integrity check, and it replaces the map-based parts, because the team chose the Mid-Air dataset, which has no aerial map.
 
 One navigator and one planning view, both on open data.
 

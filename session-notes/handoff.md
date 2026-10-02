@@ -1,35 +1,30 @@
 # Handoff
 
-Last updated: Friday 2 October 2026, evening.
+Last updated: Friday 2 October 2026, night.
 
 ## Current objective
 
-Confirm the plan as a team and start building.
+Confirm the plan as a team, get the first Mid-Air data, and produce the IMU-only baseline plot.
 
 ## State
 
 - Challenge 2, navigation without GNSS. Team of six, team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private).
-- Assumed platform, fixed on Friday evening: an existing drone at about 3,000 m with a camera, an IMU and a barometer. We build the software, not a drone. No laser and, so far, no airspeed sensor.
-- The single plan is `docs/PLAN.md`: a navigator, an integrity check and a navigability map, all on open map data, with roles, shared conventions, timeline, gates and demo script. Not yet confirmed by the team.
-- Research: `docs/landscape.md` (existing products and gaps), `docs/challenge-2-research.md` (papers, data, reading list), `research/` (two papers as PDF).
-- Experiments on real Taiwan data in `experiments/`, results in `docs/experiments.md`. They contain working first versions of the particle filter with wind, terrain matching and camera matching.
-- Data: two aerial images of Wufeng, Taichung (`scripts/fetch_aerial.py`) and an elevation strip at 24.05 N (fetched by the terrain experiment).
-- Environment: Python 3.12 via uv. Audio and deep-learning libraries were removed when the challenge was fixed.
-
-## Removed on Friday evening
-
-Docs for the challenges not chosen (decision briefing, Challenge 4 and 6 research, per-challenge plans, the nine condensed briefs) and the audio and video fetch script. They remain in the git history. The audio and video datasets are still on Dustin's laptop under `data/raw/` and can be deleted.
+- We build software, not a drone. Assumed platform: an existing drone with a downward camera, an IMU and a barometer. Flight height is not fixed.
+- Dataset: Mid-Air (synthetic, low flight, IMU, downward camera, ground truth, several weather and season variants). No barometer and no aerial map in it.
+- The single plan is `docs/PLAN.md`: a navigator (IMU baseline, camera speed, route memory), an integrity check, and a drift budget, with roles, conventions, timeline, gates and demo script. Not yet confirmed by the team.
+- Research: `docs/landscape.md`, `docs/challenge-2-research.md`, `research/` (two papers as PDF).
+- `experiments/` and `docs/experiments.md` hold earlier work on Taiwan imagery and elevation with a laser and an airspeed sensor. The particle filter and the camera-matching findings carry over; the rest is not part of the current plan.
 
 ## Open issues
 
 - The team has not confirmed the plan or assigned roles.
-- Product code is not started. The code structure for six people still has to be set up.
-- The second input the mentor named for the cold start is unknown.
-- No real flight data. A 360-degree camera or phone recording would add it.
+- Nobody has requested the Mid-Air download links yet. The form needs a captcha, so a person has to do it. First selection: Down RGB, Kite training, sunny and foggy, trajectory 0003.
+- No product code yet. No Mid-Air reader yet.
+- The plan dropped satellite map matching and the navigability map of Taiwan when Mid-Air was chosen.
 - `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
+- Mid-Air is licensed for non-commercial use.
 - The native uv is at `~/.local/bin/uv` on Dustin's laptop; the `uv` on the shell path is still the Intel build.
-- No project-specific CLAUDE.md yet.
 
 ## Next exact step
 
-Team reads `docs/PLAN.md`, confirms or changes it, and writes names into the roles table. Then set up the code structure and get the dead-reckoning baseline plot running, which is the Friday 23:00 gate.
+A team member requests the Mid-Air links and saves the text file into the repository folder. Then: fetch the sensor records, write the reader, and plot IMU-only dead reckoning against the ground truth for one flight.

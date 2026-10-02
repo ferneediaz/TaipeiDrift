@@ -1,5 +1,7 @@
 # First experiments: laser, camera and the sea
 
+These experiments were made before the team chose the Mid-Air dataset and a sensor set of camera, IMU and barometer. They used Taiwan imagery and elevation, a laser and an airspeed sensor. The particle filter and the camera-matching findings still apply; the terrain and wind results do not belong to the current plan in [PLAN.md](PLAN.md).
+
 Four quick experiments on real data of Taiwan, run on Friday evening to settle one question: does a camera cover the gaps of terrain matching with a laser, and what is left uncovered?
 
 The scripts are in `experiments/`. Run them from the repository root after `uv sync` and `python scripts/fetch_aerial.py`.
