@@ -22,3 +22,6 @@ node_modules/
 .DS_Store
 .vscode/
 .idea/
+
+# generated results (baseline/scripts/run_midair_baseline.py)
+outputs/
