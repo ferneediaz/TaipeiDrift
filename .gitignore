@@ -25,6 +25,7 @@ node_modules/
 
 # simulator: generated ground model and recorded bags
 sim/models/ground/
+sim/models/trees/
 sim/bags/
 *.mcap
 *.db3

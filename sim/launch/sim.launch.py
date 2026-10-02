@@ -70,8 +70,9 @@ def setup(context):
     if gui or demo:
         wait_for_display()
 
-    # Procedural ground on first run; replace it with the orthophoto via make_ground.py --aerial.
+    # Ground and 3D trees on first run; replace the ground with the orthophoto via make_ground.py --aerial.
     subprocess.run([sys.executable, str(SIM / "scripts/make_ground.py"), "--if-missing"], check=True)
+    subprocess.run([sys.executable, str(SIM / "scripts/make_trees.py"), "--if-missing"], check=True)
     model = drone_sdf(cam_res, gps)
     sim_time = {"use_sim_time": True}
 
@@ -93,7 +94,9 @@ def setup(context):
             # Give the Gazebo window time to open before asking it to follow the drone
             TimerAction(period=15.0, actions=[
                 ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py")], output="screen")]),
-            Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"]),
+            # Started late: opened before the camera topic exists, the viewer can stay blank
+            TimerAction(period=20.0, actions=[
+                Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
             ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-fa", "Monospace", "-fs", "9",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
                                 str(SIM / "nodes/sensor_monitor.py")]),
