@@ -63,6 +63,7 @@ Ideas 1, 2 and 4 form one coherent entry. Ideas 3 and 5 are short additions.
   - 23 March 2020, original resolution about 3.6 cm per pixel, 385 MB
   - `python scripts/fetch_aerial.py` fetches both at a quarter of the resolution (about 20 and 14 cm per pixel), which is enough for a simulated flight at around 100 m and avoids the full download.
   - A third image of the same site from September 2020 is also available.
+  - Both are fetched and checked: they open, line up, and show the same ground with visibly different colours and crops. Each covers a corridor along a motorway, about 3 km long and 300 to 600 m wide, so only a quarter to a third of the rectangle holds imagery. A simulated flight has to follow the corridor.
   - OpenAerialMap lists 371 images for Taiwan, 84 of them freely licensed and large enough for a simulated flight.
 - **How we use them:** fly a virtual drone over the 2020 image on a known path and cut out what a downward camera would see. That gives frames, altitude and an exact true path. The 2018 image is the on-board map.
 - **Real flight data for validation:** [UAV-VisLoc](https://github.com/IntelliSensing/UAV-VisLoc) has 6,742 drone images with position, height and heading, and 11 satellite maps. The full set is 16.4 GB; a sample is 2.04 GB, hosted on Google Drive. The repository states no licence.

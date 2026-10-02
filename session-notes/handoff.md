@@ -16,7 +16,8 @@ Choose the challenge as a team of six, then start building.
 - Python 3.12 arm64 environment via uv (`pyproject.toml`, `uv.lock`). Imports verified, PyTorch MPS available, laptop microphone detected.
 - Audio datasets for Challenge 7 in `data/raw/`: drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB.
 
-- Research on Challenge 2 in `docs/challenge-2-research.md`; two aerial images of one Taichung site (2018, 2020) fetched by `scripts/fetch_aerial.py`.
+- Research on Challenge 2 in `docs/challenge-2-research.md`; two aerial images of one Taichung site (2018, 2020) fetched by `scripts/fetch_aerial.py` and checked: they line up and cover a corridor about 3 km long.
+- Research on Challenge 6 in `docs/challenge-6-research.md`.
 - Research on Challenge 4 in `docs/challenge-4-research.md`; drone video set (190 MB) in `data/raw/drone_video`.
 
 ## Proposal on the table

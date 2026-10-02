@@ -183,6 +183,8 @@ One mentor on site works on heterogeneous drone task allocation, dynamic replann
 
 ## Challenge 6: maritime anomaly alerting
 
+A fuller study of this challenge, with existing products, their limits, the cable incidents around Taiwan and data options, is in [challenge-6-research.md](challenge-6-research.md).
+
 ### What it asks
 
 A dashboard that analyses vessel tracks (AIS), raises alerts with reasons and uncertainty, lets an operator give feedback, and compares a rule-based method with a statistical or machine-learning method.
