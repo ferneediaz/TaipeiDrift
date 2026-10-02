@@ -47,7 +47,6 @@ Merge test on Saturday 00:35: each branch merges into `main` cleanly. Merged one
 - Turns are not handled on ALTO.
 - The phone walk has no owner. It needs daylight.
 - Nothing has been timed on a small board.
-- "lightex technology" from the mentor is not understood.
 - `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
 - Mid-Air is licensed for non-commercial use.
 - The formulas in `docs/data.md` and in the review use `\[ ... \]`, which GitHub does not render.

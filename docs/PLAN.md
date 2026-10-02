@@ -384,7 +384,7 @@ Conditions that trouble a drone navigating with a downward camera, an IMU and a 
 - Do we download the ALTO training section (9.93 GB) for the held-out test?
 - Answered: existing products do not work at night with an ordinary camera. Raptor uses an infrared camera, and VNS01 falls back on a radar altimeter. Details and sources are in [landscape.md](landscape.md).
 - Answered: besides the sun, the mentor named radio signals of opportunity for finding the position. See "Mentor feedback" below.
-- What did the mentor mean by "lightex technology"? And is the sun sensor paper named under "Next steps" the one he had in mind?
+- Is the sun sensor paper named under "Next steps" the one the mentor had in mind?
 - Who records the phone walk, and with which phone and app?
 - How long is the demo slot, what are the judging weights, and what is the submission format?
 
@@ -400,8 +400,6 @@ Notes from the team's conversation with our mentor, and what we do with each.
 | At night the moon and the stars are still there | A next step, in the table above |
 | Over open water: NAVSOP. Radio stations, identified by their RDS signal, or TV stations for calculating the position | A next step, in the table above |
 | Demo: simulate optical flow by walking outside the campus with a phone, recording without compression. Can we get the phone's altitude, and how precise would it be? | The phone walk in the demo section. The altitude that matters is the holding height, measured with a tape |
-| "lightex technology" | Not understood. We found no company of that name. Two that sound similar and fit the topic: LITEF, a German maker of fibre-optic gyroscopes, and LightWare, a maker of small laser altimeters for drones. Ask him |
-
 ## Mentors on site
 
 From the participant page. Remove this section before the repository is made public.
