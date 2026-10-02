@@ -4,6 +4,8 @@ The one page that says what we build, who does what, and by when. Everything els
 
 Status: revised on Friday night at 21:45. Mid-Air and ALTO data are downloaded and checked. Not yet confirmed by the team. Edit this page when something is decided.
 
+**Read [findings.md](findings.md) first.** It holds the measurements made after this revision, and they change parts of this plan: camera speed with a barometer does not work on Mid-Air, and camera speed with position fixes works on ALTO. The sections below are not yet rewritten; the proposed changes are in section 6 of that page.
+
 ## What we are building
 
 Challenge 2, navigation without GNSS.
@@ -34,7 +36,7 @@ How to get each dataset onto a laptop is in [data/README.md](../data/README.md).
 
 - 54 flights with a downward camera at 25 frames per second, an IMU at 100 Hz with noise and drift, a simulated GNSS at 1 Hz, and exact ground truth at 100 Hz.
 - Each flight is rendered in several conditions: sunny, cloudy, foggy and sunset in one landscape, and spring, fall and winter in another.
-- Each flight lasts about 88 seconds and covers 1 to 1.4 km at 10 to 16 m/s. Measured on the sunny flights.
+- Each flight lasts about 88 seconds. The 30 sunny flights cover 270 m to 1.5 km, 1.0 km in the median, at 3 to 17 m/s.
 - No barometer. We simulate one from the true altitude, with realistic noise and slow drift.
 - No aerial map of the landscapes, so no position fixes from a map.
 - Licence: CC BY-NC-SA 4.0, non-commercial, with attribution.
@@ -329,6 +331,7 @@ From the participant page. Remove this section before the repository is made pub
 ## Background
 
 - [brief.md](brief.md): what the challenge asks for
+- [findings.md](findings.md): what we measured on Friday night on Mid-Air and ALTO, and what it changes
 - [data.md](data.md): how Mid-Air and the DenseUAV model would be used, by Alessandro
 - [method.md](method.md): how image matching and the particle filter work, with worked numbers
 - [landscape.md](landscape.md): existing products and their limits

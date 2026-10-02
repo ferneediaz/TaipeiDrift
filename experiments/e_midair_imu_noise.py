@@ -5,6 +5,9 @@ Run from the repository root:  python experiments/e_midair_imu_noise.py [path to
 
 The accelerometer measures along the drone's own axes and includes gravity, so the
 true value is  R^T (a_world - g)  with g = (0, 0, 9.81) in North, East, Down.
+
+The script also checks which axes the turn rates are given in. In Mid-Air the gyroscope
+and the true angular velocity fit the attitude only as rates around the map's axes.
 """
 import sys
 
@@ -25,7 +28,11 @@ def split(error: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return slow, fast
 
 
-rows = []
+def rms(x: np.ndarray) -> float:
+    return float(np.sqrt((x**2).mean()))
+
+
+rows, axes = [], []
 with h5py.File(PATH, "r") as f:
     for name in sorted(f.keys()):
         t = f[name]
@@ -34,6 +41,21 @@ with h5py.File(PATH, "r") as f:
         true_accel = body_to_world.inv().apply(t["groundtruth/acceleration"][:] - GRAVITY)
         accel_error = t["imu/accelerometer"][:] - true_accel
         gyro_error = t["imu/gyroscope"][:] - t["groundtruth/angular_velocity"][:]
+        # Which axes are the turn rates given in? Compare with the change of the true attitude
+        # from one sample to the next, once expressed in the drone's axes and once in map axes.
+        in_drone_axes = (body_to_world[:-1].inv() * body_to_world[1:]).as_rotvec() / 0.01
+        in_map_axes = (body_to_world[1:] * body_to_world[:-1].inv()).as_rotvec() / 0.01
+        axes.append(
+            [
+                rms(t["groundtruth/angular_velocity"][:-1] - in_drone_axes),
+                rms(t["groundtruth/angular_velocity"][:-1] - in_map_axes),
+                rms(t["imu/gyroscope"][:-1] - in_drone_axes),
+                rms(t["imu/gyroscope"][:-1] - in_map_axes),
+                rms(accel_error),
+                rms(t["imu/accelerometer"][:] - (t["groundtruth/acceleration"][:] - GRAVITY)),
+                rms(in_drone_axes),
+            ]
+        )
         accel_slow, accel_fast = split(accel_error)
         gyro_slow, gyro_fast = split(gyro_error)
         rows.append(
@@ -59,3 +81,9 @@ labels = [
 print(f"{PATH}: {len(r)} flights")
 for i, (label, unit) in enumerate(labels):
     print(f"{label:46s} min {r[:, i].min():.4f}  median {np.median(r[:, i]):.4f}  max {r[:, i].max():.4f} {unit}")
+
+a = np.median(np.array(axes), axis=0)
+print(f"\nWhich axes? Difference to the change of the true attitude (rms, median over flights; typical turn rate {a[6]:.2f} rad/s):")
+print(f"true turn rate:  as rates in the drone's axes {a[0]:.4f}, as rates in map axes {a[1]:.4f} rad/s")
+print(f"gyroscope:       as rates in the drone's axes {a[2]:.4f}, as rates in map axes {a[3]:.4f} rad/s")
+print(f"accelerometer against true acceleration minus gravity: in the drone's axes {a[4]:.3f}, in map axes {a[5]:.3f} m/s^2")

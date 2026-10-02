@@ -1,33 +1,36 @@
 # Handoff
 
-Last updated: Friday 2 October 2026, 21:50.
+Last updated: Friday 2 October 2026, 22:45.
 
 ## Current objective
 
-Confirm the plan as a team, assign roles, and produce the IMU-only baseline plot on Mid-Air.
+The team decides tonight whether to stay with Challenge 2, and if so confirms three results and their owners. The evidence is in `docs/findings.md`.
 
 ## State
 
 - Challenge 2, navigation without GNSS. Team of six, team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private).
-- We build software, not a drone. Assumed platform: an existing drone with a downward camera, an IMU and a barometer. Flight height is not fixed.
-- The single plan is `docs/PLAN.md`: a navigator (IMU baseline, camera speed, position fixes), an integrity check, and a drift budget. Not yet confirmed by the team.
+- We build software, not a drone. Assumed platform: an existing drone with a downward camera, an IMU and a barometer.
+- `docs/findings.md` holds everything measured on Friday night. `docs/PLAN.md` predates those measurements and points to them; it is not yet rewritten.
 - Data is on Dustin's laptop under `data/raw/` (not committed). `data/README.md` says how to get it.
-  - Mid-Air: sensor records of every flight in every condition, and the downward camera for 21 flights. Each flight lasts about 88 seconds.
-  - ALTO: the validation section of the competition sample. Real helicopter frames, reference images along the route, true positions. No raw IMU and no height above ground.
-- Dataset decision: Mid-Air for the IMU baseline, camera speed and fog. ALTO for position fixes on real images.
-- `docs/data.md` (Alessandro) proposes the pretrained DenseUAV network for position fixes. The plan lists it as an optional upgrade after classical matching. This is not yet agreed.
-- Branch `simulations` (Dan): a Gazebo simulator in Docker with a drone that carries camera, IMU, barometer and GNSS. Not merged into main. Its role is an open question in the plan.
-- `experiments/e_midair_imu_noise.py` measures the IMU errors in Mid-Air. The gyroscope white noise there is about 0.02 rad/s per sample, well above the 0.0005 to 0.005 the simulator assumes.
-- Research: `docs/landscape.md`, `docs/challenge-2-research.md`, `docs/method.md`, `research/` (two papers as PDF).
-- `experiments/a` to `d` and `docs/experiments.md` hold earlier work on Taiwan imagery and elevation. The particle filter and the camera-matching findings carry over; the rest is not part of the current plan.
+  - Mid-Air: sensor records of every flight in every condition, and the downward camera for 21 flights (download was at 29 of 38 files at 22:32).
+  - ALTO: the validation section of the competition sample.
+- Measured so far, all as experiment scripts in `experiments/` (`e` to `k`):
+  - Mid-Air IMU-only drift: 485 m after 78 s in the median, 50 m after 36 s.
+  - Mid-Air gives the gyroscope around the map's axes. The attitude step goes on the left.
+  - Camera speed with a barometer fails on Mid-Air (37 and 161 percent error).
+  - ALTO end to end: camera only 472 m median error, about 30 m with a fix every 100 to 300 m.
+  - Fixes fail when the gap exceeds 300 m with a fixed search. A score threshold and a search sized by the uncertainty repair that.
+  - Keypoint matching fails on ALTO, brightness matching works.
+- `docs/data.md` (Alessandro) proposes the pretrained DenseUAV network for position fixes. Findings propose it as an optional upgrade.
+- Branch `simulations` (Dan): a Gazebo simulator in Docker, now with a world of two islands. Not merged into main.
 
 ## Open issues
 
-- The team has not confirmed the plan or assigned roles.
-- Position fixes: classical matching first, or DenseUAV from the start. To settle with Alessandro.
-- The simulator's role: demo view, integration test, or both.
-- No product code yet: no reader, no baseline, no camera speed, no filter.
-- The four data checks in the plan have not been run.
+- The team has not decided: stay or switch, the three results, the owners.
+- No product code: the experiments are single scripts, with no shared data format, no pipeline and no demo view.
+- ALTO results are tuned and reported on the same 4.6 km section. The training section (9.93 GB) would give a held-out test.
+- Turns are not handled on ALTO: the rotation is learned once and kept.
+- Research on how Raptor and VNS01 work at night was started on Friday at 22:35; add the result to `docs/landscape.md`.
 - `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
 - Mid-Air is licensed for non-commercial use.
 - The formulas in `docs/data.md` use `\[ ... \]`, which GitHub does not render.
@@ -35,4 +38,4 @@ Confirm the plan as a team, assign roles, and produce the IMU-only baseline plot
 
 ## Next exact step
 
-Dustin writes the IMU-only baseline for one Mid-Air flight in a notebook and plots it against the ground truth. In parallel: agree roles and the two open questions with Alessandro and Dan.
+After the team decision: rewrite `docs/PLAN.md` from section 6 of the findings, then turn `experiments/j_midair_imu_only.py` and `experiments/h_alto_end_to_end.py` into the shared pipeline.
