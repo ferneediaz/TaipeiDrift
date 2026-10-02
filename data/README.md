@@ -4,7 +4,7 @@ Datasets live in `data/raw/` and are not committed. Fetch them with `bash script
 
 ## Downloaded (Challenge 7, acoustic drone detection)
 
-About 1.8 GB in total.
+About 1.8 GB in total for the audio.
 
 ### Drone audio (`data/raw/drone_audio`, 803 MB)
 
@@ -30,6 +30,16 @@ About 1.8 GB in total.
 - Format: 44.1 kHz, two channels, 90 clips of 10 seconds, 30 each of `BACKGROUND`, `DRONE`, `HELICOPTER`, class in the file name
 - Licence: CC0
 - Use: keep this set out of training and use it as the final test. It comes from a different microphone and setting than the drone audio set above, so it shows whether the detector generalises. Helsing used this same data for its acoustic challenge at the London hackathon in May 2025.
+
+## Downloaded (Challenge 4, drone detection and tracking)
+
+### Drone, bird, airplane and helicopter video (`data/raw/drone_video`, 190 MB)
+
+- Source: https://github.com/DroneDetectionThesis/Drone-detection-dataset, `Data/Video_V` and `Data/Video_IR` (Svanström et al., 2021)
+- Format: 285 visible clips (640 by 512) and 365 infrared clips (320 by 256), 10 seconds each at 30 frames per second, class in the file name
+- Licence: CC0
+- Limit: the bounding-box labels (`*_LABELS.mat`) are MATLAB `groundTruth` objects that `scipy.io.loadmat` cannot decode. Use the class from the file name, or convert the boxes in MATLAB or Octave.
+- The visible and infrared clips are separate recordings, not synchronised pairs.
 
 ## Not downloaded
 

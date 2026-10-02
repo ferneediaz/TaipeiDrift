@@ -8,6 +8,7 @@ The challenge is not chosen yet. This repository currently holds the shared envi
 
 - [docs/challenge-decision.md](docs/challenge-decision.md): **start here**, the briefing for choosing our challenge, with links to data, tools and earlier entries
 - [docs/challenges.md](docs/challenges.md): the nine challenges, condensed
+- [docs/challenge-4-research.md](docs/challenge-4-research.md): existing products, limits and options for the drone detection challenge
 - [docs/plans.md](docs/plans.md): target user, demo script and weekend plan for each candidate challenge
 - [docs/playbook.md](docs/playbook.md): timeline, idea filter, demo script, slide skeleton and working rules
 - [data/README.md](data/README.md): datasets, formats and licences
@@ -19,7 +20,7 @@ Requires [uv](https://docs.astral.sh/uv/). On an Apple Silicon Mac, use the nati
 
 ```bash
 uv sync                      # creates .venv with Python 3.12 and all libraries
-bash scripts/fetch_data.sh   # downloads the audio datasets, about 1.8 GB
+bash scripts/fetch_data.sh   # downloads the audio datasets, about 2 GB
 source .venv/bin/activate
 ```
 

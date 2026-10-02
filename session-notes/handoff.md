@@ -16,9 +16,11 @@ Choose the challenge as a team of six, then start building.
 - Python 3.12 arm64 environment via uv (`pyproject.toml`, `uv.lock`). Imports verified, PyTorch MPS available, laptop microphone detected.
 - Audio datasets for Challenge 7 in `data/raw/`: drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB.
 
+- Research on Challenge 4 in `docs/challenge-4-research.md`; drone video set (190 MB) in `data/raw/drone_video`.
+
 ## Proposal on the table
 
-Challenge 2 (navigation without GPS) with the mentor's design: optical flow with altitude for speed, a sun compass for heading and cold start, map matching for position fixes. Gate on Friday 22:00. Fallback: Challenge 7 (acoustic drone detection), without Challenge 8 as a separate entry.
+Challenge 2 (navigation without GPS) with the mentor's design: optical flow with altitude for speed, a sun compass for heading and cold start, map matching for position fixes. Gate on Friday 22:00. Fallback: Challenge 7 (acoustic drone detection), without Challenge 8 as a separate entry. Challenge 4 is a third candidate after the research.
 
 ## Open issues
 

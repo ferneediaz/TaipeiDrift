@@ -217,6 +217,8 @@ High local relevance (vessels loitering over undersea cables), a mentor with mar
 
 ### Challenge 4: drone detection and tracking
 
+A fuller study of this challenge, with existing products, their limits and the situation in Taiwan, is in [challenge-4-research.md](challenge-4-research.md). It makes Challenge 4 a third serious candidate.
+
 - **What:** detect drones in video, keep a track, raise behaviour alerts, recommend simulated responses for an operator to accept or reject.
 - **Tools:** [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) for detection (AGPL licence), [ByteTrack](https://github.com/FoundationVision/ByteTrack) for tracking.
 - **Data:** [Anti-UAV](https://github.com/ucas-vg/Anti-UAV), the video part of the [Drone-detection-dataset](https://github.com/DroneDetectionThesis/Drone-detection-dataset), and the [EDTH starter repository](https://github.com/pgryko/visual-drone-detector-hackathon).
