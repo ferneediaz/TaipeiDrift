@@ -24,7 +24,13 @@ Choose the challenge as a team of six, then start building.
 
 ## Proposal on the table
 
-Challenge 2 (navigation without GPS) with the mentor's design: optical flow with altitude for speed, a sun compass for heading and cold start, map matching for position fixes. Gate on Friday 22:00. Fallback: Challenge 7 (acoustic drone detection), without Challenge 8 as a separate entry. Challenge 4 is a third candidate after the research.
+Challenge 2. Build three parts, all on open map data (see `docs/landscape.md`):
+
+1. A navigator: dead reckoning, a particle filter over position and wind, terrain fixes, camera fixes, sun compass for the cold start.
+2. An integrity check that tests every fix against the filter and reports when the estimate should not be trusted.
+3. A navigability map of Taiwan and the Strait showing expected position error along a route.
+
+The team has not confirmed this yet. Research scripts for the navigator's parts exist in `experiments/`.
 
 ## Open issues
 
