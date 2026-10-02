@@ -94,7 +94,7 @@ def _circle(t: np.ndarray) -> Motion:
         [-radius * rate**2 * c, -radius * rate**2 * s, np.full_like(t, -climb_accel)]
     )
     yaw = rate * t + np.pi / 2  # nose along the direction of travel
-    attitude = Rotation.from_euler("Z", yaw) * Rotation.from_euler("X", bank)
+    attitude = Rotation.from_euler("Z", yaw[:, None]) * Rotation.from_euler("X", bank)  # one angle per row: accepted by old and new scipy
     omega_world = np.tile([0.0, 0.0, rate], (len(t), 1))  # R = Rz(yaw(t)) * const
     return Motion(position, velocity, acceleration, attitude, attitude.inv().apply(omega_world))
 

@@ -79,6 +79,7 @@ class Trajectory:
     gyroscope: np.ndarray  # (N, 3) rad/s, body frame
     world_frame: str = "NED"
     gravity_world: np.ndarray = field(default_factory=lambda: gravity_vector("NED"))
+    gyroscope_frame: str = "body"  # "body": rates around the drone's axes. "world": around the world axes, as Mid-Air stores them
     name: str = ""
     gps: TimedObservations | None = None  # never read by the dead-reckoning baseline
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -147,7 +148,8 @@ def imu_consistency(traj: Trajectory) -> dict[str, float]:
     expected_f = r[1:-1].inv().apply(accel_world - traj.gravity_world)
     accel_res = np.linalg.norm(traj.accelerometer[1:-1] - expected_f, axis=1)
 
-    rel = (r[:-1].inv() * r[1:]).as_rotvec() / np.diff(t)[:, None]
+    step = r[1:] * r[:-1].inv() if traj.gyroscope_frame == "world" else r[:-1].inv() * r[1:]
+    rel = step.as_rotvec() / np.diff(t)[:, None]
     gyro_mid = 0.5 * (traj.gyroscope[:-1] + traj.gyroscope[1:])
     gyro_res = np.linalg.norm(gyro_mid - rel, axis=1)
     return {

@@ -33,6 +33,8 @@ Every loader converts its data to these ([src/data/trajectory.py](src/data/traje
 | Accelerometer | specific force in the body frame: f = Rᵀ(a − g). Level and still: (0, 0, −9.81) |
 | Gyroscope | body rate relative to the world, in the body frame, rad/s |
 
+Mid-Air is the exception for the gyroscope: its files store the turn rate around the world axes. The Mid-Air loader sets `gyroscope_frame = "world"`, and the estimator then applies the turn step on the left. With the body-frame rule, flight 0003 ends 3,758 m off instead of 247 m. The measurement behind this is in `docs/findings.md`, section 2.2, on `main`.
+
 Each run prints how well the IMU matches the ground truth. If the frame, the gravity sign or the quaternion order is wrong, the accelerometer mismatch is of the order of g, and the run warns.
 
 ## Layout

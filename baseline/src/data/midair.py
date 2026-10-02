@@ -222,6 +222,7 @@ def load_midair_trajectory(cfg: MidAirConfig, data_root: str | None = None) -> T
         gyroscope=gyro,
         world_frame=conv.world_frame.upper(),
         gravity_world=gravity_vector(conv.world_frame, conv.gravity),
+        gyroscope_frame="world",  # measured: see docs/findings.md, section 2.2
         name=f"midair_{cfg.environment}_{cfg.condition}_{cfg.trajectory}",
         gps=gps,
         metadata={

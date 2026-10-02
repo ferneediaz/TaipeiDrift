@@ -48,6 +48,7 @@ def propagate(
     gyroscope: np.ndarray,
     initial: NavState,
     gravity_world: np.ndarray,
+    gyroscope_frame: str = "body",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Integrate IMU samples from an initial state.
 
@@ -70,7 +71,8 @@ def propagate(
     r = quat_wxyz_to_rotation(initial.attitude)
     quats[0] = r.as_quat()
     for k in range(len(dt)):
-        r = r * increments[k]  # right-multiply: the increment is in the body frame
+        # body-frame rates: step on the right. World-frame rates (Mid-Air): step on the left.
+        r = increments[k] * r if gyroscope_frame == "world" else r * increments[k]
         quats[k + 1] = r.as_quat()
     attitude = Rotation.from_quat(quats)
 
@@ -98,6 +100,6 @@ def run_dead_reckoning(traj: Trajectory, gnss_cutoff: float) -> DeadReckoningRes
     )
     t = traj.timestamp[k0:]
     position, velocity, attitude = propagate(
-        t, traj.accelerometer[k0:], traj.gyroscope[k0:], initial, traj.gravity_world
+        t, traj.accelerometer[k0:], traj.gyroscope[k0:], initial, traj.gravity_world, traj.gyroscope_frame
     )
     return DeadReckoningResult(t, position, velocity, attitude, start_index=k0, t0=float(t[0]))
