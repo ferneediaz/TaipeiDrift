@@ -42,7 +42,11 @@ Written on Saturday at 01:00, right before the chat was compacted. Dustin wants 
 9. Then, if time is left: the status logic, degraded images (blur, darkness, haze), and the held-out test on the training section.
 10. Update `baseline/README.md`, the findings and the plan, then push.
 
-**The ALTO training section** was downloading at 00:47 as `data/raw/alto/Unconfirmed 150932.crdownload`. When the browser finishes, the file should be named `Train.zip` in that folder. `load_alto_flight(AltoConfig(section="Train"))` then reads it.
+**The build order** is in `docs/PLAN.md` under "Build order: a baseline first, then one step at a time". Tonight's goal is the baseline row of that table. Items 1 to 8 below are that baseline. The mentor's main advice governs the scope: pick one thing, do it really well, and name a next step for every limit.
+
+**The ALTO training section** was downloading at 00:47 as `data/raw/alto/Unconfirmed 150932.crdownload`. At 01:18 that file had 10.0 GB and still carried the temporary name. When the browser finishes, the file should be named `Train.zip` in that folder. `load_alto_flight(AltoConfig(section="Train"))` then reads it.
+
+**Read since the last note:** the ALTO paper in full and the IMU sections of the Mid-Air paper. The Mid-Air documentation says the gyroscope is in the Body frame; the data only fits as rates around the world axes (`docs/findings.md`, 2.2).
 
 **Working rules from Dustin:** pull, then commit, then push, and say what the pull brought in. No assistant attribution in commits. Plain language in documents, no "not X but Y" phrasing, no middle dots.
 
