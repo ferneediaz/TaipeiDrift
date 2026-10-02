@@ -14,7 +14,17 @@ Software that keeps a drone's position estimate usable after GNSS is jammed, fro
 
 The target, set with our mentor on Friday night: navigation for low-cost drones. A price of about 500 dollars is the orientation for that class and not a hard cap. Such a drone has a camera, an IMU and a barometer. Parts that cost as much as the drone itself do not fit it: a graphics processor, a thermal camera, a radar altimeter or licensed map data.
 
-The one thing we do well: position fixes from the camera the drone already has, against freely available aerial images, with a check that keeps a wrong fix from doing damage. Everything else on this page is either a baseline for that or a stated next step.
+The one thing we do well: position fixes from the camera the drone already has, against freely available aerial images, with a check that keeps a wrong fix from doing damage. Everything else on this page is either a baseline for that or a stated next step. This follows our mentor's main advice: pick one thing, do it really well, say what could be done in the future and what it would require, and tell one cohesive story.
+
+What doing it really well means, by Sunday:
+
+1. It is tested on data we did not tune on.
+2. Its failure is shown and handled: a wrong fix is demonstrated and rejected, and we report how often an accepted fix is wrong.
+3. It needs nothing extra: no calibration, no added sensor, and a measured computing cost.
+4. Its limits are measured: where darker and blurred pictures make it stop, and what it reports then.
+5. Anyone can reproduce it with one command, and one plot tells the result.
+
+What we leave out, so that the one thing gets done: camera speed on Mid-Air, the DenseUAV model, work on the simulator beyond what the demo needs, and any experiment of our own on the sun, radio or infrared ideas. Those ideas go on the next-steps slide.
 
 We are not building a drone. The assumed platform is an existing drone with:
 
@@ -209,7 +219,25 @@ Demo Day is Sunday 13:00. Code freeze is Sunday 10:00.
 | Sunday 10:00 | Code freeze | Demo branch tagged |
 | Sunday 10:00 to 13:00 | Rehearse three times, submit | Submission confirmed |
 
-If we fall behind, cut in this order: the simulator flight, the DenseUAV comparison, turns, the demo view. The IMU baseline on Mid-Air, camera dead reckoning with fixes on ALTO, the rejected wrong fix and the drift budget are the smallest complete entry.
+If we fall behind, we stop climbing the build order below. Every step leaves a system that runs from start to end and can be shown.
+
+### Build order: a baseline first, then one step at a time
+
+First the baseline, with the features we need at least. Then one addition at a time, and after each one the whole chain still runs.
+
+| Step | What is added | Done when |
+|---|---|---|
+| Baseline | Read the ALTO flight. Learn from GNSS before the jam. Dead reckoning by camera after it. Position fixes by matching, blended with the estimate. The check that rejects a fix with a low score or one that disagrees with the estimate. A plot of path and error, a summary of the numbers, one command, tests. The IMU baseline on Mid-Air exists already and is merged | The shared code reproduces the experiment: 472 m with the camera alone, about 30 m with a fix every 300 m |
+| 1 | A search that grows with the uncertainty, and a status: tracking, degraded, lost | Fixes 1,000 m apart are recovered, at a median near 56 m |
+| 2 | The test on the training section. No new feature | The numbers on data we did not tune on are in the findings |
+| 3 | Limits: darkened, blurred and hazy camera frames | A chart shows where fixes stop and what the status reports |
+| 4 | The numbers on wrong fixes: how often an accepted fix is wrong, how often a correct one is rejected | They are in the summary of every run |
+| 5 | The demo view: the flight replayed, with the jam and the rejected fix | It runs live and as a recorded video |
+| 6 | Turns, with a heading that changes | A section with a turn stays below 50 m |
+| 7 | The phone walk as second evidence | The loop closes within a few percent |
+| 8 | A flight in the simulator with all sensors | Optional |
+
+Steps 6 to 8 are the first to go.
 
 After tonight, no further datasets are considered.
 
@@ -250,15 +278,15 @@ The brief scores the user and product side. Role 6 collects it, everyone contrib
 
 ### The story for the slides
 
-One thing done well, then what comes next.
+One thing done well, then what comes next. The slides tell one story: a problem, one thing that solves part of it, the proof, and a named next step for every limit we show.
 
 1. The problem: jamming, and why the existing products do not fit a low-cost drone of around 500 dollars. Raptor needs a graphics processor and licensed 3D data. VNS01 is a dedicated unit that uses a radar altimeter where it cannot see.
 2. What such a drone has, and how fast its IMU alone drifts: 50 m after 36 seconds.
 3. Our one thing: fixes from the drone's own camera against free aerial images. On a real flight, 472 m of drift becomes about 30 m.
 4. Knowing when not to trust it: the wrong fix, the check that rejects it, and the rule for how far the drone can fly between fixes.
 5. What it costs: no extra sensor, no calibration, and one fix in a fraction of a second on one processor core.
-6. The limits, measured.
-7. The next steps, each with what it would require.
+6. The limits, measured: turns, open water and night.
+7. The next steps, one for each limit, each with what it would require: a heading from the sun for turns, a position from radio stations for water, an infrared or low-light camera for night.
 
 ### Next steps and what each would require
 
