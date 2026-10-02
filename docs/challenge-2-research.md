@@ -48,7 +48,7 @@ This is what makes the local problem different from Ukraine's. Over land, map ma
 
 ## Where a weekend entry can add something
 
-1. **A layered estimate with honest uncertainty.** Speed from optical flow, heading from a sun compass, position fixes from map matching, all combined in a Kalman filter that reports how sure it is. Show which layer carries the estimate in which conditions.
+1. **A layered estimate with honest uncertainty.** Speed from optical flow, heading from a sun compass, position fixes from map matching, all combined in a particle filter that reports how sure it is. Show which layer carries the estimate in which conditions.
 2. **A water-crossing scenario.** Take away map matching for a stretch, let the uncertainty grow, then recover at the coastline with one position fix. No fielded product solves this, and it is the Taiwanese case.
 3. **Cold start.** Find heading and a first position with no GPS at all, from the sun and one map match.
 4. **A map from a different date.** Use an older image as the on-board map and a newer one as the world the drone sees, so the result does not depend on matching an image against itself.
@@ -91,6 +91,36 @@ Five papers, one per building block. Selected from their abstracts; read the rel
 
 With code: the WildNav paper, "Vision-Based GNSS-Free Localization for UAVs in the Wild" ([repository](https://github.com/TIERS/wildnav)).
 
+## What the papers tell us
+
+Papers 1, 2 and 3 were read in full. Paper 5 was read through a partial extract. Paper 4 could not be opened from here (the sites block automated access), so open it in a browser before relying on it.
+
+### Findings
+
+- **Heading is the bottleneck.** In both Kinnari papers the filter starts with no heading information, first diverges, and needs about 2 km of flight to converge. The optical-flow paper reports that outdoor drift came mainly from compass errors. A sky compass at the start removes exactly this problem, which is what the mentor proposed.
+- **Expect tens of metres.** Paper 1 reports about 50 m RMS error after convergence and under 20 m over areas with roads, against 217 to 253 m for odometry alone over 4 to 6 km. Paper 2 reports 26.5, 29.1 and 30.6 m on three real flights after 2 km. Both used maps at 1 m per pixel from about 92 m altitude.
+- **The published method is a particle filter.** Both papers use Monte-Carlo localisation with 1000 particles over position, heading and a scale factor. Map matching is ambiguous (neighbouring fields and road junctions look alike), and a filter that tracks many hypotheses survives that where a single estimate gets lost.
+- **Featureless stretches are handled by falling back.** Paper 2 describes a flight over a lake: the matching score stays flat, all nearby particles keep similar weight, and the estimate relies on odometry until distinct ground returns.
+- **Our simulation plan is a published protocol.** Paper 2 runs 100 simulated flights with one aerial image as the map and another image of the same area, from a different date, as what the drone sees. It adds noise of 2 m per 100 m step in position and 1 degree in heading. Paper 1 simulates its inertial data from the true path plus noise.
+- **Simple matching works when the two images look similar.** Paper 1 compares twelve classical measures and finds two that separate right from wrong positions best (Moravec and zero-normalised cross-correlation). Paper 2 shows these fail under winter against summer and that a trained network does better. Our two images differ in crops and colour, with no snow, which is the milder case.
+- **Optical flow gives metric speed with one formula.** Speed equals image flow times distance to the ground divided by focal length, after subtracting the rotation measured by a gyroscope. The sensor runs at 250 Hz on a microcontroller, draws 0.575 W and measures 45 by 35 mm. Integrated over a 28 m indoor loop it closed to within 0.25 m.
+- **Its range sensor does not reach flight altitude.** The sensor uses ultrasound, which works for a few metres. At 100 m a laser rangefinder or a barometer with a terrain model is needed, and any height error becomes a speed error of the same percentage. The scale factor in the particle filter absorbs this.
+- **Matching is cheap enough.** Paper 2 needs 0.33 s plus 0.13 s per update for 1000 particles on a laptop, with one update every 100 m of flight.
+- **The review does not cover sky compasses.** In the extract I could read, celestial and polarisation navigation are not mentioned, and finding the initial position is listed as an open challenge.
+
+### Consequences for our design
+
+1. Use a particle filter over position, heading and scale, as in papers 1 and 2. It is also simpler to write than a Kalman filter.
+2. Match by template at 1 m per pixel with zero-normalised cross-correlation. With heading known from the sky compass, no rotation search is needed, which cuts the compute.
+3. Copy the simulation protocol and noise values of paper 2 and cite it.
+4. Make the headline experiment the one the papers leave open: distance to convergence and error with and without a sky-compass heading.
+5. Second experiment: a stretch with matching switched off, showing error growth and recovery.
+6. Promise tens of metres, and compare against dead reckoning drifting to hundreds.
+
+### What this means for originality
+
+Map matching with odometry in a particle filter is established work from 2021 and 2022, funded by Saab. The fallback over featureless ground is described there in one paragraph. What we would add is the sky-compass heading for cold start and cheaper matching, measured, and a quantified long stretch without fixes, on Taiwanese imagery.
+
 ## Earlier entries
 
 - Rome, third place: a visual positioning kit that matches camera images against Earth-observation maps. The team is developing it commercially ([recap](https://eurodefense.tech/back-in-rome-recap-of-our-second-european-defense-tech-hackathon-in-italy/)).
@@ -103,7 +133,7 @@ Map matching on its own has therefore been shown at these events already. The la
 1. Flight simulator: frames, altitude, true path and sensor noise from the 2020 image
 2. Optical flow: speed over ground from the frames
 3. Sun compass and cold start: heading from time and sun direction
-4. Kalman filter: combine the sources and report uncertainty
+4. Particle filter: combine the sources over position, heading and scale, and report uncertainty
 5. Map matching: position fixes against the 2018 image
 6. Visualisation, evaluation, hardware concept and pitch
 

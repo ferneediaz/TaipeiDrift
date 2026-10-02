@@ -59,7 +59,7 @@ Estimate a vehicle's position when satellite positioning is jammed. Build a simp
 - **Speed from the camera (optical flow):** a camera pointing down sees the ground slide across the image. How fast it slides, multiplied by the height above ground, gives the speed over ground.
 - **Heading from the sun:** with the time known, the sun's direction gives a heading that cannot be jammed. This also solves the cold start, which is knowing which way we face before any movement.
 - **Position fixes from a map:** match the camera view against an aerial image stored on board to get an absolute position from time to time.
-- **A Kalman filter to combine them:** it keeps a position estimate and a measure of its own uncertainty, and weights each new measurement by how reliable it is.
+- **A particle filter to combine them:** it keeps a thousand guesses of position and heading, moves each with the measured speed, and keeps the guesses whose camera view fits the map. The spread of the guesses is the uncertainty. This is the method used in the published work on this problem.
 
 The optical-flow and sun-compass ideas came from a mentor who works on GNSS security.
 
