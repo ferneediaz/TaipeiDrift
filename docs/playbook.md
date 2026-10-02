@@ -38,7 +38,7 @@ Gate at 14:00: if the core method does not beat the baseline yet, switch to the 
 
 Before writing code, answer these in writing. If one answer is weak, change the idea or narrow it.
 
-1. Is it feasible by Sunday 12:00 with the people at this table?
+1. Is it feasible by Sunday 10:00 with the people at this table?
 2. Is it more than the obvious solution every team will build?
 3. Does it solve a real problem for a named user?
 4. Can the demo show one input turning into one visible result?
