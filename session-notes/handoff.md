@@ -31,7 +31,7 @@ The team stays with Challenge 2 (decided Friday night). Next: confirm the three 
 ## Open issues
 
 - Owners of the three results are not agreed.
-- Mentor feedback from Friday night is in `docs/PLAN.md`: the target is a drone under 500 dollars, one thing done well, and a phone walk as a second demo. The phone walk has no owner and has not been tried.
+- Mentor feedback from Friday night is in `docs/PLAN.md`: the target is low-cost drones, with about 500 dollars as an orientation and not a hard cap, one thing done well, and a phone walk as a second demo. The phone walk has no owner and has not been tried.
 - Results 2 and 3 exist only as experiment scripts, with no shared data format, no pipeline and no demo view.
 - ALTO results are tuned and reported on the same 4.6 km section. The training section (9.93 GB) would give a held-out test. Not downloaded.
 - Turns are not handled on ALTO: the rotation is learned once and kept.

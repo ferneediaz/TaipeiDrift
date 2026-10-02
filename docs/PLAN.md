@@ -12,7 +12,7 @@ Challenge 2, navigation without GNSS.
 
 Software that keeps a drone's position estimate usable after GNSS is jammed, from the sensors the drone already carries. It also says how long the estimate can be trusted and flags when it cannot.
 
-The target, set with our mentor on Friday night: navigation for a drone that costs less than 500 dollars. Such a drone has a camera, an IMU and a barometer. It cannot carry a graphics processor, a thermal camera or a radar altimeter, and it cannot pay for licensed map data.
+The target, set with our mentor on Friday night: navigation for low-cost drones. A price of about 500 dollars is the orientation for that class and not a hard cap. Such a drone has a camera, an IMU and a barometer. Parts that cost as much as the drone itself do not fit it: a graphics processor, a thermal camera, a radar altimeter or licensed map data.
 
 The one thing we do well: position fixes from the camera the drone already has, against freely available aerial images, with a check that keeps a wrong fix from doing damage. Everything else on this page is either a baseline for that or a stated next step.
 
@@ -245,7 +245,7 @@ The brief scores the user and product side. Role 6 collects it, everyone contrib
 
 One thing done well, then what comes next.
 
-1. The problem: jamming, and why the existing products do not fit a 500-dollar drone. Raptor needs a graphics processor and licensed 3D data. VNS01 is a dedicated unit that uses a radar altimeter where it cannot see.
+1. The problem: jamming, and why the existing products do not fit a low-cost drone of around 500 dollars. Raptor needs a graphics processor and licensed 3D data. VNS01 is a dedicated unit that uses a radar altimeter where it cannot see.
 2. What such a drone has, and how fast its IMU alone drifts: 50 m after 36 seconds.
 3. Our one thing: fixes from the drone's own camera against free aerial images. On a real flight, 472 m of drift becomes about 30 m.
 4. Knowing when not to trust it: the wrong fix, the check that rejects it, and the rule for how far the drone can fly between fixes.
@@ -379,7 +379,7 @@ Notes from the team's conversation with our mentor, and what we do with each.
 
 | Note | What we do with it |
 |---|---|
-| The use case: make navigation fit for drones under 500 dollars | It is now the target at the top of this page |
+| The use case: make navigation fit for drones under 500 dollars | It is the target at the top of this page. We take the price as an orientation for the class of drone and not as a hard cap |
 | Pick one thing, do it really well, say what could be done in the future and what it would require. One cohesive story in the slides | The one thing is camera fixes with the integrity check. The story is in "The story for the slides" |
 | Find the position with the sun: a line sensor and a microcontroller, as in a Chinese paper. The sun is the cheapest way. Use an infrared lens | A next step, in the table above. The sun gives a good heading and a rough position |
 | At night the moon and the stars are still there | A next step, in the table above |
