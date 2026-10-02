@@ -257,6 +257,10 @@ longest gap between fixes = size of the search / drift per metre flown
 
 **The first drift budget.** Camera dead reckoning with no fix is off by 27 m after 300 m, 62 m after 500 m, 193 m after 1,000 m and 465 m after 2,000 m. The drift grows faster than the distance because scale and direction go stale.
 
+**Where that drift comes from.** At the end of the section the error is 575 m along the route and 198 m across it. The first comes from a scale that has become 13 percent too small, the second from a direction that is 3 degrees off. A heading reference, such as a sun sensor, would remove only the second part.
+
+**What a fix costs.** One fix with 105 comparisons takes 285 ms on one processor core of a laptop. With the images shrunk to 250 pixels it takes 69 ms, and at 125 pixels 20 ms. The fix error on four test frames is the same at all three sizes, 4 to 15 m. A drone needs a fix every few seconds at most, which leaves a wide margin for a small board. It has not been run on one.
+
 All 14 runs together take 78 seconds on a laptop.
 
 ### 3.5 An idea that did not hold up
@@ -341,5 +345,6 @@ Run from the repository root after `uv sync`. The data has to be in `data/raw/` 
 | `experiments/i_alto_zoom_check.py` | Score at right and wrong places, zoom against height | 3.2, 3.5 | 50 s |
 | `experiments/k_alto_camera_speed.py` | Camera speed on ALTO and how fast the scale goes stale | 3.3 | 20 s |
 | `experiments/h_alto_end_to_end.py` | The full chain on ALTO, with figure | 3.4 | 90 s |
+| `experiments/l_alto_cost_and_drift.py` | Computing time of one fix at three image sizes, and the sources of camera-only drift | 3.4 | 10 s |
 
 `e` takes the path of another sensor file as its argument, for example the foggy one. `i` fetches a small piece of the Copernicus elevation model on its first run.

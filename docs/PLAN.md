@@ -12,6 +12,10 @@ Challenge 2, navigation without GNSS.
 
 Software that keeps a drone's position estimate usable after GNSS is jammed, from the sensors the drone already carries. It also says how long the estimate can be trusted and flags when it cannot.
 
+The target, set with our mentor on Friday night: navigation for a drone that costs less than 500 dollars. Such a drone has a camera, an IMU and a barometer. It cannot carry a graphics processor, a thermal camera or a radar altimeter, and it cannot pay for licensed map data.
+
+The one thing we do well: position fixes from the camera the drone already has, against freely available aerial images, with a check that keeps a wrong fix from doing damage. Everything else on this page is either a baseline for that or a stated next step.
+
 We are not building a drone. The assumed platform is an existing drone with:
 
 - a camera pointing down
@@ -147,7 +151,7 @@ The paper matches against a map that covers an area. The ALTO sample has referen
 - Flights: settings are tuned on some data and reported on other data. On Mid-Air report the median over the 30 sunny flights. On ALTO tune on the validation section and report on the training section.
 - Flight length: a Mid-Air flight lasts about 88 seconds, so every drift curve on Mid-Air ends there.
 - Noise sweep: more IMU noise on Mid-Air, and blurred, darkened and hazy camera frames on ALTO. Show where the method breaks.
-- Computing: milliseconds per camera frame and per fix on a plain CPU, and what board that implies. Measured so far: image motion takes 9 ms per frame on a laptop. Fixes are not yet timed on their own.
+- Computing: milliseconds per camera frame and per fix on a plain CPU, and what board that implies. Measured on one processor core of a laptop: image motion takes 9 ms per frame, and one fix takes 285 ms at 500 pixels, 69 ms at 250 pixels and 20 ms at 125 pixels, with the same fix error on four test frames. Not yet measured on a small board.
 
 ## How the parts connect
 
@@ -215,6 +219,17 @@ After tonight, no further datasets are considered.
 6. The drift budget: how far the drone can fly between fixes before the search can no longer recover.
 7. One slide: the sensors assumed, what the system learns from GNSS before the jam, and what is not covered.
 
+### A second demo on real, cheap sensors: the phone walk
+
+Proposed by our mentor. A phone has the same class of sensors as a cheap drone. Nobody has tried this yet.
+
+- Walk a loop of 150 to 300 m on textured ground in daylight, with the phone held flat at chest height and the camera pointing straight down. Measure the holding height with a tape. That height is the distance to the ground, and it stays constant, which is what camera speed needs.
+- Record video at a high bitrate with the stabilisation switched off and with exposure and focus locked, at 60 frames per second if possible. Stabilisation shifts the picture and falsifies the image motion. Log GNSS, IMU and barometer at the same time, and tap the phone once at the start so that both recordings can be lined up.
+- Walk the loop twice. The first pass, with GNSS, is the reference. The second pass is the test: GNSS is used for the first 30 m and then ignored.
+- What it shows: camera dead reckoning on real hardware, with the scale learned from GNSS. With the first pass as stored reference images, it can also show position fixes.
+- How it is scored: the walk ends where it started, so the gap between the estimated start and end is an exact error. Phone GNSS is only good to about 3 to 5 m, which is too coarse to score a walk of 200 m.
+- What to expect: a height held to within 5 cm of 1.3 m gives a speed error of about 4 percent from the height alone. Tilt and the bounce of walking come on top.
+
 ## What the pitch has to contain
 
 The brief scores the user and product side. Role 6 collects it, everyone contributes.
@@ -225,6 +240,30 @@ The brief scores the user and product side. Role 6 collects it, everyone contrib
 - Deployment: how it would run on an existing autopilot, and what a real test would require.
 - Evidence on real data: camera dead reckoning and position fixes on the ALTO helicopter images. A phone also has a camera, an IMU, a barometer and GNSS, so a two-minute walk with the camera pointing down gives a real recording for the same method.
 - Where we stand against existing products: Raptor and VNS01 use the same building blocks. Say this openly. Our angle is that it works with openly available reference images and without calibration, and that we state measured limits.
+
+### The story for the slides
+
+One thing done well, then what comes next.
+
+1. The problem: jamming, and why the existing products do not fit a 500-dollar drone. Raptor needs a graphics processor and licensed 3D data. VNS01 is a dedicated unit that uses a radar altimeter where it cannot see.
+2. What such a drone has, and how fast its IMU alone drifts: 50 m after 36 seconds.
+3. Our one thing: fixes from the drone's own camera against free aerial images. On a real flight, 472 m of drift becomes about 30 m.
+4. Knowing when not to trust it: the wrong fix, the check that rejects it, and the rule for how far the drone can fly between fixes.
+5. What it costs: no extra sensor, no calibration, and one fix in a fraction of a second on one processor core.
+6. The limits, measured.
+7. The next steps, each with what it would require.
+
+### Next steps and what each would require
+
+Ideas from our mentor for the gaps we do not close this weekend.
+
+| Gap | Idea | What it gives | What it would require |
+|---|---|---|---|
+| Heading in turns, and a start without GNSS | A sun sensor: a line sensor behind a slit, read by a microcontroller. An infrared filter makes the sun stand out through haze | An absolute heading, which is what our chain lacks in turns. A position only roughly: 1 degree of error in the vertical is 111 km on the ground | The sensor for a few dollars, the time of day, and the tilt from the IMU |
+| Night | The moon and the stars | A heading from the moon in the same way. Light for the camera only with a more sensitive or an infrared sensor | Moon tables, another image sensor |
+| Open water | Signals of opportunity: radio and TV transmitters with known positions. BAE Systems calls its version NAVSOP | A position where there is no ground to look at | A software radio receiver, a table of transmitter positions, and signal processing we have not built |
+
+On our straight test section the direction is the smaller part of the camera-only drift. At the end, the error is 575 m along the route, from the scale, and 198 m across it, from the direction. A heading reference matters most in turns.
 
 ## What we claim and what we do not
 
@@ -329,8 +368,24 @@ Conditions that trouble a drone navigating with a downward camera, an IMU and a 
 - What is the simulator for: the demo view, a test that all parts work together in one flight, or both? It does not replace Mid-Air and ALTO as evidence.
 - Do we download the ALTO training section (9.93 GB) for the held-out test?
 - Answered: existing products do not work at night with an ordinary camera. Raptor uses an infrared camera, and VNS01 falls back on a radar altimeter. Details and sources are in [landscape.md](landscape.md).
-- Which second input did the mentor name for the cold start, besides the position of the sun? He has not seen this version of the plan.
+- Answered: besides the sun, the mentor named radio signals of opportunity for finding the position. See "Mentor feedback" below.
+- What did the mentor mean by "lightex technology", and which paper on a line sensor for the sun did he refer to?
+- Who records the phone walk, and with which phone and app?
 - How long is the demo slot, what are the judging weights, and what is the submission format?
+
+## Mentor feedback, Friday night
+
+Notes from the team's conversation with our mentor, and what we do with each.
+
+| Note | What we do with it |
+|---|---|
+| The use case: make navigation fit for drones under 500 dollars | It is now the target at the top of this page |
+| Pick one thing, do it really well, say what could be done in the future and what it would require. One cohesive story in the slides | The one thing is camera fixes with the integrity check. The story is in "The story for the slides" |
+| Find the position with the sun: a line sensor and a microcontroller, as in a Chinese paper. The sun is the cheapest way. Use an infrared lens | A next step, in the table above. The sun gives a good heading and a rough position |
+| At night the moon and the stars are still there | A next step, in the table above |
+| Over open water: NAVSOP. Radio stations ("ADS signal") or TV stations for calculating the position | A next step, in the table above. "ADS" may be RDS, the station identifier in FM radio, or ADS-B, the position broadcast of aircraft |
+| Demo: simulate optical flow by walking outside the campus with a phone, recording without compression. Can we get the phone's altitude, and how precise would it be? | The phone walk in the demo section. The altitude that matters is the holding height, measured with a tape |
+| "lightex technology" | Not understood. Ask him |
 
 ## Mentors on site
 
