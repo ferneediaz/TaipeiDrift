@@ -1,0 +1,321 @@
+<?xml version="1.0"?>
+<!--
+  Mid-Air-like quadcopter.
+
+  Mid-Air (Fonder and Van Droogenbroeck, CVPRW 2019) flew AirSim's default quadcopter.
+  Its left camera, down camera, IMU and GPS receiver sit at one point on the body X-axis,
+  about 0.5 m ahead of the centre (paper Fig. 3); that point is the body-frame origin.
+  Here the model frame is that point (sensor_link), and the airframe (base_link) sits 0.5 m behind it.
+
+  Airframe numbers follow AirSim's default quad: 1 kg, arm 0.2275 m, body box 0.18 x 0.11 x 0.04 m,
+  max thrust about 4.2 N per rotor. Motor and controller plugins follow Gazebo's X3 example.
+
+  Sensors (only what our assumed platform carries):
+    camera_down  1024 x 1024, 90 deg FOV, 25 Hz, pinhole, no distortion, no noise (as Mid-Air)
+    imu          100 Hz, noise-free here; sim/nodes/sensor_noise.py adds the Mid-Air noise model
+    air_pressure 50 Hz Gazebo Air Pressure sensor (the barometer), white noise here; the node adds slow drift
+    navsat       1 Hz (as Mid-Air); removed by the launch file when gps:=false
+  Resolution and GPS are overridden by sim/launch/sim.launch.py.
+-->
+<sdf version="1.10">
+  <model name="midair_quad" canonical_link="base_link">
+
+    <link name="base_link">
+      <pose>-0.5 0 0 0 0 0</pose>
+      <inertial>
+        <mass>0.97</mass>
+        <!-- body box plus four 55 g motors at the arm tips, as AirSim computes it -->
+        <inertia><ixx>0.0066</ixx><iyy>0.0079</iyy><izz>0.0143</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="body">
+        <geometry><box><size>0.18 0.11 0.04</size></box></geometry>
+        <material><ambient>0.2 0.2 0.25 1</ambient><diffuse>0.2 0.2 0.25 1</diffuse></material>
+      </visual>
+      <visual name="arm_a">
+        <pose>0 0 0.01 0 0 0.7854</pose>
+        <geometry><box><size>0.455 0.02 0.01</size></box></geometry>
+        <material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      </visual>
+      <visual name="arm_b">
+        <pose>0 0 0.01 0 0 -0.7854</pose>
+        <geometry><box><size>0.455 0.02 0.01</size></box></geometry>
+        <material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      </visual>
+      <visual name="boom">
+        <pose>0.25 0 0 0 0 0</pose>
+        <geometry><box><size>0.5 0.015 0.015</size></box></geometry>
+        <material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      </visual>
+      <collision name="body">
+        <geometry><box><size>0.36 0.36 0.06</size></box></geometry>
+      </collision>
+    </link>
+
+    <link name="sensor_link">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia><ixx>1e-06</ixx><iyy>1e-06</iyy><izz>1e-06</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="pod">
+        <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <material><ambient>0.1 0.4 0.9 1</ambient><diffuse>0.1 0.4 0.9 1</diffuse></material>
+      </visual>
+      <collision name="pod">
+        <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+      </collision>
+
+      <sensor name="camera_down" type="camera">
+        <!-- pitch +90 deg: the optical axis (+X) points down, image top points forward -->
+        <pose>0 0 0 0 1.5708 0</pose>
+        <always_on>true</always_on>
+        <update_rate>25</update_rate>
+        <visualize>true</visualize>
+        <topic>camera/down/image_raw</topic>
+        <gz_frame_id>camera_down</gz_frame_id>
+        <camera>
+          <horizontal_fov>1.5708</horizontal_fov>
+          <image><width>1024</width><height>1024</height><format>R8G8B8</format></image>
+          <clip><near>0.1</near><far>3000</far></clip>
+        </camera>
+      </sensor>
+
+      <sensor name="imu" type="imu">
+        <always_on>true</always_on>
+        <update_rate>100</update_rate>
+        <topic>sim/imu_raw</topic>
+        <gz_frame_id>sensor_link</gz_frame_id>
+      </sensor>
+
+      <sensor name="air_pressure" type="air_pressure">
+        <always_on>true</always_on>
+        <update_rate>50</update_rate>
+        <topic>sim/air_pressure_raw</topic>
+        <gz_frame_id>sensor_link</gz_frame_id>
+        <air_pressure>
+          <reference_altitude>0</reference_altitude>
+          <pressure>
+            <!-- about 0.8 m of altitude noise, typical for an MS5611-class MEMS barometer -->
+            <noise type="gaussian"><mean>0</mean><stddev>10</stddev></noise>
+          </pressure>
+        </air_pressure>
+      </sensor>
+
+      <sensor name="navsat" type="navsat">
+        <always_on>true</always_on>
+        <update_rate>1</update_rate>
+        <topic>sim/navsat_raw</topic>
+        <gz_frame_id>sensor_link</gz_frame_id>
+        <navsat>
+          <position_sensing>
+            <!-- Gazebo applies horizontal noise to latitude and longitude in DEGREES:
+                 1.4e-5 deg is about 1.5 m. Vertical noise is in metres. -->
+            <horizontal><noise type="gaussian"><mean>0</mean><stddev>1.4e-5</stddev></noise></horizontal>
+            <vertical><noise type="gaussian"><mean>0</mean><stddev>3.0</stddev></noise></vertical>
+          </position_sensing>
+        </navsat>
+      </sensor>
+    </link>
+
+    <joint name="sensor_mount" type="fixed">
+      <parent>base_link</parent>
+      <child>sensor_link</child>
+    </joint>
+
+    <link name="rotor_0">
+      <pose>-0.3391 -0.1609 0.03 0 0 0</pose>
+      <inertial>
+        <mass>0.005</mass>
+        <inertia><ixx>9.75e-07</ixx><iyy>2.17e-05</iyy><izz>2.17e-05</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry><cylinder><radius>0.114</radius><length>0.005</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 0.6</ambient><diffuse>0.1 0.1 0.1 0.6</diffuse></material>
+        <transparency>0.4</transparency>
+      </visual>
+    </link>
+    <joint name="rotor_0_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_0</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e16</lower><upper>1e16</upper></limit>
+      </axis>
+    </joint>
+    <link name="rotor_1">
+      <pose>-0.6609 0.1609 0.03 0 0 0</pose>
+      <inertial>
+        <mass>0.005</mass>
+        <inertia><ixx>9.75e-07</ixx><iyy>2.17e-05</iyy><izz>2.17e-05</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry><cylinder><radius>0.114</radius><length>0.005</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 0.6</ambient><diffuse>0.1 0.1 0.1 0.6</diffuse></material>
+        <transparency>0.4</transparency>
+      </visual>
+    </link>
+    <joint name="rotor_1_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_1</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e16</lower><upper>1e16</upper></limit>
+      </axis>
+    </joint>
+    <link name="rotor_2">
+      <pose>-0.3391 0.1609 0.03 0 0 0</pose>
+      <inertial>
+        <mass>0.005</mass>
+        <inertia><ixx>9.75e-07</ixx><iyy>2.17e-05</iyy><izz>2.17e-05</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry><cylinder><radius>0.114</radius><length>0.005</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 0.6</ambient><diffuse>0.1 0.1 0.1 0.6</diffuse></material>
+        <transparency>0.4</transparency>
+      </visual>
+    </link>
+    <joint name="rotor_2_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_2</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e16</lower><upper>1e16</upper></limit>
+      </axis>
+    </joint>
+    <link name="rotor_3">
+      <pose>-0.6609 -0.1609 0.03 0 0 0</pose>
+      <inertial>
+        <mass>0.005</mass>
+        <inertia><ixx>9.75e-07</ixx><iyy>2.17e-05</iyy><izz>2.17e-05</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry><cylinder><radius>0.114</radius><length>0.005</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 0.6</ambient><diffuse>0.1 0.1 0.1 0.6</diffuse></material>
+        <transparency>0.4</transparency>
+      </visual>
+    </link>
+    <joint name="rotor_3_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_3</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e16</lower><upper>1e16</upper></limit>
+      </axis>
+    </joint>
+
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>midair_quad</robotNamespace>
+      <jointName>rotor_0_joint</jointName>
+      <linkName>rotor_0</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>700.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>0</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>midair_quad</robotNamespace>
+      <jointName>rotor_1_joint</jointName>
+      <linkName>rotor_1</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>700.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>1</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>midair_quad</robotNamespace>
+      <jointName>rotor_2_joint</jointName>
+      <linkName>rotor_2</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>700.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>2</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>midair_quad</robotNamespace>
+      <jointName>rotor_3_joint</jointName>
+      <linkName>rotor_3</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>700.0</maxRotVelocity>
+      <motorConstant>8.54858e-06</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>3</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <plugin filename="gz-sim-multicopter-control-system" name="gz::sim::systems::MulticopterVelocityControl">
+      <robotNamespace>midair_quad</robotNamespace>
+      <commandSubTopic>gazebo/command/twist</commandSubTopic>
+      <enableSubTopic>enable</enableSubTopic>
+      <comLinkName>base_link</comLinkName>
+      <velocityGain>2.7 2.7 2.7</velocityGain>
+      <attitudeGain>2 3 0.15</attitudeGain>
+      <angularRateGain>0.4 0.52 0.18</angularRateGain>
+      <maximumLinearAcceleration>2 2 2</maximumLinearAcceleration>
+      <rotorConfiguration>
+        <rotor>
+          <jointName>rotor_0_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>1</direction>
+        </rotor>
+        <rotor>
+          <jointName>rotor_1_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>1</direction>
+        </rotor>
+        <rotor>
+          <jointName>rotor_2_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>-1</direction>
+        </rotor>
+        <rotor>
+          <jointName>rotor_3_joint</jointName>
+          <forceConstant>8.54858e-06</forceConstant>
+          <momentConstant>0.016</momentConstant>
+          <direction>-1</direction>
+        </rotor>
+      </rotorConfiguration>
+    </plugin>
+
+    <!-- Ground truth: pose and twist of the model frame (= sensor_link, the IMU origin) at 100 Hz -->
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>world</odom_frame>
+      <robot_base_frame>sensor_link</robot_base_frame>
+      <odom_publish_frequency>100</odom_publish_frequency>
+      <dimensions>3</dimensions>
+      <odom_topic>ground_truth/odom</odom_topic>
+    </plugin>
+  </model>
+</sdf>

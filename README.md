@@ -14,6 +14,7 @@ We are working on Challenge 2, navigation without GNSS. The plan is proposed and
 - [docs/playbook.md](docs/playbook.md): working rules, slide skeleton and submission checklist
 - [data/README.md](data/README.md): datasets and licences
 - [research/](research/): the two key papers as PDF
+- [sim/README.md](sim/README.md): ROS 2 + Gazebo simulator with a Mid-Air-like drone (camera, IMU, barometer, GPS)
 - [session-notes/handoff.md](session-notes/handoff.md): current state and next step
 
 ## Setup
