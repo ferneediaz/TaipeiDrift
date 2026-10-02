@@ -20,6 +20,8 @@ Choose the challenge as a team of six, then start building.
 - Research on Challenge 6 in `docs/challenge-6-research.md`.
 - Research on Challenge 4 in `docs/challenge-4-research.md`; drone video set (190 MB) in `data/raw/drone_video`.
 
+- First experiments in `experiments/` with results in `docs/experiments.md`: camera fixes, terrain matching and a water crossing, on real elevation and imagery.
+
 ## Proposal on the table
 
 Challenge 2 (navigation without GPS) with the mentor's design: optical flow with altitude for speed, a sun compass for heading and cold start, map matching for position fixes. Gate on Friday 22:00. Fallback: Challenge 7 (acoustic drone detection), without Challenge 8 as a separate entry. Challenge 4 is a third candidate after the research.
