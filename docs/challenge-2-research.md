@@ -79,6 +79,18 @@ Ideas 1, 2 and 4 form one coherent entry. Ideas 3 and 5 are short additions.
 - A sun-position library such as `astral` or `pvlib` for the sun compass (to be added)
 - [WildNav](https://github.com/TIERS/wildnav) as a reference implementation. Check the licence of the matcher it depends on before reusing code.
 
+## Reading list
+
+Five papers, one per building block. Selected from their abstracts; read the relevant one before building your part.
+
+1. **Map matching and cold start.** Kinnari, Verdoja, Kyrki (2021), "GNSS-denied geolocalization of UAVs by visual matching of onboard camera images with orthophotos", ICAR 2021. [arXiv](https://arxiv.org/abs/2103.14381). Locates a drone from inertial data, one camera and an aerial map, using a particle filter that starts from a rough guess. Closest to our overall design.
+2. **Maps from a different season.** Kinnari, Verdoja, Kyrki (2022), "Season-invariant GNSS-denied visual localization for UAVs", IEEE Robotics and Automation Letters. [arXiv](https://arxiv.org/abs/2110.01967). Matching camera images to a map taken in another season. Directly relevant to using the 2018 image as the map for a 2020 flight.
+3. **Speed from optical flow.** Honegger, Meier, Tanskanen, Pollefeys (2013), "An open source and open hardware embedded metric optical flow CMOS camera for indoor and outdoor applications", ICRA 2013. [Semantic Scholar](https://www.semanticscholar.org/paper/An-open-source-and-open-hardware-embedded-metric-Honegger-Meier/579e2e12c1e46e8636206eb5028ecf04bf5c205c). The PX4-Flow sensor: optical flow scaled by distance to the ground and corrected for rotation with a gyroscope. This is the method the mentor described, on real hardware.
+4. **Heading from the sky.** Dupeyroux, Viollet, Serres (2019), "Polarized skylight-based heading measurements: a bio-inspired approach", Journal of the Royal Society Interface. [open access](https://pmc.ncbi.nlm.nih.gov/articles/PMC6364636/). A two-pixel sensor modelled on desert ants that reads heading from the polarisation of the sky. Shows how cheap a sky compass can be.
+5. **Overview and limits.** "GNSS-denied unmanned aerial vehicle navigation: analyzing computational complexity, sensor fusion, and localization methodologies" (2025), Satellite Navigation. [Springer](https://link.springer.com/article/10.1186/s43020-025-00162-z). A review of methods, their computing cost and where they fail. Useful for the pitch and the limits slide.
+
+With code: the WildNav paper, "Vision-Based GNSS-Free Localization for UAVs in the Wild" ([repository](https://github.com/TIERS/wildnav)).
+
 ## Earlier entries
 
 - Rome, third place: a visual positioning kit that matches camera images against Earth-observation maps. The team is developing it commercially ([recap](https://eurodefense.tech/back-in-rome-recap-of-our-second-european-defense-tech-hackathon-in-italy/)).
