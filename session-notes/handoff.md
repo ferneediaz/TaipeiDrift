@@ -16,6 +16,8 @@ Arrive at kickoff with a working environment, data on disk and a shortlist, then
 - Evidence from earlier EDTH hackathons added to `docs/pitches.md`. Timeline corrected to Demo Day on Sunday 13:00.
 - Repository initialised and pushed to github.com/dwn97/DefenseHackathon (private).
 
+- Team decision briefing in `docs/challenge-decision.md` (all nine challenges, links, roles, risks). Its mentor table must be removed before the repository goes public.
+
 ## Files changed
 
 - `README.md`, `pyproject.toml`, `uv.lock`, `.gitignore`
@@ -25,7 +27,7 @@ Arrive at kickoff with a working environment, data on disk and a shortlist, then
 
 ## Open issues
 
-- Challenge not chosen. Depends on the team formed at kickoff. Current lean: Challenge 7 with 8, Challenge 2 if a filter-experienced teammate joins.
+- Challenge not chosen. Team of six formed. Proposal: Challenge 2 with a gate on Friday 22:00, Challenge 7 as fallback.
 - Venue unclear: Nangang District (EDTH page) or National Taiwan University (tdth.org). Check the acceptance email.
 - Unknown whether pre-written code is allowed, so no product code exists.
 - No navigation dataset for Challenge 2. The organisers suggest one; ask for it.

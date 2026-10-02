@@ -6,6 +6,7 @@ The challenge is not chosen yet. This repository currently holds the shared envi
 
 ## Contents
 
+- [docs/challenge-decision.md](docs/challenge-decision.md): **start here**, the briefing for choosing our challenge, with links to data, tools and earlier entries
 - [docs/challenges.md](docs/challenges.md): the nine challenges, condensed
 - [docs/pitches.md](docs/pitches.md): the three candidates, with demo, approach, roles and plan
 - [docs/kickoff.md](docs/kickoff.md): questions for the organisers and a team-forming checklist
