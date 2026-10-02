@@ -1,46 +1,58 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 00:20.
+Last updated: Saturday 3 October 2026, 00:55.
 
 ## Current objective
 
-The team stays with Challenge 2 (decided Friday night). Next: confirm the three results in `docs/PLAN.md` and their owners, then move the experiments into shared code.
+The team stays with Challenge 2 (decided Friday night). Saturday morning: agree roles, merge the open branches, record the phone walk, and move the ALTO experiment into shared code.
 
 ## State
 
-- Challenge 2, navigation without GNSS. Team of six, team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private).
-- We build software, not a drone. Assumed platform: an existing drone with a downward camera, an IMU and a barometer.
-- `docs/findings.md` holds everything measured on Friday night. `docs/PLAN.md` was rewritten at 22:55 to match it: three results, each with dataset, state and "done when". Owners are open.
+- Challenge 2, navigation without GNSS. Team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private). Six members have write access: dwn97, alessandrodipiano, ferneediaz (Dan), IlhanTech, FelixZukunft, rychardsandreireyes-rgb. The last two have not pushed anything yet.
+- We build software, not a drone. Target, set with the mentor: low-cost drones, with about 500 dollars as an orientation and not a hard cap. The one thing: position fixes from the drone's own camera against free aerial images, with a check that rejects a wrong fix.
+- `docs/PLAN.md` is the plan (three results, roles, timeline, slide story, next steps, mentor feedback). `docs/findings.md` holds every measurement. `docs/landscape.md` holds the research on Raptor and VNS01.
 - Data is on Dustin's laptop under `data/raw/` (not committed). `data/README.md` says how to get it.
-  - Mid-Air: sensor records of every flight in every condition, and the downward camera for 21 flights. All 38 archives are complete and pass the integrity test (9.8 GB).
-  - ALTO: the validation section of the competition sample.
-- Measured so far, all as experiment scripts in `experiments/` (`e` to `k`):
+  - Mid-Air: all 38 archives, complete and verified (9.8 GB).
+  - ALTO: the validation section (1.73 GB). The training section (9.93 GB) is not downloaded.
+- Experiments on `main`, scripts `e` to `m` in `experiments/`. Headline numbers:
   - Mid-Air IMU-only drift: 485 m after 78 s in the median, 50 m after 36 s.
-  - Mid-Air gives the gyroscope around the map's axes. The attitude step goes on the left.
-  - Camera speed with a barometer fails on Mid-Air (37 and 161 percent error).
-  - ALTO end to end: camera only 472 m median error, about 30 m with a fix every 100 to 300 m.
-  - Fixes fail when the gap exceeds 300 m with a fixed search. A score threshold and a search sized by the uncertainty repair that.
-  - Keypoint matching fails on ALTO, brightness matching works.
-- Branches on GitHub besides `main`:
-  - `mid-air-baseline` (Alessandro, 22:06): product code for the IMU-only baseline. Uses the textbook gyroscope rule, which is wrong on Mid-Air.
-  - `mid-air-baseline-fix` (pushed 23:00): the same plus one commit with the gyroscope rule, a scipy fix for the synthetic circle and three tests. 53 tests pass. Median error 491 m on the 30 sunny flights, in line with the experiment script. Not yet merged anywhere.
-  - `simulations` (Dan): a Gazebo simulator in Docker, now with a world of two islands. Not merged into main.
-  - `docs/denseuav-critical-review` (Ilhan, 22:46): a review of the DenseUAV idea with a proposal for verified fixes.
-- `docs/data.md` (Alessandro) proposes the pretrained DenseUAV network for position fixes. The plan lists it as an optional upgrade.
+  - ALTO end to end: camera only 472 m median error, 26 to 31 m with a fix every 100 to 300 m.
+  - One fix costs 285 ms on one laptop core, 20 ms at 125 pixels, with the same fix error.
+
+## Branches on GitHub
+
+| Branch | Owner | Content | State |
+|---|---|---|---|
+| `mid-air-baseline` | Alessandro | Package `baseline/`: Mid-Air loader, IMU dead reckoning, metrics, plots, 50 tests | Uses the textbook gyroscope rule, which is wrong on Mid-Air |
+| `mid-air-baseline-fix` | pushed from Dustin's laptop | The same plus one commit: gyroscope rule, scipy fix, 3 tests | 53 tests pass. Median 491 m on the 30 sunny flights. Waiting for Alessandro to confirm |
+| `simulations` | Dan | Gazebo in Docker, drone with camera, IMU, barometer, GNSS; worlds `terrain` and `islands` | Pull request 1 is open, without description or review. No recording or export code yet |
+| `docs/denseuav-critical-review` | Ilhan | A review of the DenseUAV idea with a proposal for verified fixes | One document, 547 lines |
+
+Merge test on Saturday 00:35: each branch merges into `main` cleanly. Merged one after the other, the only conflict is in `.gitignore` (the baseline and the simulator both add lines at the end). After merging all three, 53 tests pass.
+
+## Notes for building on the team's code
+
+- The baseline's `Trajectory` type requires accelerometer, gyroscope and attitude for every sample. ALTO has none of these, so the ALTO loader needs its own type or the fields have to become optional. The metrics only need a timestamp and a position, so they can be reused.
+- The baseline imports its code as `src.*` with `baseline/` on the path. New code for ALTO fits next to it: `src/data/alto.py`, `src/estimation/`, `src/evaluation/`.
+- The simulator publishes `/imu/data`, `/air_pressure`, `/gps/fix`, `/ground_truth/odom` and `/camera/down/image_raw`. Its IMU is in the drone's own axes. The image has rosbag with mcap storage installed, but nothing records yet. Its frames are East, North, Up.
+- The simulator's gyroscope noise bounds are below what Mid-Air contains (median 0.014 to 0.021 rad/s per sample).
+- Ilhan's review specifies states (ACQUIRING, TRACKING, DEGRADED, LOST), rejection reasons and metrics. It proposes SIFT keypoints as the verifier; on ALTO keypoints fail and brightness matching works (`docs/findings.md`, 3.2).
+- ALTO orientation: x forward, y right, z down. The camera frame needs a rotation of 90 degrees minus the heading (`experiments/m_alto_orientation.py`).
 
 ## Open issues
 
-- Owners of the three results are not agreed.
-- Mentor feedback from Friday night is in `docs/PLAN.md`: the target is low-cost drones, with about 500 dollars as an orientation and not a hard cap, one thing done well, and a phone walk as a second demo. The phone walk has no owner and has not been tried.
-- Results 2 and 3 exist only as experiment scripts, with no shared data format, no pipeline and no demo view.
-- ALTO results are tuned and reported on the same 4.6 km section. The training section (9.93 GB) would give a held-out test. Not downloaded.
-- Turns are not handled on ALTO: the rotation is learned once and kept.
-- Research on how Raptor and VNS01 work, including at night, is done and written into `docs/landscape.md`.
+- Roles are not assigned. Targets for the integrity check are not agreed.
+- Results 2 and 3 exist only as experiment scripts.
+- ALTO results are tuned and reported on the same 4.6 km section. The training section has to be downloaded in a browser.
+- Turns are not handled on ALTO.
+- The phone walk has no owner. It needs daylight.
+- Nothing has been timed on a small board.
+- "lightex technology" from the mentor is not understood.
 - `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
 - Mid-Air is licensed for non-commercial use.
-- The formulas in `docs/data.md` use `\[ ... \]`, which GitHub does not render.
+- The formulas in `docs/data.md` and in the review use `\[ ... \]`, which GitHub does not render.
 - The native uv is at `~/.local/bin/uv` on Dustin's laptop; the `uv` on the shell path is still the Intel build.
 
 ## Next exact step
 
-Alessandro checks out `mid-air-baseline-fix` and confirms it runs for him. Then the team fills the roles table in `docs/PLAN.md`, and `experiments/h_alto_end_to_end.py` is turned into shared code for result 2.
+Saturday morning, in this order: Alessandro confirms `mid-air-baseline-fix`; merge the three branches into `main`; the team fills the roles table; then `experiments/h_alto_end_to_end.py` is turned into shared code for result 2.
