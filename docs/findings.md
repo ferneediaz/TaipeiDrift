@@ -36,7 +36,7 @@ The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 
 
 | Dataset | What it is | On disk | What it lacks |
 |---|---|---|---|
-| Mid-Air | Synthetic drone flights, low over hilly terrain | Sensor records of every flight in every condition (0.8 GB). Downward camera for 21 flights (about 9 GB, download finishing) | Barometer, distance to the ground, any map |
+| Mid-Air | Synthetic drone flights, low over hilly terrain | Sensor records of every flight in every condition (0.8 GB). Downward camera for 21 flights (about 9 GB). All 38 archives arrived and pass the integrity test | Barometer, distance to the ground, any map |
 | ALTO validation section | A real helicopter flight over rural Ohio, August 2017 | 1,684 camera frames and 459 reference images with coordinates (1.73 GB) | Raw IMU, height above ground |
 | Our simulator (branch `simulations`) | Gazebo in Docker, a drone with camera, IMU, barometer and GNSS | Runs on a MacBook according to its README. A second world with two islands was added at 22:19 | The GNSS cut, recorded flights, export in our format |
 

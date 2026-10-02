@@ -12,7 +12,7 @@ The team stays with Challenge 2 (decided Friday night). Next: confirm the three 
 - We build software, not a drone. Assumed platform: an existing drone with a downward camera, an IMU and a barometer.
 - `docs/findings.md` holds everything measured on Friday night. `docs/PLAN.md` was rewritten at 22:55 to match it: three results, each with dataset, state and "done when". Owners are open.
 - Data is on Dustin's laptop under `data/raw/` (not committed). `data/README.md` says how to get it.
-  - Mid-Air: sensor records of every flight in every condition, and the downward camera for 21 flights (download was at 32 of 38 files at 22:48).
+  - Mid-Air: sensor records of every flight in every condition, and the downward camera for 21 flights. All 38 archives are complete and pass the integrity test (9.8 GB).
   - ALTO: the validation section of the competition sample.
 - Measured so far, all as experiment scripts in `experiments/` (`e` to `k`):
   - Mid-Air IMU-only drift: 485 m after 78 s in the median, 50 m after 36 s.
