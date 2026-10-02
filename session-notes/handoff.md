@@ -34,7 +34,7 @@ The team stays with Challenge 2 (decided Friday night). Next: confirm the three 
 - Results 2 and 3 exist only as experiment scripts, with no shared data format, no pipeline and no demo view.
 - ALTO results are tuned and reported on the same 4.6 km section. The training section (9.93 GB) would give a held-out test. Not downloaded.
 - Turns are not handled on ALTO: the rotation is learned once and kept.
-- Research on how Raptor and VNS01 work at night was started on Friday at 22:35; add the result to `docs/landscape.md`.
+- Research on how Raptor and VNS01 work, including at night, is done and written into `docs/landscape.md`.
 - `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
 - Mid-Air is licensed for non-commercial use.
 - The formulas in `docs/data.md` use `\[ ... \]`, which GitHub does not render.

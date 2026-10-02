@@ -328,7 +328,7 @@ Conditions that trouble a drone navigating with a downward camera, an IMU and a 
 - Position fixes: do we agree on brightness matching first and DenseUAV as an upgrade? [data.md](data.md) proposes DenseUAV from the start.
 - What is the simulator for: the demo view, a test that all parts work together in one flight, or both? It does not replace Mid-Air and ALTO as evidence.
 - Do we download the ALTO training section (9.93 GB) for the held-out test?
-- How do existing products work at night? Research on Raptor and VNS01 is under way.
+- Answered: existing products do not work at night with an ordinary camera. Raptor uses an infrared camera, and VNS01 falls back on a radar altimeter. Details and sources are in [landscape.md](landscape.md).
 - Which second input did the mentor name for the cold start, besides the position of the sun? He has not seen this version of the plan.
 - How long is the demo slot, what are the judging weights, and what is the submission format?
 
