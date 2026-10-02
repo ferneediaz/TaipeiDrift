@@ -1,41 +1,33 @@
 # Handoff
 
-Last updated: Friday 2 October 2026, afternoon, after the opening.
+Last updated: Friday 2 October 2026, evening.
 
 ## Current objective
 
-Choose the challenge as a team of six, then start building.
+Confirm the plan as a team and start building.
 
-## Completed
+## State
 
-- Team of six formed, team name Taipei Drift. Repository renamed to github.com/dwn97/TaipeiDrift (private), collaborators invited.
-- Decision briefing for the team in `docs/challenge-decision.md`: all nine challenges with data, tools, earlier entries, roles and risks.
-- Demo scripts and weekend plans for Challenges 2, 7, 3 and 6 in `docs/plans.md`.
-- Timeline, idea filter, slide skeleton and working rules in `docs/playbook.md`. Code freeze Sunday 10:00, Demo Day 13:00.
-- Condensed briefs of all nine challenges in `docs/challenges.md`.
-- Python 3.12 arm64 environment via uv (`pyproject.toml`, `uv.lock`). Imports verified, PyTorch MPS available, laptop microphone detected.
-- Audio datasets for Challenge 7 in `data/raw/`: drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB.
+- Challenge 2, navigation without GNSS. Team of six, team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private).
+- The single plan is `docs/PLAN.md`: a navigator, an integrity check and a navigability map, all on open map data, with roles, shared conventions, timeline, gates and demo script. Not yet confirmed by the team.
+- Research: `docs/landscape.md` (existing products and gaps), `docs/challenge-2-research.md` (papers, data, reading list), `research/` (two papers as PDF).
+- Experiments on real Taiwan data in `experiments/`, results in `docs/experiments.md`. They contain working first versions of the particle filter with wind, terrain matching and camera matching.
+- Data: two aerial images of Wufeng, Taichung (`scripts/fetch_aerial.py`) and an elevation strip at 24.05 N (fetched by the terrain experiment).
+- Environment: Python 3.12 via uv. Audio and deep-learning libraries were removed when the challenge was fixed.
 
-- Research on Challenge 2 in `docs/challenge-2-research.md`; two aerial images of one Taichung site (2018, 2020) fetched by `scripts/fetch_aerial.py` and checked: they line up and cover a corridor about 3 km long.
-- Research on Challenge 6 in `docs/challenge-6-research.md`.
-- Research on Challenge 4 in `docs/challenge-4-research.md`; drone video set (190 MB) in `data/raw/drone_video`.
+## Removed on Friday evening
 
-- First experiments in `experiments/` with results in `docs/experiments.md`: camera fixes, terrain matching and a water crossing, on real elevation and imagery.
-
-## Plan
-
-The single plan is `docs/PLAN.md`: Challenge 2, with a navigator, an integrity check and a navigability map, all on open map data. It has roles, shared conventions, a timeline with gates and the demo script. The team has not confirmed it yet. Research scripts for the navigator's parts exist in `experiments/`.
+Docs for the challenges not chosen (decision briefing, Challenge 4 and 6 research, per-challenge plans, the nine condensed briefs) and the audio and video fetch script. They remain in the git history. The audio and video datasets are still on Dustin's laptop under `data/raw/` and can be deleted.
 
 ## Open issues
 
-- The team has not confirmed the plan yet.
-- The second item the mentor named for the cold start, besides the position of the sun, is not known. Ask him again.
-- Challenge 2 data: aerial images are available; the flight simulator over them is not built. The organiser dataset has not been seen.
-- No stereo microphone for direction finding in Challenge 7. Ask whether one can be borrowed.
-- Dataset licences need a check with the organisers (see `data/README.md`).
-- The mentor table in `docs/challenge-decision.md` must be removed before the repository is made public. `docs/challenges.md` paraphrases the members-only challenge page.
+- The team has not confirmed the plan or assigned roles.
+- Product code is not started. The code structure for six people still has to be set up.
+- The second input the mentor named for the cold start is unknown.
+- No real flight data. A 360-degree camera or phone recording would add it.
+- `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
 - The native uv is at `~/.local/bin/uv` on Dustin's laptop; the `uv` on the shell path is still the Intel build.
-- No project-specific CLAUDE.md yet. Write one once the challenge is fixed.
+- No project-specific CLAUDE.md yet.
 
 ## Next exact step
 

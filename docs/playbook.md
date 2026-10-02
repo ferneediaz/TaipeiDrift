@@ -1,45 +1,6 @@
-# Weekend playbook
+# Working rules and templates
 
-A plan that works for whichever challenge the team picks. The hackathon runs Friday 12:00 to Sunday 17:00. According to the official site (tdth.org), doors open Friday at 12:00, the opening is at 14:00, and Demo Day starts Sunday at 13:00 after arrival at 08:30. Confirm these times and the submission deadline with the organisers.
-
-## Timeline
-
-### Friday
-
-| Time | What | Done when |
-|---|---|---|
-| 12:00 to 14:00 | Doors open, questions to the organisers, team forming | Team of six, challenge and fallback agreed |
-| 14:00 to 17:00 | Opening, then idea filter, demo script, roles, setup | Demo script written, every laptop runs the environment |
-| 17:00 to 22:00 | Thinnest end-to-end version | Real input goes in, something shows on screen, however crude |
-
-Gate at 22:00: if nothing runs end to end, cut scope before going to sleep.
-
-### Saturday
-
-| Time | What | Done when |
-|---|---|---|
-| 09:00 to 13:00 | Core method working on real data | First honest number against the baseline |
-| 13:00 to 14:00 | Mentor round | Shown to at least two mentors, feedback written down |
-| 14:00 to 19:00 | Experiments, failure cases, demo interface | The demo script runs start to finish |
-| 19:00 to 22:00 | Record a fallback demo video, draft the slides | Video file saved, slide skeleton filled |
-
-Gate at 14:00: if the core method does not beat the baseline yet, switch to the simplest version that does and spend the afternoon on evaluation and the demo.
-
-### Sunday
-
-| Time | What | Done when |
-|---|---|---|
-| 08:30 to 10:00 | Bug fixes only, slides, README | Nothing new is being built |
-| 10:00 | Code freeze | Demo branch tagged, nobody edits it |
-| 10:00 to 13:00 | Rehearse three times with a timer, submit | Submission confirmed |
-| 13:00 to 17:00 | Demo Day | |
-
-## First hour after choosing
-
-- Each teammate runs the setup in the [README](../README.md) and the data script.
-- Write the decision and the owner of each part into the README.
-- Run the idea filter below and write the demo script, starting from [plans.md](plans.md).
-- Fix shared conventions in writing: units, coordinate frames, file formats, branch names.
+Idea filter, demo script template, slide skeleton, working rules and submission checklist. What we build and the timeline are in [PLAN.md](PLAN.md).
 
 ## Idea filter
 

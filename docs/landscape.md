@@ -52,6 +52,8 @@ Research on Friday evening, after the first experiments in [experiments.md](expe
 
 ## What we should build
 
+This proposal became the plan in [PLAN.md](PLAN.md), which adds roles, timeline and demo.
+
 One navigator and one planning view, both on open data.
 
 ### 1. The navigator (meets every required deliverable)

@@ -129,10 +129,24 @@ Do not claim: better accuracy than existing products, a solved crossing of the w
 - Did the organisers hand out the suggested dataset?
 - How long is the demo slot, and what is the submission format?
 
+## Mentors on site
+
+From the participant page. Remove this section before the repository is made public.
+
+| Mentor | Field | Most useful for |
+|---|---|---|
+| Milosch Meriac, CTO at [Bitqan Systems Design](https://bitqan.ae/about.html) | GNSS security, RF localisation, signal processing, acoustics, embedded hardware | The navigation design, sensor hardware and cost |
+| MC (@minmax) | Sensor data and systems integration, maritime | Sensor fusion, the maritime side |
+| Wenteng Chang | Multi-UAV task allocation, replanning, human-in-the-loop, demo and pitch | Operator workflow, pitch structure |
+| Oleksandr Kulyniak | Current warfare challenges | Reality check for any idea |
+| Caine Cortellino | Test scenarios based on battlefield conditions, government contracting | Failure scenarios, deployment slide |
+| Yen Chang | RC planes | What a small aircraft can carry |
+| Paruyr Abrahamyan | Defence industry, sales pitch | Pitch rehearsal |
+
 ## Background
 
+- [brief.md](brief.md): what the challenge asks for
 - [landscape.md](landscape.md): existing products and their limits
 - [experiments.md](experiments.md): our first measurements on real data
 - [challenge-2-research.md](challenge-2-research.md): papers, data sources, reading list
 - [playbook.md](playbook.md): working rules, slide skeleton, submission checklist
-- [challenge-decision.md](challenge-decision.md): how the challenges compared

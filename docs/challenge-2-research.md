@@ -1,6 +1,6 @@
 # Challenge 2 in depth: navigation without GPS
 
-Research on what already exists for navigation when satellite positioning is jammed, where it falls short, and what a team of six could add in a weekend. Read [challenge-decision.md](challenge-decision.md) first for the comparison with the other challenges.
+Research on what already exists for navigation when satellite positioning is jammed, where it falls short, and what a team of six could add in a weekend. The plan that came out of it is in [PLAN.md](PLAN.md).
 
 ## Short version
 
@@ -74,7 +74,7 @@ Ideas 1, 2 and 4 form one coherent entry. Ideas 3 and 5 are short additions.
 
 - OpenCV for optical flow and for feature matching (installed)
 - [LightGlue](https://github.com/cvg/LightGlue), a modern image matcher with an Apache-2.0 licence, if plain feature matching is not robust enough across the two dates
-- [filterpy](https://github.com/rlabbe/filterpy) for the Kalman filter (installed), and the free book [Kalman and Bayesian Filters in Python](https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python)
+- A particle filter in plain numpy; working first versions are in `experiments/`
 - rasterio for reading large aerial images (installed)
 - A sun-position library such as `astral` or `pvlib` for the sun compass (to be added)
 - [WildNav](https://github.com/TIERS/wildnav) as a reference implementation. Check the licence of the matcher it depends on before reusing code.
@@ -128,24 +128,6 @@ Map matching with odometry in a particle filter is established work from 2021 an
 
 Map matching on its own has therefore been shown at these events already. The layered estimate and the water crossing are what would be new.
 
-## Six roles
-
-1. Flight simulator: frames, altitude, true path and sensor noise from the 2020 image
-2. Optical flow: speed over ground from the frames
-3. Sun compass and cold start: heading from time and sun direction
-4. Particle filter: combine the sources over position, heading and scale, and report uncertainty
-5. Map matching: position fixes against the 2018 image
-6. Visualisation, evaluation, hardware concept and pitch
-
-## Demo
-
-1. A map shows the true path and the dead-reckoning estimate drifting away.
-2. Camera speed and sun heading are switched on. The drift slows.
-3. Map matching is switched on. The estimate snaps back to the true path at each fix.
-4. The drone crosses a stretch with no usable features. The uncertainty ellipse grows, then collapses at the first fix on the far side.
-5. One chart: position error over time for all three configurations, with one headline number.
-6. One slide: sensor package, compute and cost per drone.
-
 ## Risks
 
 - This option has the most parts. If the simulator is late, everything waits. Build it first.
@@ -157,16 +139,3 @@ Map matching on its own has therefore been shown at these events already. The la
 ## Open question for the mentor
 
 He named the position of the sun and one more input for the cold start. Candidates are an accurate clock, the polarisation pattern of the sky, a magnetometer, or a single map match. Ask which he meant.
-
-## How it compares with Challenges 7 and 4
-
-| | Challenge 2 | Challenge 7 | Challenge 4 |
-|---|---|---|---|
-| Data today | Ready: two aerial images, simulation needed | Ready | Ready at clip level |
-| Local relevance | High: interference reported, water crossing | Medium | Highest: cancelled contract |
-| Fielded products | Yes, on land | Yes | Yes |
-| Gap we can show | Layered estimate, water crossing | Quiet contacts, evidence | Bird rejection by movement |
-| Record at earlier events | Placed | First and second place | First place, most entries |
-| Competition expected | Low | Medium | High |
-| Mentor match | Strong | Strong | Partial |
-| Main risk | Many parts | Routine without the extras | Detector quality |

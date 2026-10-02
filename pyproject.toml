@@ -4,29 +4,16 @@ version = "0.1.0"
 description = "Taiwan Defense Tech Hackathon 2026 (EDTH x NTU), 2-4 Oct 2026"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    # shared numerics, analysis, plotting
     "numpy",
     "scipy",
     "pandas",
     "matplotlib",
-    "scikit-learn",
-    "jupyterlab",
-    "ipykernel",
-    # challenge 2: state estimation, camera and map imagery
-    "filterpy",
-    "pyproj",
     "opencv-python",
     "rasterio",
-    # challenge 7: audio
-    "librosa",
-    "soundfile",
-    "sounddevice",
-    # challenge 7 + 8: models and edge deployment
-    "torch",
-    "torchaudio",
-    "onnx",
-    "onnxruntime",
-    # challenge 3: simulator API
+    "pyproj",
+    "jupyterlab",
+    "ipykernel",
+    # demo view
     "fastapi",
     "uvicorn[standard]",
     "pydantic>=2",
