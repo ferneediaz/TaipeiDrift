@@ -162,6 +162,8 @@ What follows: on Mid-Air, camera speed needs another source of scale, which is t
 - 459 reference images from an aerial survey years earlier, one every 10 m along the flown route. Each covers 301 m at 0.60 m per pixel, with north at the top.
 - For every camera frame: true position, altitude and orientation. The altitude is 376 to 455 m above the Earth model. The ground along the route is at 250 to 323 m according to the open Copernicus elevation model, so the helicopter is very roughly 100 to 200 m above the ground. The two heights use different zero levels, and we have not corrected for that.
 - The camera frames are rotated by about 10 to 20 degrees against the reference images, show a little less ground, and are strongly green and overexposed.
+- The orientation values describe the aircraft with x forward, y to the right and z down. The heading is 76 degrees in the median, 4 degrees off the course because of wind. The top of the camera frame is the aircraft's left side, so the frame has to be turned by 90 degrees minus the heading, here 14 degrees, to put north at the top. That agrees with the rotation found by matching.
+- The camera looks 2.3 degrees away from straight down in the median, and up to 6.9 degrees. At this height 2.3 degrees move the centre of the picture by about 7 m on the ground.
 - The reference images form a strip along the route. There is no map of the area to the sides.
 
 ### 3.2 Matching a camera frame against the reference images
@@ -346,5 +348,6 @@ Run from the repository root after `uv sync`. The data has to be in `data/raw/` 
 | `experiments/k_alto_camera_speed.py` | Camera speed on ALTO and how fast the scale goes stale | 3.3 | 20 s |
 | `experiments/h_alto_end_to_end.py` | The full chain on ALTO, with figure | 3.4 | 90 s |
 | `experiments/l_alto_cost_and_drift.py` | Computing time of one fix at three image sizes, and the sources of camera-only drift | 3.4 | 10 s |
+| `experiments/m_alto_orientation.py` | What the orientation values in ALTO mean: heading, and how far the camera looks away from straight down | 3.1 | 5 s |
 
 `e` takes the path of another sensor file as its argument, for example the foggy one. `i` fetches a small piece of the Copernicus elevation model on its first run.

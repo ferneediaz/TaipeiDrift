@@ -140,7 +140,7 @@ The paper matches against a map that covers an area. The ALTO sample has referen
 | Scale: does a barometer give the scale for camera speed on Mid-Air? | Done. No: 37 and 161 percent speed error on two flights |
 | ALTO matching: does classical matching find the right place? | Done. Keypoints fail. Brightness matching puts 21 of 24 frames within 20 m |
 | Held-out test: do the ALTO results hold on the training section? | Open |
-| Heading: how fast does a heading from the gyroscope drift? | Open. Needed for turns |
+| Heading for turns on ALTO | Partly done. The orientation in the data gives the heading, and the camera frame has to be turned by 90 degrees minus the heading, which matches the rotation found by matching. Open: how fast a heading from a gyroscope drifts, since a real drone has no perfect heading |
 | Route memory across seasons on Mid-Air | Dropped. ALTO replaced its purpose |
 
 ## How we measure
@@ -190,6 +190,10 @@ Write names here once agreed. Each person owns one part and can explain it alone
 
 Work that exists already: the baseline code (Alessandro), the simulator (Dan), a review of the DenseUAV idea (Ilhan), and the experiment scripts for results 2 and 3 in `experiments/`.
 
+The review on branch `docs/denseuav-critical-review` already specifies most of role 4: the states ACQUIRING, TRACKING, DEGRADED and LOST, explicit reasons for rejecting a fix, and the metrics to report. Its targets, such as 95 percent of accepted fixes within 10 m, are stricter than what we measure today (a median of 14 m), so the team has to agree on targets.
+
+The team has six members with write access to the repository. Two of them have not pushed anything yet.
+
 ## Timeline
 
 Demo Day is Sunday 13:00. Code freeze is Sunday 10:00.
@@ -197,7 +201,7 @@ Demo Day is Sunday 13:00. Code freeze is Sunday 10:00.
 | When | What | Gate |
 |---|---|---|
 | Friday night | Done: data downloaded and checked, IMU-only drift measured, the ALTO chain run as an experiment, decision to stay with the challenge | Met: the plot of IMU-only drift exists, and ALTO is decided |
-| Saturday 09:00 to 13:00 | Agree roles. Merge the baseline. Move camera dead reckoning and fixes from the experiment into shared code. Download the ALTO training section and run the held-out test | The correction beats the baseline in a plot made by the shared code, on data we did not tune on. The brief's minimum is met |
+| Saturday 09:00 to 13:00 | Agree roles. Merge the three open branches into `main` first: the baseline fix, the review, then the simulator (they merge cleanly, except for one trivial conflict in `.gitignore`). Record the phone walk while there is daylight. Move camera dead reckoning and fixes from the experiment into shared code. Download the ALTO training section and run the held-out test | The correction beats the baseline in a plot made by the shared code, on data we did not tune on. The brief's minimum is met |
 | Saturday 13:00 to 14:00 | Show mentors, write down what they say | |
 | Saturday 14:00 to 19:00 | Integrity check and status, degraded images, drift budget, turns, noise sweep, timing. Simulator: GNSS cut and recording | A fix after too long a gap is shown and rejected. The drift budget chart exists |
 | Saturday 19:00 to 22:00 | Demo view, fallback video, slide draft | Video file saved |
@@ -229,6 +233,9 @@ Proposed by our mentor. A phone has the same class of sensors as a cheap drone. 
 - What it shows: camera dead reckoning on real hardware, with the scale learned from GNSS. With the first pass as stored reference images, it can also show position fixes.
 - How it is scored: the walk ends where it started, so the gap between the estimated start and end is an exact error. Phone GNSS is only good to about 3 to 5 m, which is too coarse to score a walk of 200 m.
 - What to expect: a height held to within 5 cm of 1.3 m gives a speed error of about 4 percent from the height alone. Tilt and the bounce of walking come on top.
+- Apps: [Sensor Logger](https://www.tszheichoi.com/sensorlogger) records video, IMU, barometer and GNSS together and exports CSV, in its free version. If its video turns out stabilised or blurred, record the video with [Blackmagic Camera](https://www.blackmagicdesign.com/products/blackmagiccamera), which can switch stabilisation off and lock the shutter, and let Sensor Logger run in the background. Test for 30 seconds before the real walk.
+- Shutter: 1/1000 of a second or faster. At 1.3 m one pixel covers about 1 mm of ground, so a walking step during 1/60 of a second smears the picture over about 25 pixels.
+- The challenge brief names a smartphone recording as an allowed data source.
 
 ## What the pitch has to contain
 
@@ -266,6 +273,10 @@ Ideas from our mentor for the gaps we do not close this weekend.
 On our straight test section the direction is the smaller part of the camera-only drift. At the end, the error is 575 m along the route, from the scale, and 198 m across it, from the direction. A heading reference matters most in turns.
 
 On the sun sensor: the paper our mentor most likely meant is [Micro digital sun sensor with linear detector](https://doi.org/10.1063/1.4958696) by Fan, Peng and Gao, Beihang University, 2016. To be confirmed with him. A V-shaped slit sits above a single row of light-sensitive pixels, and a microcontroller reads the row. The sensor gives the direction to the sun to 0.1 degrees, 25 times per second, on 200 mW. It was built for small satellites and measures a direction, not a position. Two related papers: the same idea with an N-shaped slit, open access, from [Tsinghua University, 2011](https://doi.org/10.3390/s111009764), and a low-cost build with a photodiode row and a small microcontroller from [York University, 2013](https://onlinelibrary.wiley.com/doi/10.1155/2013/549080).
+
+On the sky as a compass: published sensors that read the sun or the polarisation of the sky report headings good to 0.1 to 0.2 degrees, and a commercial unit exists ([Inside GNSS](https://insidegnss.com/trust-the-sky-to-guide-you-home/), [SkyPASS](https://www.polarissensor.com/skypass/)).
+
+On radio as a position source: in a [published flight](https://www.gpsworld.com/lte-cellular-steers-uav-signals-of-opportunity-work-in-challenged-environments/) a drone kept its position within 4.7 m for 50 seconds without GPS, from the signals of five mobile-phone towers. It carried two research-grade radio receivers and needed the surveyed positions of the towers. FM radio is a weaker source for distance than mobile or TV signals, because its signal is narrow.
 
 On radio over water: by the usual rule for radio range, a drone at 100 m hears a mast on a 1,000 m mountain at up to about 170 km. The Taiwan Strait is 130 to 180 km wide. This is an estimate from the rule and not a measurement.
 
@@ -389,7 +400,7 @@ Notes from the team's conversation with our mentor, and what we do with each.
 | At night the moon and the stars are still there | A next step, in the table above |
 | Over open water: NAVSOP. Radio stations, identified by their RDS signal, or TV stations for calculating the position | A next step, in the table above |
 | Demo: simulate optical flow by walking outside the campus with a phone, recording without compression. Can we get the phone's altitude, and how precise would it be? | The phone walk in the demo section. The altitude that matters is the holding height, measured with a tape |
-| "lightex technology" | Not understood. Ask him |
+| "lightex technology" | Not understood. We found no company of that name. Two that sound similar and fit the topic: LITEF, a German maker of fibre-optic gyroscopes, and LightWare, a maker of small laser altimeters for drones. Ask him |
 
 ## Mentors on site
 
