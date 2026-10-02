@@ -50,7 +50,7 @@ Product code so far: branch `mid-air-baseline` holds a first IMU-only baseline f
 - A flight lasts 88 to 90 seconds. The 30 sunny flights cover 270 m to 1.5 km, 1.0 km in the median, at 3 to 17 m/s.
 - Within one flight the altitude changes by 14 to 242 m, 70 m in the median. The drone follows hilly terrain.
 - Per flight the sensor file holds the IMU at 100 Hz, a simulated GNSS at 1 Hz, the true position, speed, acceleration and attitude at 100 Hz, and the file names of the camera frames at 25 Hz.
-- There is no distance to the ground below. As far as we can tell, the depth images in the dataset belong to the forward camera.
+- There is no distance to the ground below. The depth images in the dataset belong to the forward camera, according to the Mid-Air specifications.
 
 ### 2.2 The gyroscope is given around the map's axes
 
@@ -79,7 +79,9 @@ The evidence: each signal compared with the change of the true attitude from one
 | Kite foggy | 30 | 0.070 | 0.001 | 0.077 | 0.020 |
 | PLE fall | 24 | 0.140 | 0.002 | 0.148 | 0.020 |
 
-Values are the typical difference in rad/s. The 0.02 that remains for the gyroscope in map axes is its noise. The accelerometer fits to 0.06 m/s² in the drone's axes and misses by more than 1 m/s² in map axes. We did not find the axes stated on the Mid-Air data organisation page.
+Values are the typical difference in rad/s. The 0.02 that remains for the gyroscope in map axes is its noise. The accelerometer fits to 0.06 m/s² in the drone's axes and misses by more than 1 m/s² in map axes.
+
+The documentation says otherwise. The [technical specifications](https://midair.ulg.ac.be/tech_specs.html) of Mid-Air state that the gyroscope and the true angular velocity are expressed in the Body frame. The files we downloaded do not behave that way: in all 84 flights we checked, they fit the attitude only as rates around the world axes. Code written from the documentation alone gives wrong results, which is what happened to the first version of our baseline.
 
 There are two consistent ways to handle this, and they do not give the same drift. Median over the 30 sunny flights, GNSS cut after 10 seconds:
 
@@ -164,6 +166,7 @@ What follows: on Mid-Air, camera speed needs another source of scale, which is t
 - The camera frames are rotated by about 10 to 20 degrees against the reference images, show a little less ground, and are strongly green and overexposed.
 - The orientation values describe the aircraft with x forward, y to the right and z down. The heading is 76 degrees in the median, 4 degrees off the course because of wind. The top of the camera frame is the aircraft's left side, so the frame has to be turned by 90 degrees minus the heading, here 14 degrees, to put north at the top. That agrees with the rotation found by matching.
 - The camera looks 2.3 degrees away from straight down in the median, and up to 6.9 degrees. At this height 2.3 degrees move the centre of the picture by about 7 m on the ground.
+- The [ALTO paper](https://arxiv.org/abs/2207.12317) confirms these axes: x towards the nose of the helicopter, z down. It names the camera (1600 by 1200 pixels, a 3.5 mm lens, 20 frames per second) and says the full dataset also holds an IMU at 200 Hz and a laser altimeter. The public sample contains neither, and the paper says it covers only a few kilometres.
 - The reference images form a strip along the route. There is no map of the area to the sides.
 
 ### 3.2 Matching a camera frame against the reference images
