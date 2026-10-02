@@ -9,6 +9,7 @@ Confirm the plan as a team and start building.
 ## State
 
 - Challenge 2, navigation without GNSS. Team of six, team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private).
+- Assumed platform, fixed on Friday evening: an existing drone at about 3,000 m with a camera, an IMU and a barometer. We build the software, not a drone. No laser and, so far, no airspeed sensor.
 - The single plan is `docs/PLAN.md`: a navigator, an integrity check and a navigability map, all on open map data, with roles, shared conventions, timeline, gates and demo script. Not yet confirmed by the team.
 - Research: `docs/landscape.md` (existing products and gaps), `docs/challenge-2-research.md` (papers, data, reading list), `research/` (two papers as PDF).
 - Experiments on real Taiwan data in `experiments/`, results in `docs/experiments.md`. They contain working first versions of the particle filter with wind, terrain matching and camera matching.

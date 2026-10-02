@@ -8,12 +8,20 @@ Status: proposed on Friday evening. Not yet confirmed by the team. Edit this pag
 
 Challenge 2, navigation without GNSS.
 
-A navigation method for small drones that runs on free map data and cheap sensors. It tells the operator before launch where it will hold, and during flight when it should not be trusted.
+Software that tells a drone where it is when GNSS is jammed. It runs on free map data and on sensors the drone already carries. It tells the operator before launch where it will hold, and during flight when it should not be trusted.
+
+We are not building a drone. The assumed platform is an existing drone with:
+
+- a camera
+- an IMU (rotation and acceleration)
+- a barometer for altitude
+- a map stored on board
+- a flight height of about 3,000 m
 
 One-liner for the team form:
 
 ```
-Keeps a drone on course when GNSS is jammed, on open maps and cheap sensors, and says when not to trust it.
+Keeps a drone on course when GNSS is jammed, using its own camera and free maps, and says when not to trust it.
 ```
 
 ## Why this
@@ -26,13 +34,13 @@ Keeps a drone on course when GNSS is jammed, on open maps and cheap sensors, and
 
 ### 1. Navigator
 
-- Dead-reckoning baseline from airspeed and heading.
-- Particle filter over position and wind.
-- Terrain fixes: downward range sensor against the free elevation model.
-- Camera fixes: camera view against the free aerial image.
-- Sun compass for heading at the start.
+- Dead-reckoning baseline from the IMU alone.
+- Speed over ground from the camera: image motion times distance to the ground, corrected for rotation with the IMU. The distance to the ground is barometer altitude minus the ground elevation from the free elevation model.
+- Position fixes from the camera: the view matched against free satellite imagery. At 3,000 m the camera sees about 3.5 km of ground, so imagery at 10 m per pixel is detailed enough.
+- Heading from the IMU, corrected by the map match, and by the sun if the camera sees the sky.
+- A particle filter that combines these and carries its own uncertainty.
 
-Done when: on one simulated route from sea to mountains, plots show the true path, the baseline and the filter, with position error over time for each sensor combination.
+Done when: on one simulated flight at 3,000 m over Taiwan, plots show the true path, the baseline and the filter, with position error over time for each sensor combination.
 
 ### 2. Integrity check
 
@@ -43,19 +51,19 @@ Done when: a deliberately wrong camera fix and a filter started in the wrong pla
 
 ### 3. Navigability map
 
-- A map of the test region coloured by expected position error: terrain fixes in hills, camera fixes on flat land, growing drift over water.
+- A map of the test region coloured by expected position error: small where the ground is distinctive, growing over water, featureless ground and under cloud.
 - For a route drawn on the map, the predicted error along the way.
 
-Done when: the map exists for the strip at 24.05 N, and the prediction for the demo route roughly matches what the navigator achieved on it.
+Done when: the map exists for the test region, and the prediction for the demo route roughly matches what the navigator achieved on it.
 
 ## How the parts connect
 
 ```
-scenario (route, wind, noise)
+scenario (route, cloud cover, noise)
         |
    simulator  ->  true path  +  sensor readings per time step
         |
-   navigator  <-  terrain fix, camera fix, sun heading   (each with a confidence)
+   navigator  <-  camera speed, camera position fix, heading   (each with a confidence)
         |              ^
         |        integrity check accepts or rejects each fix
         v
@@ -66,9 +74,9 @@ scenario (route, wind, noise)
 
 Shared conventions, fixed now so six people can work in parallel:
 
-- Coordinates: metres in EPSG:3826 (TWD97), x east, y north. Both aerial images already use it. The elevation model is converted once.
+- Coordinates: metres in EPSG:3826 (TWD97), x east, y north. Imagery and elevation are converted to it once.
 - Units: metres, seconds, metres per second. Heading in degrees, 0 is north, clockwise.
-- One time step is a row: time, airspeed, heading, altitude, range to ground, and optionally a camera patch.
+- One time step is a row: time, IMU rotation rates and accelerations, barometer altitude, and optionally a camera frame.
 - A fix is: x, y, uncertainty in metres, source name, confidence between 0 and 1.
 - Every result that goes on a slide is produced by a script in the repository.
 
@@ -78,16 +86,16 @@ Write names here once agreed. Each person owns one part and can explain it alone
 
 | # | Role | Owns | Name |
 |---|---|---|---|
-| 1 | Simulator | Routes, wind, sensor readings with noise, sun heading | |
-| 2 | Filter | Dead-reckoning baseline, particle filter with wind | |
-| 3 | Terrain sensor | Elevation data, terrain fix and its confidence | |
-| 4 | Camera sensor | Image matching, score turned into confidence | |
+| 1 | Simulator | Route at 3,000 m, camera views cut from imagery, IMU and barometer readings with noise, cloud gaps | |
+| 2 | Filter | IMU dead-reckoning baseline, particle filter | |
+| 3 | Camera speed | Image motion, barometer and elevation map turned into speed over ground | |
+| 4 | Camera position fix | Matching against satellite imagery, score turned into confidence | |
 | 5 | Integrity and evaluation | Fix checking, failure cases, all plots and numbers | |
 | 6 | Map and demo | Navigability map, demo view, slides | |
 
-The pitch, the sensor package and the cost estimate are shared. Role 6 collects them.
+The pitch, the target platform and the deployment concept are shared. Role 6 collects them.
 
-Starting material: the four scripts in `experiments/` contain working first versions of roles 2, 3 and 4.
+Starting material: the scripts in `experiments/` contain working first versions of the particle filter and of camera matching. They were written for low flight with a laser and an airspeed sensor, so the sensor parts need adapting.
 
 ## Timeline
 
@@ -96,7 +104,7 @@ Demo Day is Sunday 13:00. Code freeze is Sunday 10:00.
 | When | What | Gate |
 |---|---|---|
 | Friday until 23:00 | Confirm this plan, assign roles, set up the code structure, baseline running | A plot shows dead reckoning drifting away from the true path |
-| Saturday 09:00 to 13:00 | Filter with wind, terrain fix and camera fix each working alone on a short leg | One correction beats the baseline in a plot. The brief's minimum is met |
+| Saturday 09:00 to 13:00 | Filter, camera speed and camera position fix each working alone on a short leg | One correction beats the baseline in a plot. The brief's minimum is met |
 | Saturday 13:00 to 14:00 | Show mentors, write down what they say | |
 | Saturday 14:00 to 19:00 | All sensors on the full route, integrity check, first navigability map | Full route runs end to end |
 | Saturday 19:00 to 22:00 | Demo view, fallback video, slide draft | Video file saved |
@@ -104,27 +112,28 @@ Demo Day is Sunday 13:00. Code freeze is Sunday 10:00.
 | Sunday 10:00 | Code freeze | Demo branch tagged |
 | Sunday 10:00 to 13:00 | Rehearse three times, submit | Submission confirmed |
 
-If we fall behind, cut in this order: sun compass, navigability map reduced to the demo route only, camera fixes. The navigator with terrain fixes and the integrity check is the smallest complete entry.
+If we fall behind, cut in this order: sun heading, navigability map reduced to the demo route only, camera speed. The baseline with camera position fixes and the integrity check is the smallest complete entry.
 
 ## Demo
 
-1. The map shows the route from the Strait across the plain into the mountains. Dead reckoning drifts off.
+1. The map shows a route at 3,000 m over Taiwan. Dead reckoning from the IMU drifts off within a minute.
 2. The navigability map predicts where the drone will hold position and where it will drift.
-3. The flight runs. Over water the uncertainty grows, on the plain camera fixes pull it back, in the hills the terrain takes over.
+3. The flight runs. Camera fixes hold the position over land. Under cloud and over water the uncertainty grows, and it collapses again at the next clear view.
 4. A wrong fix is injected. The system rejects it and says so.
 5. One chart: position error over time, baseline against ours, with one headline number.
-6. One slide: sensor package and cost, free map sources, and what is not covered.
+6. One slide: the sensors assumed, free map sources, and what is not covered.
 
 ## What we claim and what we do not
 
-Claim: it works on free maps and cheap sensors, it knows where it will hold, and it flags when it should not be trusted.
+Claim: it works on free maps and the sensors a drone already has, it knows where it will hold, and it flags when it should not be trusted.
 
-Do not claim: better accuracy than existing products, a solved crossing of the whole Strait, or performance at night and in fog.
+Do not claim: better accuracy than existing products, navigation through long stretches of cloud or over open sea, or performance at night.
 
 ## Open questions
 
 - Does the team confirm this plan?
-- Does anyone have a 360-degree camera here? If so, real footage becomes an extra on Saturday afternoon.
+- May we assume an airspeed sensor? Fixed-wing drones have one. Without it, a stretch of cloud longer than about a minute cannot be bridged.
+- Does the camera see the sky as well as the ground? The sun heading depends on it.
 - Which second input did the mentor name for the cold start, besides the position of the sun?
 - Did the organisers hand out the suggested dataset?
 - How long is the demo slot, and what is the submission format?
