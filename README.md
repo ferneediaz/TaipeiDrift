@@ -1,6 +1,6 @@
-# Taiwan Defense Tech Hackathon 2026
+# Taipei Drift
 
-Team repository for the hackathon organised by EDTH and the Unmanned Vehicles R&D Center at National Taiwan University, 2 to 4 October 2026 in Taipei.
+Repository of team Taipei Drift for the Taiwan Defense Tech Hackathon 2026, organised by EDTH and the Unmanned Vehicles R&D Center at National Taiwan University, 2 to 4 October 2026 in Taipei.
 
 The challenge is not chosen yet. This repository currently holds the shared environment, the datasets and the briefs. No product code has been written.
 

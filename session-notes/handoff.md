@@ -14,7 +14,7 @@ Arrive at kickoff with a working environment, data on disk and a shortlist, then
 - Python 3.12 arm64 environment via uv (`pyproject.toml`, `uv.lock`). Imports verified, PyTorch MPS available, laptop microphone detected.
 - Audio datasets for Challenge 7 in `data/raw/` (drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB).
 - Evidence from earlier EDTH hackathons added to `docs/pitches.md`. Timeline corrected to Demo Day on Sunday 13:00.
-- Repository initialised and pushed to github.com/dwn97/DefenseHackathon (private).
+- Repository initialised and pushed to github.com/dwn97/TaipeiDrift (private). Team name: Taipei Drift.
 
 - Team decision briefing in `docs/challenge-decision.md` (all nine challenges, links, roles, risks). Its mentor table must be removed before the repository goes public.
 
