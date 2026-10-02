@@ -17,8 +17,8 @@ The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 
 
 ## What the team has to decide
 
-1. Stay with Challenge 2 or switch. A switch would have to happen tonight. Section 5 lists what speaks for and against staying.
-2. If we stay: confirm the three results in section 6 and put one name on each.
+1. Decided on Friday night: we stay with Challenge 2. Section 5 lists what spoke for and against.
+2. Confirm the three results in section 6 and put one name on each.
 3. Position fixes: start with brightness matching, and treat DenseUAV as an upgrade to compare against it.
 4. What the simulator is for: the demo view, a test of all sensors in one flight, or both.
 5. Whether to download the ALTO training section (9.93 GB) tonight. It is roughly 30 km of the same flight, estimated from its image count, and would let us report on data we did not tune on.
@@ -91,7 +91,7 @@ There are two consistent ways to handle this, and they do not give the same drif
 
 We use A, because the baseline must not read ground truth after the jam. A and B agree during the first 10 seconds and then drift apart, more so in flights with many turns: a constant gyroscope offset partly cancels in A when the drone turns, and it adds up in B.
 
-The baseline code on branch `mid-air-baseline` used the textbook rule when it was pushed at 22:06 and ends 3,758 m off on flight 0003. With reading A it ends 247 m off on that flight, the same value to the centimetre as `experiments/j_midair_imu_only.py`. The change is eight lines.
+The baseline code on branch `mid-air-baseline` used the textbook rule when it was pushed at 22:06 and ends 3,758 m off on flight 0003. With reading A it ends 247 m off on that flight, and an independent implementation with the method of `experiments/j_midair_imu_only.py` gives the same value to the centimetre. The change is eight lines and is on branch `mid-air-baseline-fix`, together with three tests for it. On all 30 sunny flights that code gives a median of 491 m at the end. Its error includes the height, which is why it differs slightly from the 485 m of the experiment script.
 
 ### 2.3 How large the IMU errors are
 
@@ -125,6 +125,7 @@ Scenario from the plan: GNSS works for the first 10 seconds, then it is cut. Fro
 - The error at the end is 57 percent of the distance flown since the jam (median).
 - The error passes 50 m after 36 seconds in the median, between 17 and 74 seconds. One flight of 30 stays below 50 m.
 - The same code fed with the true motion ends 0.13 m off (largest 0.64 m), so these numbers come from the sensor errors and not from the code.
+- These are horizontal errors. The height drifts as well, by about 200 m on flight 0003. Holding the height is what a barometer is good for.
 
 ![IMU-only drift on Mid-Air](figures/midair_imu_only.png)
 
@@ -302,7 +303,7 @@ Neither page shows what happens between fixes or when a fix is wrong. More in [l
 
 | Result | Data | State | Owner |
 |---|---|---|---|
-| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Product code with loader, metrics, plots and tests is on branch `mid-air-baseline`; it needs the gyroscope rule from 2.2 | |
+| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Product code with loader, metrics, plots and tests is on branch `mid-air-baseline-fix`, which is `mid-air-baseline` plus the gyroscope rule from 2.2. Needs merging into `main` | |
 | 2. Camera dead reckoning plus position fixes | ALTO | Experiment done (3.4). Needs a held-out test, turns, and a cleaner filter | |
 | 3. Integrity check and drift budget | ALTO | First version done (3.4). Needs degraded images: blur, darkness, haze | |
 | All sensors in one flight, and the demo view | Simulator | Needs the GNSS cut, recording and export | |
@@ -313,6 +314,7 @@ Changes against the current plan:
 - The fog run on Mid-Air loses its purpose, because camera speed there is already poor in sunshine. Degraded images on ALTO take its place.
 - Route memory across seasons on Mid-Air is dropped.
 - DenseUAV is an optional upgrade. If someone tries it, compare it on the same frames as `experiments/f_alto_matching.py`.
+- A review of the DenseUAV idea is on branch `docs/denseuav-critical-review`. It asks how often an accepted fix is wrong, which section 3.4 measures for brightness matching. It proposes keypoints to verify a match. Section 3.2 shows that keypoints fail on ALTO and that brightness matching can take that role.
 - In the simulator, the IMU should keep reporting around the drone's own axes, as a real IMU does. Only code that reads Mid-Air needs the rule from section 2.2.
 - The islands world in the simulator fits the open-water question. Over water the camera sees nothing fixed, so there are no fixes and camera motion is unreliable as well. Our number for land without fixes, 465 m of error after 2 km, is the best case to expect for a crossing.
 
