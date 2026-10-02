@@ -5,8 +5,9 @@
 cam_res  down camera width and height in pixels; 1024 matches Mid-Air, 512 renders faster on a CPU
 gps      false removes the GNSS receiver from the drone
 gui      false runs Gazebo without its window (server only)
-world    a file name in sim/worlds/ without .sdf
-demo     true flies the drone in circles (nodes/demo_flight.py), and opens the down-camera view
+world    a file name in sim/worlds/ without .sdf: terrain (fields and woods) or islands (two islands and open sea)
+demo     true flies the drone (circles; island to island in the islands world, nodes/demo_flight.py), and opens
+         the down-camera view
          and a terminal with the live sensor monitor (nodes/sensor_monitor.py) on the desktop
 """
 import os
@@ -24,6 +25,11 @@ from launch_ros.actions import Node
 
 SIM = Path(__file__).resolve().parents[1]
 GENERATED_MODEL = Path("/tmp/taipeidrift_midair_quad.sdf")
+# Scenery each world needs, generated on first run
+WORLD_ASSETS = {
+    "terrain": ["make_ground.py", "make_trees.py"],  # replace the ground with the orthophoto via make_ground.py --aerial
+    "islands": ["make_islands.py"],
+}
 
 
 def drone_sdf(cam_res: int, gps: bool) -> Path:
@@ -67,12 +73,13 @@ def setup(context):
     gui = LaunchConfiguration("gui").perform(context).lower() == "true"
     world = SIM / "worlds" / f"{LaunchConfiguration('world').perform(context)}.sdf"
     demo = LaunchConfiguration("demo").perform(context).lower() == "true"
+    if not world.exists():
+        sys.exit(f"No world {world}. Choose one of: {', '.join(sorted(w.stem for w in world.parent.glob('*.sdf')))}")
     if gui or demo:
         wait_for_display()
 
-    # Ground and 3D trees on first run; replace the ground with the orthophoto via make_ground.py --aerial.
-    subprocess.run([sys.executable, str(SIM / "scripts/make_ground.py"), "--if-missing"], check=True)
-    subprocess.run([sys.executable, str(SIM / "scripts/make_trees.py"), "--if-missing"], check=True)
+    for script in WORLD_ASSETS.get(world.stem, []):
+        subprocess.run([sys.executable, str(SIM / "scripts" / script), "--if-missing"], check=True)
     model = drone_sdf(cam_res, gps)
     sim_time = {"use_sim_time": True}
 
@@ -93,13 +100,14 @@ def setup(context):
         actions += [
             # Give the Gazebo window time to open before asking it to follow the drone
             TimerAction(period=15.0, actions=[
-                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py")], output="screen")]),
+                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem],
+                               output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank
             TimerAction(period=20.0, actions=[
                 Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
             ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-fa", "Monospace", "-fs", "9",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
-                                str(SIM / "nodes/sensor_monitor.py")]),
+                                str(SIM / "nodes/sensor_monitor.py"), "--world", world.stem]),
         ]
     return actions
 

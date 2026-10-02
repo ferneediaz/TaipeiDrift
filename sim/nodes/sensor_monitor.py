@@ -1,13 +1,16 @@
 """Live sensor dashboard in the terminal.
 
-    docker compose exec sim bash -ic "python3 sim/nodes/sensor_monitor.py"
+    docker compose exec sim bash -ic "python3 sim/nodes/sensor_monitor.py [--world terrain|islands]"
 
 Shows what the drone's sensors report, next to the ground truth, refreshed 5 times a second.
 Rates are measured in simulation time.
 """
+import argparse
 import math
 import time
+import xml.etree.ElementTree as ET
 from collections import deque
+from pathlib import Path
 
 import rclpy
 from nav_msgs.msg import Odometry
@@ -16,10 +19,8 @@ from rclpy.qos import qos_profile_sensor_data
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, FluidPressure, Image, Imu, NavSatFix
 
-# World origin of worlds/terrain.sdf, for turning GPS into metres east/north
-LAT0, LON0 = 24.0640, 120.6990
+WORLDS = Path(__file__).resolve().parents[1] / "worlds"
 M_PER_DEG_LAT = 111_320.0
-M_PER_DEG_LON = 111_320.0 * math.cos(math.radians(LAT0))
 
 BOLD, DIM, GREEN, RED, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[31m", "\033[0m"
 
@@ -42,9 +43,16 @@ class Rate:
         return (len(self.t) - 1) / (self.t[-1] - self.t[0]) if len(self.t) > 2 and self.t[-1] > self.t[0] else 0.0
 
 
+def world_origin(name):
+    """Latitude and longitude of the world origin, for turning GPS into metres east/north."""
+    sc = ET.parse(WORLDS / f"{name}.sdf").find(".//spherical_coordinates")
+    return float(sc.findtext("latitude_deg")), float(sc.findtext("longitude_deg"))
+
+
 class Monitor(Node):
-    def __init__(self):
+    def __init__(self, world):
         super().__init__("sensor_monitor")
+        self.lat0, self.lon0 = world_origin(world)
         self.sim_t = None
         self.imu = self.baro = self.gps = self.truth = self.info = None
         self.p0 = None
@@ -112,8 +120,8 @@ class Monitor(Node):
 
         out.append(f"{BOLD}GPS{RESET} {DIM}({r['gps']:5.1f} Hz){RESET}")
         if self.gps and r["gps"] > 0 and self.sim_t - stamp(self.gps) < 3:
-            e = (self.gps.longitude - LON0) * M_PER_DEG_LON
-            n = (self.gps.latitude - LAT0) * M_PER_DEG_LAT
+            e = (self.gps.longitude - self.lon0) * M_PER_DEG_LAT * math.cos(math.radians(self.lat0))
+            n = (self.gps.latitude - self.lat0) * M_PER_DEG_LAT
             err = ""
             if self.truth:
                 tp = self.truth.pose.pose.position
@@ -134,9 +142,12 @@ class Monitor(Node):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--world", default="terrain", help="the world that runs, for the GPS origin")
+    args = ap.parse_args()
     rclpy.init()
     try:
-        rclpy.spin(Monitor())
+        rclpy.spin(Monitor(args.world))
     except KeyboardInterrupt:
         pass
 

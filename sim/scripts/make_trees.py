@@ -84,32 +84,35 @@ def positions(rng, count, area):
     return pts
 
 
+def tree(rng, i, x, y, z=0.0):
+    """One random tree standing at (x, y, z), as SDF visuals and a collision; also used by make_islands.py."""
+    bark = rgba(*(np.array([0.30, 0.22, 0.15]) * rng.uniform(0.8, 1.1)))
+    if rng.random() < 0.65:  # broadleaf
+        h = rng.uniform(6, 14)
+        rz = h * rng.uniform(0.28, 0.36)  # crown half-height
+        rx = rz * rng.uniform(0.9, 1.3)
+        ry = rx * rng.uniform(0.85, 1.15)
+        tl = h - rz  # trunk reaches the crown centre
+        g = rng.uniform(0.75, 1.15)
+        leaf = rgba(0.20 * g, 0.40 * g, 0.14 * g)
+        return BROADLEAF.format(i=i, x=x, y=y, th=z + tl / 2, tr=0.12 + 0.015 * h, tl=tl,
+                                cz=z + h - rz, rx=rx, ry=ry, rz=rz, yaw=rng.uniform(0, math.pi),
+                                bark=bark, leaf=leaf, hh=z + h / 2, h=h, cr=0.8 * min(rx, ry))
+    # conifer
+    h = rng.uniform(9, 18)
+    cl = h * rng.uniform(0.7, 0.85)  # cone length
+    rx = cl * rng.uniform(0.2, 0.26)
+    tl = h - cl + 0.5
+    g = rng.uniform(0.75, 1.1)
+    leaf = rgba(0.12 * g, 0.30 * g, 0.16 * g)
+    return CONIFER.format(i=i, x=x, y=y, th=z + tl / 2, tr=0.10 + 0.012 * h, tl=tl,
+                          cz=z + h - cl / 2, rx=rx, cl=cl, bark=bark, leaf=leaf,
+                          hh=z + h / 2, h=h, cr=0.6 * rx)
+
+
 def build(count, area, seed):
     rng = np.random.default_rng(seed)
-    body = []
-    for i, (x, y) in enumerate(positions(rng, count, area)):
-        bark = rgba(*(np.array([0.30, 0.22, 0.15]) * rng.uniform(0.8, 1.1)))
-        if rng.random() < 0.65:  # broadleaf
-            h = rng.uniform(6, 14)
-            rz = h * rng.uniform(0.28, 0.36)  # crown half-height
-            rx = rz * rng.uniform(0.9, 1.3)
-            ry = rx * rng.uniform(0.85, 1.15)
-            tl = h - rz  # trunk reaches the crown centre
-            g = rng.uniform(0.75, 1.15)
-            leaf = rgba(0.20 * g, 0.40 * g, 0.14 * g)
-            body.append(BROADLEAF.format(i=i, x=x, y=y, th=tl / 2, tr=0.12 + 0.015 * h, tl=tl,
-                                         cz=h - rz, rx=rx, ry=ry, rz=rz, yaw=rng.uniform(0, math.pi),
-                                         bark=bark, leaf=leaf, hh=h / 2, h=h, cr=0.8 * min(rx, ry)))
-        else:  # conifer
-            h = rng.uniform(9, 18)
-            cl = h * rng.uniform(0.7, 0.85)  # cone length
-            rx = cl * rng.uniform(0.2, 0.26)
-            tl = h - cl + 0.5
-            g = rng.uniform(0.75, 1.1)
-            leaf = rgba(0.12 * g, 0.30 * g, 0.16 * g)
-            body.append(CONIFER.format(i=i, x=x, y=y, th=tl / 2, tr=0.10 + 0.012 * h, tl=tl,
-                                       cz=h - cl / 2, rx=rx, cl=cl, bark=bark, leaf=leaf,
-                                       hh=h / 2, h=h, cr=0.6 * rx))
+    body = [tree(rng, i, x, y) for i, (x, y) in enumerate(positions(rng, count, area))]
     return MODEL.format(count=count, seed=seed, body="".join(body))
 
 
