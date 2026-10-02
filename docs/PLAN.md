@@ -2,7 +2,7 @@
 
 The one page that says what we build, who does what, and by when. Everything else in `docs/` is background.
 
-Status: revised on Friday night after comparing the Mid-Air, ALTO and Blackbird datasets. Not yet confirmed by the team. Edit this page when something is decided.
+Status: revised on Friday night at 21:45. Mid-Air and ALTO data are downloaded and checked. Not yet confirmed by the team. Edit this page when something is decided.
 
 ## What we are building
 
@@ -26,31 +26,48 @@ Keeps a drone on course after GNSS is jammed, using only its camera, IMU and bar
 
 ## Datasets
 
-### Mid-Air: the base, confirmed available
+How to get each dataset onto a laptop is in [data/README.md](../data/README.md).
+
+### Mid-Air: IMU baseline, camera speed, fog
 
 [Mid-Air](https://midair.ulg.ac.be/) is a synthetic dataset of low drone flights from the University of Liège.
 
 - 54 flights with a downward camera at 25 frames per second, an IMU at 100 Hz with noise and drift, a simulated GNSS at 1 Hz, and exact ground truth at 100 Hz.
 - Each flight is rendered in several conditions: sunny, cloudy, foggy and sunset in one landscape, and spring, fall and winter in another.
+- Each flight lasts about 88 seconds and covers 1 to 1.4 km at 10 to 16 m/s. Measured on the sunny flights.
 - No barometer. We simulate one from the true altitude, with realistic noise and slow drift.
 - No aerial map of the landscapes, so no position fixes from a map.
 - Licence: CC BY-NC-SA 4.0, non-commercial, with attribution.
-- First download, about 300 MB: the sensor records for one weather setting (43 MB) and the downward camera for one flight (trajectory 0003 in sunny is 260 MB). The links come from a form with a captcha on the [download page](https://midair.ulg.ac.be/download.html), so a team member has to request them.
+- Downloaded on Friday night: the sensor records of every flight in every condition (0.8 GB), and the downward camera for 21 flights (about 9 GB): six in sun, the same six in fog, three each in spring, fall and winter. All downward-camera data together would be 100.6 GB.
 
-### ALTO: the candidate for real data, availability to be checked tonight
+### ALTO: position fixes on real images
 
-[ALTO](https://github.com/MetaSLAM/ALTO) is a real dataset from two helicopter flights of 150 km and 260 km at over 300 m ([paper](https://arxiv.org/abs/2207.12317)).
+[ALTO](https://github.com/MetaSLAM/ALTO) is a real dataset from a helicopter flight of 150 km at over 300 m ([paper](https://arxiv.org/abs/2207.12317)). The full dataset is not public. What is public is the sample made for the ICRA 2022 place-recognition competition, and we checked its validation section on Friday night.
 
-- Downward camera at 20 Hz, 1600 by 1200 pixels.
-- High-grade inertial unit at 200 Hz, and a GNSS reference accurate to about 1.5 m.
-- Laser altimeter at 20 Hz. It measures the distance to the ground directly.
-- Public aerial imagery along both routes as a reference map. This allows real position fixes by matching the camera view to the map.
-- Open question: the repository links two competition subsets on Dropbox and says the full dataset is "coming soon", a note from 2022. The paper says the subsets cover only a few kilometres. We have not seen what they contain.
+- A 4.59 km section flown in 84 seconds, about 56 m/s, with 1,684 camera frames of 500 by 500 pixels, one every 2.8 m.
+- For every frame: the true position, the altitude and the orientation of the camera.
+- 459 reference images from an aerial survey five years earlier, one every 10 m along the flown route, plus copies shifted 20 and 40 m to the north and south.
+- A file that names the correct reference image for every camera frame.
+- No raw IMU: no accelerations and no rotation rates.
+- No height above ground. The altitude is given above the Earth model, 376 to 455 m.
+- The camera frames are rotated to the helicopter's heading, show less ground than the reference images, and are strongly green and overexposed. A frame has to be rotated and rescaled before it can be compared.
+- The reference images form a ribbon along the route and do not cover an area. A match says how far along the route the aircraft is. Places off the route that look alike cannot confuse it, so the task is easier than matching against a full map.
 
-Decision tonight: one person opens the two Dropbox links and reports the files and their size.
+Decision: use the validation section (1.73 GB) for position fixes. The training section (9.93 GB) is only needed if we train a model.
 
-- If the subset has camera frames, positions and reference imagery: use it for the position-fix part.
-- If it has only a place-recognition benchmark without sensor data: stay with Mid-Air alone.
+### Our own simulator: all sensors in one flight
+
+Branch `simulations`, folder `sim/`. Gazebo in Docker, shown in a browser tab.
+
+- A drone with a downward camera, an IMU with the Mid-Air noise model, a barometer with drift, GNSS that can be switched off, and exact ground truth.
+- The ground can be the real 2020 aerial image of Wufeng, Taichung. The 2018 image of the same site can then serve as the on-board map.
+- It is the only source we have where IMU, camera, barometer, GNSS and a map exist in one flight.
+- Limits: flat ground, an area of 1 km by 1 km, IMU noise values that are our own assumption, and about half real-time speed on a MacBook.
+- Check of the noise assumption against the 30 sunny Mid-Air flights (`experiments/e_midair_imu_noise.py`, a rough estimate): the accelerometer values fit. The gyroscope white noise in Mid-Air is about 0.02 rad/s per sample in the median and up to 0.07, against 0.0005 to 0.005 assumed in the simulator.
+- Not there yet: the GNSS cut, recorded flights, and export in the shared format. Gazebo uses East, North, Up, so recordings have to be converted.
+- Results from our own simulator are the weakest evidence for the jury, because we control both the world and the method. Its strength is showing the whole system working together.
+
+Its role is open: see the open questions.
 
 ### Blackbird: not used
 
@@ -66,9 +83,12 @@ GNSS works at the start of the flight and is then jammed. From that moment the s
 
 - Baseline: dead reckoning from the IMU alone after GNSS is lost.
 - Correction 1, camera speed: image motion from the downward camera, times the height, corrected for rotation with the IMU. This gives speed over ground. Built on Mid-Air.
-- Correction 2, position fixes:
-  - With ALTO: the camera view matched against the aerial map. Real data at 300 m.
-  - Without ALTO: route memory on Mid-Air. The same flight in another season or weather is the stored route, and recognising ground seen before gives a fix.
+- Correction 2, position fixes, built on ALTO:
+  - The camera frame is compared with the reference images near the filter's current estimate. The best match gives the position.
+  - First version: classical matching of brightness patterns, after rotating and rescaling the frame.
+  - Optional upgrade: the pretrained DenseUAV network described in [data.md](data.md). It needs PyTorch, and its weights and its behaviour on a MacBook are untested.
+  - ALTO has no raw IMU. Between fixes the movement comes from the camera, or from simulated movement measurements with stated noise, as in the Kinnari paper.
+  - Fallback: route memory on Mid-Air. The same flight in another season or weather is the stored route.
 - A filter that combines IMU, camera speed and fixes, and carries its own uncertainty.
 
 Done when: plots show the true path, the IMU baseline and the filter, with position error over time for each combination.
@@ -94,7 +114,7 @@ We take two ideas from the paper "Season-invariant GNSS-denied visual localizati
 - Matching: for a guessed position, cut the square of map the camera should see, compare it with the camera view, and get a similarity score. A further step turns the score into a probability that the match is right. That step is the core of our integrity check.
 - Monte Carlo localization: keep a thousand guesses of the position. Move each by the measured movement, weigh each by its match probability, keep the good ones. The spread of the guesses is the uncertainty.
 
-The paper applies directly if we use ALTO, which has an aerial map. Its reported accuracy is 26 to 31 m on real flights, and it assumes a movement error of about 2 percent of distance flown, which is the bar for our camera speed.
+The paper matches against a map that covers an area. The ALTO sample has reference images along the route only, so our guesses spread along the route and up to 40 m to each side. The paper's reported accuracy is 26 to 31 m on real flights, and it assumes a movement error of about 2 percent of distance flown, which is the bar for our camera speed.
 
 - Explanation with worked numbers, and which sections to read: [method.md](method.md)
 - Paper: [arXiv 2110.01967](https://arxiv.org/abs/2110.01967), and the earlier one it builds on: [arXiv 2103.14381](https://arxiv.org/abs/2103.14381)
@@ -105,12 +125,15 @@ The paper applies directly if we use ALTO, which has an aerial map. Its reported
 1. Scale. On one Mid-Air flight, compare speed from image motion times barometer height with the true speed. The barometer gives height above the start point, and Mid-Air flies low over hilly ground, so this may be off by a large factor. If it is, the camera speed needs another source of scale.
 2. Heading. Mid-Air has no compass and the camera does not see the sky, so heading comes from the gyroscope and drifts. Measure how fast.
 3. Route memory. Confirm that a flight follows the identical path in every season and weather. If it does, add a deliberate offset so the test is not trivially easy.
+4. ALTO matching. For 100 camera frames, rotate and rescale the frame and compare it with the reference images within 150 m. Count how often the best match is the correct one. If classical matching fails on these images, the DenseUAV upgrade becomes necessary.
 
 ## How we measure
 
 - Scenario: GNSS is cut at a fixed time after the start of each flight.
 - Metrics: position error as a percentage of distance flown, and time until the error passes 50 m.
+- Reference: the error is measured against the ground truth path. The simulated GNSS in Mid-Air is noisy and is only an input before the cut.
 - Flights: settings are tuned on some flights and reported on others. Report the median over several flights, not one good run.
+- Flight length: a Mid-Air flight lasts about 88 seconds, so every drift curve on Mid-Air ends there.
 - Noise sweep: more IMU noise, more height error, blurred images. Show where the method breaks.
 - Computing: milliseconds per camera frame on a plain CPU, and what board that implies.
 
@@ -141,10 +164,10 @@ Write names here once agreed. Each person owns one part and can explain it alone
 
 | # | Role | Owns | Name |
 |---|---|---|---|
-| 1 | Data | Mid-Air reader, simulated barometer, jamming scenario, downloads, the ALTO check | |
+| 1 | Data | Mid-Air and ALTO readers, simulated barometer, jamming scenario, recordings from the simulator | |
 | 2 | Filter | IMU dead-reckoning baseline, the filter that combines everything | |
 | 3 | Camera speed | Image motion, height and rotation turned into speed over ground | |
-| 4 | Position fixes | Map matching on ALTO, or route memory on Mid-Air | |
+| 4 | Position fixes | Matching on ALTO, the DenseUAV upgrade if time allows | |
 | 5 | Integrity and evaluation | Checks, fog and season runs, metrics, noise sweep, timing, drift budget | |
 | 6 | Demo and pitch | Demo view, slides, user, platform, the Taiwan case, deployment | |
 
@@ -185,7 +208,7 @@ The brief scores the user and product side. Role 6 collects it, everyone contrib
 - The Taiwan case: interference around the outlying islands is reported regularly, and Taiwan is adopting a map-based product that needs its vendor's data. Our method holds the position between map fixes and says for how long.
 - Platform: which sensors and how much computing the method needs.
 - Deployment: how it would run on an existing autopilot, and what a real test would require.
-- Evidence beyond the simulator: ALTO if available. A phone also has a camera, an IMU, a barometer and GNSS, so a two-minute walk with the camera pointing down gives a real recording for the same method.
+- Evidence on real data: position fixes on the ALTO helicopter images. A phone also has a camera, an IMU, a barometer and GNSS, so a two-minute walk with the camera pointing down gives a real recording for the same method.
 
 ## What we claim and what we do not
 
@@ -282,8 +305,10 @@ Conditions that trouble a drone navigating with a downward camera, an IMU and a 
 
 ## Open questions
 
-- Does the team confirm this plan?
-- Who requests the Mid-Air links, and who checks the ALTO Dropbox folders?
+- Does the team confirm this plan, and who takes which role?
+- Position fixes: do we agree on classical matching first and DenseUAV as an upgrade? [data.md](data.md) proposes DenseUAV from the start.
+- What is the simulator for: the demo view, a test that all parts work together in one flight, or both? It does not replace Mid-Air and ALTO as evidence.
+- Where does the height above ground come from on ALTO, if we want camera speed there?
 - Which second input did the mentor name for the cold start, besides the position of the sun? He has not seen this version of the plan.
 - How long is the demo slot, what are the judging weights, and what is the submission format?
 
@@ -304,6 +329,7 @@ From the participant page. Remove this section before the repository is made pub
 ## Background
 
 - [brief.md](brief.md): what the challenge asks for
+- [data.md](data.md): how Mid-Air and the DenseUAV model would be used, by Alessandro
 - [method.md](method.md): how image matching and the particle filter work, with worked numbers
 - [landscape.md](landscape.md): existing products and their limits
 - [experiments.md](experiments.md): earlier measurements on Taiwan imagery and elevation, made before the dataset was chosen
