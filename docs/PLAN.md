@@ -2,7 +2,7 @@
 
 The one page that says what we build, who does what, and by when. Everything else in `docs/` is background.
 
-Status: revised on Friday night after the team chose the Mid-Air dataset. Not yet confirmed by the team. Edit this page when something is decided.
+Status: revised on Friday night after comparing the Mid-Air, ALTO and Blackbird datasets. Not yet confirmed by the team. Edit this page when something is decided.
 
 ## What we are building
 
@@ -14,9 +14,9 @@ We are not building a drone. The assumed platform is an existing drone with:
 
 - a camera pointing down
 - an IMU (rotation and acceleration)
-- a barometer for altitude
+- an altitude sensor (a barometer, or a laser altimeter where the data has one)
 
-We do not fix a flight height. The method takes the height from the barometer as an input. We test it at low height, because that is what the dataset contains, and we state how the numbers change with height.
+We do not fix a flight height. The method takes the height as an input. We test it on the heights the datasets contain and state how the numbers change with height.
 
 One-liner for the team form:
 
@@ -24,39 +24,61 @@ One-liner for the team form:
 Keeps a drone on course after GNSS is jammed, using only its camera, IMU and barometer, and says when not to trust it.
 ```
 
-## The dataset
+## Datasets
 
-[Mid-Air](https://midair.ulg.ac.be/), a synthetic dataset of low-altitude drone flights from the University of Liège.
+### Mid-Air: the base, confirmed available
+
+[Mid-Air](https://midair.ulg.ac.be/) is a synthetic dataset of low drone flights from the University of Liège.
 
 - 54 flights with a downward camera at 25 frames per second, an IMU at 100 Hz with noise and drift, a simulated GNSS at 1 Hz, and exact ground truth at 100 Hz.
 - Each flight is rendered in several conditions: sunny, cloudy, foggy and sunset in one landscape, and spring, fall and winter in another.
-- No barometer. We simulate one from the true altitude plus noise.
-- No aerial map of the landscapes.
+- No barometer. We simulate one from the true altitude, with realistic noise and slow drift.
+- No aerial map of the landscapes, so no position fixes from a map.
 - Licence: CC BY-NC-SA 4.0, non-commercial, with attribution.
+- First download, about 300 MB: the sensor records for one weather setting (43 MB) and the downward camera for one flight (trajectory 0003 in sunny is 260 MB). The links come from a form with a captcha on the [download page](https://midair.ulg.ac.be/download.html), so a team member has to request them.
 
-First download, about 300 MB: the sensor records for one weather setting (43 MB) and the downward camera for one flight (trajectory 0003 in sunny is 260 MB). The links come from a form with a captcha on the [download page](https://midair.ulg.ac.be/download.html), so a team member has to request them.
+### ALTO: the candidate for real data, availability to be checked tonight
+
+[ALTO](https://github.com/MetaSLAM/ALTO) is a real dataset from two helicopter flights of 150 km and 260 km at over 300 m ([paper](https://arxiv.org/abs/2207.12317)).
+
+- Downward camera at 20 Hz, 1600 by 1200 pixels.
+- High-grade inertial unit at 200 Hz, and a GNSS reference accurate to about 1.5 m.
+- Laser altimeter at 20 Hz. It measures the distance to the ground directly.
+- Public aerial imagery along both routes as a reference map. This allows real position fixes by matching the camera view to the map.
+- Open question: the repository links two competition subsets on Dropbox and says the full dataset is "coming soon", a note from 2022. The paper says the subsets cover only a few kilometres. We have not seen what they contain.
+
+Decision tonight: one person opens the two Dropbox links and reports the files and their size.
+
+- If the subset has camera frames, positions and reference imagery: use it for the position-fix part.
+- If it has only a place-recognition benchmark without sensor data: stay with Mid-Air alone.
+
+### Blackbird: not used
+
+A drone flying fast loops inside one room, with camera images rendered afterwards. No meaningful altitude, no map and no distance covered.
 
 ## The scenario
 
-GNSS works at the start of the flight and is then jammed. From that moment the software has to hold the position on its own. The error is measured against the ground truth.
+GNSS works at the start of the flight and is then jammed. From that moment the software has to hold the position on its own. The error is measured against the reference path.
 
 ## The three parts
 
 ### 1. Navigator
 
 - Baseline: dead reckoning from the IMU alone after GNSS is lost.
-- Correction 1, camera speed: image motion from the downward camera, times the height from the barometer, corrected for rotation with the IMU. This gives speed over ground.
-- Correction 2, route memory: the same flight exists in another season or weather. One version is the stored route, the other is the flight. Recognising ground seen before gives a position fix.
+- Correction 1, camera speed: image motion from the downward camera, times the height, corrected for rotation with the IMU. This gives speed over ground. Built on Mid-Air.
+- Correction 2, position fixes:
+  - With ALTO: the camera view matched against the aerial map. Real data at 300 m.
+  - Without ALTO: route memory on Mid-Air. The same flight in another season or weather is the stored route, and recognising ground seen before gives a fix.
 - A filter that combines IMU, camera speed and fixes, and carries its own uncertainty.
 
-Done when: for one flight, plots show the true path, the IMU baseline and the filter, with position error over time for each combination.
+Done when: plots show the true path, the IMU baseline and the filter, with position error over time for each combination.
 
 ### 2. Integrity check
 
 - Each camera measurement and each fix is tested before it is used.
 - The system flags when the camera cannot be trusted, for example in fog or over ground without texture, and when the estimate has drifted too long without a fix.
 
-Done when: the same flight is run in sunny and in foggy conditions, and the flag rises where the camera speed goes wrong.
+Done when: the same Mid-Air flight is run in sunny and in foggy conditions, and the flag rises where the camera speed goes wrong.
 
 ### 3. Drift budget
 
@@ -65,24 +87,38 @@ Done when: the same flight is run in sunny and in foggy conditions, and the flag
 
 Done when: one chart shows the curves for at least three conditions, and one sentence states the time to reach 50 m of error for each.
 
+## Checks to run on the data before building on it
+
+1. Scale. On one Mid-Air flight, compare speed from image motion times barometer height with the true speed. The barometer gives height above the start point, and Mid-Air flies low over hilly ground, so this may be off by a large factor. If it is, the camera speed needs another source of scale.
+2. Heading. Mid-Air has no compass and the camera does not see the sky, so heading comes from the gyroscope and drifts. Measure how fast.
+3. Route memory. Confirm that a flight follows the identical path in every season and weather. If it does, add a deliberate offset so the test is not trivially easy.
+
+## How we measure
+
+- Scenario: GNSS is cut at a fixed time after the start of each flight.
+- Metrics: position error as a percentage of distance flown, and time until the error passes 50 m.
+- Flights: settings are tuned on some flights and reported on others. Report the median over several flights, not one good run.
+- Noise sweep: more IMU noise, more height error, blurred images. Show where the method breaks.
+- Computing: milliseconds per camera frame on a plain CPU, and what board that implies.
+
 ## How the parts connect
 
 ```
-Mid-Air flight (IMU, camera frames, GNSS until the jamming moment, ground truth)
+flight data (IMU, camera frames, height, GNSS until the jamming moment, reference path)
         |
-   data reader  ->  simulated barometer, jamming time
+   data reader  ->  simulated barometer where needed, jamming time
         |
-   navigator  <-  camera speed, route-memory fix   (each with a confidence)
+   navigator  <-  camera speed, position fix   (each with a confidence)
         |              ^
         |        integrity check accepts or rejects each one
         v
-   estimate + uncertainty per time step  ->  error against ground truth  ->  plots, drift budget, demo view
+   estimate + uncertainty per time step  ->  error against the reference  ->  plots, drift budget, demo view
 ```
 
 Shared conventions, fixed now so six people can work in parallel:
 
-- Coordinates: the dataset's own frame. North, East, Down in metres, origin at the start of each flight.
-- Units: metres, seconds, radians, as in the dataset.
+- Coordinates: North, East, Down in metres, origin at the start of each flight, as in Mid-Air. ALTO data is converted to the same.
+- Units: metres, seconds, radians.
 - A measurement handed to the filter is: value, uncertainty, source name, confidence between 0 and 1.
 - Every result that goes on a slide is produced by a script in the repository.
 
@@ -92,12 +128,12 @@ Write names here once agreed. Each person owns one part and can explain it alone
 
 | # | Role | Owns | Name |
 |---|---|---|---|
-| 1 | Data | Mid-Air reader, simulated barometer, jamming scenario, download | |
+| 1 | Data | Mid-Air reader, simulated barometer, jamming scenario, downloads, the ALTO check | |
 | 2 | Filter | IMU dead-reckoning baseline, the filter that combines everything | |
 | 3 | Camera speed | Image motion, height and rotation turned into speed over ground | |
-| 4 | Route memory | Recognising ground from another season or weather, position fix | |
-| 5 | Integrity and evaluation | Checks, fog and season runs, all plots and numbers, drift budget | |
-| 6 | Demo and pitch | Demo view, slides, target platform and deployment concept | |
+| 4 | Position fixes | Map matching on ALTO, or route memory on Mid-Air | |
+| 5 | Integrity and evaluation | Checks, fog and season runs, metrics, noise sweep, timing, drift budget | |
+| 6 | Demo and pitch | Demo view, slides, user, platform, the Taiwan case, deployment | |
 
 ## Timeline
 
@@ -105,25 +141,38 @@ Demo Day is Sunday 13:00. Code freeze is Sunday 10:00.
 
 | When | What | Gate |
 |---|---|---|
-| Friday night | Confirm this plan, assign roles, request the download links, read the sensor records | A plot shows the IMU-only path drifting away from the true path |
-| Saturday 09:00 to 13:00 | Camera speed working on one sunny flight, filter combining it with the IMU | The correction beats the baseline in a plot. The brief's minimum is met |
+| Friday night | Confirm this plan, assign roles, request the Mid-Air links, check ALTO, read the sensor records | A plot shows the IMU-only path drifting away from the true path. ALTO is decided, yes or no |
+| Saturday 09:00 to 13:00 | The three data checks. Camera speed on one sunny flight, filter combining it with the IMU | The correction beats the baseline in a plot. The brief's minimum is met |
 | Saturday 13:00 to 14:00 | Show mentors, write down what they say | |
-| Saturday 14:00 to 19:00 | Fog and season runs, integrity check, drift budget, route memory | Same flight compared across at least two conditions |
+| Saturday 14:00 to 19:00 | Position fixes, fog and season runs, integrity check, drift budget, noise sweep, timing | Same flight compared across at least two conditions |
 | Saturday 19:00 to 22:00 | Demo view, fallback video, slide draft | Video file saved |
 | Sunday 08:30 to 10:00 | Bug fixes only | |
 | Sunday 10:00 | Code freeze | Demo branch tagged |
 | Sunday 10:00 to 13:00 | Rehearse three times, submit | Submission confirmed |
 
-If we fall behind, cut in this order: route memory, the season runs, the demo view. The IMU baseline, camera speed, one fog run and the drift budget are the smallest complete entry.
+If we fall behind, cut in this order: position fixes, the season runs, the demo view. The IMU baseline, camera speed, one fog run and the drift budget are the smallest complete entry.
+
+After tonight, no further datasets are considered.
 
 ## Demo
 
 1. The downward camera video plays next to a map of the flight. GNSS is switched off.
 2. The IMU-only estimate leaves the true path within seconds.
 3. With camera speed, the estimate stays close. One chart shows both errors over time, with one headline number.
-4. The same flight in fog. The camera speed goes wrong, and the system flags it.
-5. The drift budget: how long each condition allows before the error passes 50 m.
-6. One slide: the sensors assumed, how the result changes with flight height, and what is not covered.
+4. A position fix arrives and the error drops back.
+5. The same flight in fog. The camera speed goes wrong, and the system flags it.
+6. The drift budget: how long each condition allows before the error passes 50 m.
+7. One slide: the sensors assumed, how the result changes with flight height, and what is not covered.
+
+## What the pitch has to contain
+
+The brief scores the user and product side. Role 6 collects it, everyone contributes.
+
+- User: operators of small drones that lose GNSS under jamming.
+- The Taiwan case: interference around the outlying islands is reported regularly, and Taiwan is adopting a map-based product that needs its vendor's data. Our method holds the position between map fixes and says for how long.
+- Platform: which sensors and how much computing the method needs.
+- Deployment: how it would run on an existing autopilot, and what a real test would require.
+- Evidence beyond the simulator: ALTO if available. A phone also has a camera, an IMU, a barometer and GNSS, so a two-minute walk with the camera pointing down gives a real recording for the same method.
 
 ## What we claim and what we do not
 
@@ -131,23 +180,26 @@ Claim: after GNSS is lost, the method holds the position far longer than the IMU
 
 Do not claim:
 
-- Results on real flights. The data is synthetic.
+- Results on real flights, unless ALTO or a phone recording provides them.
 - A position without a known start. The method continues from the last GNSS position.
-- Performance at a specific flight height other than the low flight tested.
+- Performance at a flight height we have not tested.
 - That drift is removed. Camera speed slows it. Only a position fix resets it.
 
-## Known weak points to address in the limits slide
+## Known weak points for the limits slide
 
 - The barometer gives height above the start point. Over hills the true distance to the ground differs, and the speed estimate is off by the same proportion.
+- The simulated barometer is derived from the true altitude. Its noise and drift model must be stated.
+- Heading drifts when it comes from the gyroscope alone.
 - Higher flight makes the camera see more ground and makes attitude errors count more. At 3,000 m a tilt error of 1 degree is about 52 m on the ground.
 - Fog, darkness and ground without texture stop the camera from measuring speed.
+- Camera-plus-IMU navigation is well studied. What is ours is the integrity check and the drift budget across conditions.
 
 ## Open questions
 
 - Does the team confirm this plan?
-- Who requests the download links?
-- Which second input did the mentor name for the cold start, besides the position of the sun?
-- How long is the demo slot, and what is the submission format?
+- Who requests the Mid-Air links, and who checks the ALTO Dropbox folders?
+- Which second input did the mentor name for the cold start, besides the position of the sun? He has not seen this version of the plan.
+- How long is the demo slot, what are the judging weights, and what is the submission format?
 
 ## Mentors on site
 

@@ -25,4 +25,4 @@ uv sync                              # creates .venv with Python 3.12 and the li
 source .venv/bin/activate
 ```
 
-The Mid-Air data is requested through a form on its website. See "The dataset" in [docs/PLAN.md](docs/PLAN.md) for what to select; the first download is about 300 MB.
+The Mid-Air data is requested through a form on its website. See "Datasets" in [docs/PLAN.md](docs/PLAN.md) for what to select; the first download is about 300 MB.
