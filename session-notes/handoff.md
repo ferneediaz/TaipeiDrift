@@ -12,7 +12,8 @@ Arrive at kickoff with a working environment, data on disk and a shortlist, then
 - Shortlist with demo, approach, roles and plan in `docs/pitches.md`: Challenge 2, Challenge 7 with 8, Challenge 3. Challenge 6 is reported as taken.
 - Weekend playbook in `docs/playbook.md`: timeline with gates, idea filter, demo script, slide skeleton, working rules.
 - Python 3.12 arm64 environment via uv (`pyproject.toml`, `uv.lock`). Imports verified, PyTorch MPS available, laptop microphone detected.
-- Audio datasets for Challenge 7 in `data/raw/` (drone audio 803 MB, ESC-50 846 MB).
+- Audio datasets for Challenge 7 in `data/raw/` (drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB).
+- Evidence from earlier EDTH hackathons added to `docs/pitches.md`. Timeline corrected to Demo Day on Sunday 13:00.
 - Repository initialised and pushed to github.com/dwn97/DefenseHackathon (private).
 
 ## Files changed
@@ -24,7 +25,8 @@ Arrive at kickoff with a working environment, data on disk and a shortlist, then
 
 ## Open issues
 
-- Challenge not chosen. Depends on the team formed at kickoff.
+- Challenge not chosen. Depends on the team formed at kickoff. Current lean: Challenge 7 with 8, Challenge 2 if a filter-experienced teammate joins.
+- Venue unclear: Nangang District (EDTH page) or National Taiwan University (tdth.org). Check the acceptance email.
 - Unknown whether pre-written code is allowed, so no product code exists.
 - No navigation dataset for Challenge 2. The organisers suggest one; ask for it.
 - Dataset licences need a check with the organisers (see `data/README.md`).

@@ -71,8 +71,8 @@ Site security teams and units that need a passive, cheap warning layer around a 
 
 - Features: mel spectrograms of 1 to 2 second windows, resampled to 16 kHz.
 - Model: a small convolutional network, or a pretrained audio model as feature extractor with a simple classifier on top.
-- Data: drone audio set and ESC-50, both already in `data/raw/` (see [data/README.md](../data/README.md)). Mix drone clips into background noise at controlled levels.
-- Evaluation: precision and recall, a curve of accuracy against signal-to-noise ratio, and a breakdown of false alarms by sound class. Hold out audio from a different source for the final test.
+- Data: drone audio set, ESC-50 and an outdoor test set, all already in `data/raw/` (see [data/README.md](../data/README.md)). Mix drone clips into background noise at controlled levels.
+- Evaluation: precision and recall, a curve of accuracy against signal-to-noise ratio, and a breakdown of false alarms by sound class. Use the outdoor set, which comes from a different microphone and setting, only for the final test.
 - Challenge 8 add-on: export to ONNX, quantize to 8-bit, report size, latency, memory and accuracy before and after in a CPU- and memory-limited container.
 - Stretch: direction of arrival. Two microphones a known distance apart hear the drone at slightly different times, and that delay gives the bearing. This needs a stereo input where both channels share one clock, so two separate phones will not work.
 - Tools: Python, librosa, PyTorch, onnxruntime, sounddevice. All installed.
@@ -143,6 +143,17 @@ A single operator in a ground station who supervises a mixed fleet on search, pa
 
 - Scope. Simulator, solver, three event types and an animated interface is a lot. Keep the simulation crude and spend the time on the replan and approve loop.
 - The algorithm is standard, so the entry stands or falls on the operator experience and the explanations.
+
+## What earlier EDTH hackathons show
+
+From public recaps and repositories of earlier events. Judging criteria were not published for any of them.
+
+- Acoustic detection has placed well with software alone. At Copenhagen 2025, first and second place both went to teams on Helsing's acoustic challenge: an 8-microphone sensor array, and an edge AI model for acoustic sensors.
+- Helsing's acoustic challenge (London, May 2025) had two phases: classify background, drone and helicopter, then make the model fit for the field through explainability, a lightweight or fast model, and synthetic data for quiet contacts. That second phase is close to Challenge 7 and 8 combined. The challenge repository is public: https://github.com/Phissie/ldth-2025-acoustics
+- Navigation entries that placed went beyond a basic filter. Rome's third place matched live camera images against satellite maps; another winning team had drones share observations to localise as a group. A dead-reckoning filter with landmark fixes meets this brief, but it is the expected baseline, so the correction source has to be the interesting part.
+- Task allocation and swarm simulators are common entries (several public repositories, second place in Rome), so Option C needs a clear angle on the operator side.
+
+Sources: https://eurodefense.tech/copenhagen-defense-tech-hackathon-2025/ and https://eurodefense.tech/back-in-rome-recap-of-our-second-european-defense-tech-hackathon-in-italy/
 
 ## How to choose
 

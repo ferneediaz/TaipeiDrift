@@ -19,7 +19,7 @@ Requires [uv](https://docs.astral.sh/uv/). On an Apple Silicon Mac, use the nati
 
 ```bash
 uv sync                      # creates .venv with Python 3.12 and all libraries
-bash scripts/fetch_data.sh   # downloads the audio datasets, about 1.65 GB
+bash scripts/fetch_data.sh   # downloads the audio datasets, about 1.8 GB
 source .venv/bin/activate
 ```
 

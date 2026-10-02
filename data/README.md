@@ -4,6 +4,8 @@ Datasets live in `data/raw/` and are not committed. Fetch them with `bash script
 
 ## Downloaded (Challenge 7, acoustic drone detection)
 
+About 1.8 GB in total.
+
 ### Drone audio (`data/raw/drone_audio`, 803 MB)
 
 - Source: https://github.com/saraalemadi/DroneAudioDataset (Al-Emadi et al., 2019)
@@ -21,6 +23,13 @@ Datasets live in `data/raw/` and are not committed. Fetch them with `bash script
 - Useful negative classes: `engine`, `helicopter`, `airplane`, `wind`, `rain`, `train`, `chainsaw`, `vacuum_cleaner`, `insects`, `siren`
 - Licence: CC BY-NC (non-commercial). The ESC-10 subset is CC BY.
 - The sample rate differs from the drone set, so resample everything to 16 kHz before training.
+
+### Outdoor drone, helicopter and background audio (`data/raw/outdoor_audio`, 152 MB)
+
+- Source: https://github.com/DroneDetectionThesis/Drone-detection-dataset, `Data/Audio` only (Svanström et al., 2021)
+- Format: 44.1 kHz, two channels, 90 clips of 10 seconds, 30 each of `BACKGROUND`, `DRONE`, `HELICOPTER`, class in the file name
+- Licence: CC0
+- Use: keep this set out of training and use it as the final test. It comes from a different microphone and setting than the drone audio set above, so it shows whether the detector generalises. Helsing used this same data for its acoustic challenge at the London hackathon in May 2025.
 
 ## Not downloaded
 

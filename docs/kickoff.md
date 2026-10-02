@@ -1,6 +1,8 @@
 # Kickoff checklist
 
-Friday 2 October 2026, 12:00, Nangang District, Taipei.
+Friday 2 October 2026. Doors open at 12:00, opening at 14:00.
+
+Venue: the two official pages disagree. The EDTH event page says Nangang District; tdth.org says National Taiwan University. Use the address in the acceptance email.
 
 ## Questions for the organisers
 
@@ -25,4 +27,4 @@ Friday 2 October 2026, 12:00, Nangang District, Taipei.
 - Each teammate runs the setup in the [README](../README.md).
 - Run the idea filter and write the demo script from the [playbook](playbook.md), then cut the plan to what the demo needs.
 - Fix shared conventions in writing: units, coordinate frames, file formats, branch names.
-- Set a demo freeze for Sunday 12:00.
+- Set a demo freeze for Sunday 10:00. Demo Day starts at 13:00.

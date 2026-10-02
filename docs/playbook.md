@@ -1,6 +1,6 @@
 # Weekend playbook
 
-A plan that works for whichever challenge the team picks. The hackathon runs Friday 12:00 to Sunday 17:00. The official agenda is not published yet, so adjust the times to it at kickoff, especially the submission deadline and the demo slot.
+A plan that works for whichever challenge the team picks. The hackathon runs Friday 12:00 to Sunday 17:00. According to the official site (tdth.org), doors open Friday at 12:00, the opening is at 14:00, and Demo Day starts Sunday at 13:00 after arrival at 08:30. Confirm these times and the submission deadline at kickoff.
 
 ## Timeline
 
@@ -8,8 +8,8 @@ A plan that works for whichever challenge the team picks. The hackathon runs Fri
 
 | Time | What | Done when |
 |---|---|---|
-| 12:00 to 14:00 | Kickoff, questions to the organisers, team forming | Team of 3 to 6, challenge and fallback agreed |
-| 14:00 to 17:00 | Idea filter, demo script, roles, setup | Demo script written, every laptop runs the environment |
+| 12:00 to 14:00 | Doors open, questions to the organisers, team forming | Team of 3 to 6, challenge and fallback agreed |
+| 14:00 to 17:00 | Opening, then idea filter, demo script, roles, setup | Demo script written, every laptop runs the environment |
 | 17:00 to 22:00 | Thinnest end-to-end version | Real input goes in, something shows on screen, however crude |
 
 Gate at 22:00: if nothing runs end to end, cut scope before going to sleep.
@@ -29,10 +29,10 @@ Gate at 14:00: if the core method does not beat the baseline yet, switch to the 
 
 | Time | What | Done when |
 |---|---|---|
-| 09:00 to 12:00 | Bug fixes only, slides, README | Nothing new is being built |
-| 12:00 | Code freeze | Demo branch tagged, nobody edits it |
-| 12:00 to 15:00 | Rehearse three times with a timer, submit | Submission confirmed |
-| 15:00 to 17:00 | Demo day | |
+| 08:30 to 10:00 | Bug fixes only, slides, README | Nothing new is being built |
+| 10:00 | Code freeze | Demo branch tagged, nobody edits it |
+| 10:00 to 13:00 | Rehearse three times with a timer, submit | Submission confirmed |
+| 13:00 to 17:00 | Demo Day | |
 
 ## Idea filter
 

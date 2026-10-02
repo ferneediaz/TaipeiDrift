@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fetch the public audio datasets for Challenge 7 into data/raw/ (about 1.65 GB).
+# Fetch the public audio datasets for Challenge 7 into data/raw/ (about 1.8 GB).
 # Run from the repo root: bash scripts/fetch_data.sh
 set -euo pipefail
 
@@ -18,4 +18,12 @@ if [ ! -d esc50 ]; then
   rm esc50.zip
 fi
 
-du -sh drone_audio esc50
+if [ ! -d outdoor_audio ]; then
+  git clone --depth 1 --filter=blob:none --sparse https://github.com/DroneDetectionThesis/Drone-detection-dataset.git _ddt
+  (cd _ddt && git sparse-checkout set Data/Audio)
+  mkdir -p outdoor_audio
+  mv _ddt/Data/Audio/* outdoor_audio/
+  rm -rf _ddt
+fi
+
+du -sh drone_audio esc50 outdoor_audio
