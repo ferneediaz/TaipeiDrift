@@ -261,9 +261,11 @@ Ideas from our mentor for the gaps we do not close this weekend.
 |---|---|---|---|
 | Heading in turns, and a start without GNSS | A sun sensor: a line sensor behind a slit, read by a microcontroller. An infrared filter makes the sun stand out through haze | An absolute heading, which is what our chain lacks in turns. A position only roughly: 1 degree of error in the vertical is 111 km on the ground | The sensor for a few dollars, the time of day, and the tilt from the IMU |
 | Night | The moon and the stars | A heading from the moon in the same way. Light for the camera only with a more sensitive or an infrared sensor | Moon tables, another image sensor |
-| Open water | Signals of opportunity: radio and TV transmitters with known positions. BAE Systems calls its version NAVSOP | A position where there is no ground to look at | A software radio receiver, a table of transmitter positions, and signal processing we have not built |
+| Open water | Signals of opportunity: FM radio stations, which name themselves in their RDS signal, and TV stations. The positions of their masts are known. BAE Systems calls its version NAVSOP | A position where there is no ground to look at | A software radio receiver, a table of mast positions, and signal processing we have not built |
 
 On our straight test section the direction is the smaller part of the camera-only drift. At the end, the error is 575 m along the route, from the scale, and 198 m across it, from the direction. A heading reference matters most in turns.
+
+On radio over water: by the usual rule for radio range, a drone at 100 m hears a mast on a 1,000 m mountain at up to about 170 km. The Taiwan Strait is 130 to 180 km wide. This is an estimate from the rule and not a measurement.
 
 ## What we claim and what we do not
 
@@ -383,7 +385,7 @@ Notes from the team's conversation with our mentor, and what we do with each.
 | Pick one thing, do it really well, say what could be done in the future and what it would require. One cohesive story in the slides | The one thing is camera fixes with the integrity check. The story is in "The story for the slides" |
 | Find the position with the sun: a line sensor and a microcontroller, as in a Chinese paper. The sun is the cheapest way. Use an infrared lens | A next step, in the table above. The sun gives a good heading and a rough position |
 | At night the moon and the stars are still there | A next step, in the table above |
-| Over open water: NAVSOP. Radio stations ("ADS signal") or TV stations for calculating the position | A next step, in the table above. "ADS" may be RDS, the station identifier in FM radio, or ADS-B, the position broadcast of aircraft |
+| Over open water: NAVSOP. Radio stations, identified by their RDS signal, or TV stations for calculating the position | A next step, in the table above |
 | Demo: simulate optical flow by walking outside the campus with a phone, recording without compression. Can we get the phone's altitude, and how precise would it be? | The phone walk in the demo section. The altitude that matters is the holding height, measured with a tape |
 | "lightex technology" | Not understood. Ask him |
 
