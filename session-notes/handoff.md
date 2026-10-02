@@ -1,6 +1,50 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 00:55.
+Last updated: Saturday 3 October 2026, 01:00.
+
+## Resume here
+
+Written on Saturday at 01:00, right before the chat was compacted. Dustin wants to work until 03:00 or 04:00, and he decided that the assistant writes all the code.
+
+**Where we are.** Branch `alto-navigator` is checked out. It is `main` plus a merge of `origin/mid-air-baseline-fix` plus the new files below. Goal for tonight: result 2 as shared code inside the `baseline/` package, reproducing `experiments/h_alto_end_to_end.py`.
+
+**Numbers the shared code has to reproduce** (ALTO validation section, GNSS cut after 300 m):
+
+| Run | Median | Worst | End |
+|---|---|---|---|
+| Camera only | 472.4 m | 657.0 m | 608.2 m |
+| Fix every 100 m, 7 nearest images | 25.5 m | 50.3 m | 26.3 m |
+| Fix every 300 m, 7 nearest images | 30.6 m | 83.1 m | 15.7 m |
+| Fix every 400 m, 7 nearest images (the cliff) | 285.1 m | 897.9 m | 897.9 m |
+| Fix every 1,000 m, 7 nearest, score at least 0.33 | 472.4 m | 657.0 m | 608.2 m |
+| Fix every 1,000 m, search sized by uncertainty, score at least 0.33 | 56.3 m | 278.1 m | 10.0 m |
+
+**Done and checked** (both flights load, 53 existing tests pass):
+
+- `baseline/src/data/camera_flight.py`: `CameraFlight`, `ReferenceMap`, `prepare`. Positions are (north, east) in metres from the first frame.
+- `baseline/src/data/alto.py`: `load_alto_flight`, reads `Val.zip` without unpacking.
+- `baseline/src/data/synthetic_camera.py`: `make_synthetic_camera_flight`, a small generated flight for tests (160 pixel images, zoom 0.85, rotation 15 degrees).
+
+**Still to write, in this order:**
+
+1. `src/estimation/image_motion.py`: `image_shift(previous, current)`, the median optical flow in pixels (Farneback with 0.5, 4, 21, 3, 7, 1.5 on frames reduced to about 250 pixels, median over the centre, scaled back to full-size pixels), and `shifts_for_flight(flight, cache_path)`.
+2. `src/estimation/map_matching.py`: `make_template(frame, zoom, angle, keep=0.8)` and `match(frame, reference_map, candidates, zooms, angles)`, returning score, position, zoom, angle and reference index. Position is the reference position plus (-(cy - H/2), (cx - H/2)) times metres per pixel, as (north, east).
+3. `src/estimation/navigator_core.py`: `fit_motion_matrix(shifts, steps)` by least squares so that steps is about shifts @ A; `blend(estimate, variance, fix, fix_variance)` with gain = variance / (variance + fix_variance); `fix_decision(score, distance, allowed, min_score)` returning use and a reason (OK, LOW_SCORE, DISAGREES_WITH_ESTIMATE); `status(sigma)` giving TRACKING, DEGRADED or LOST.
+4. `src/estimation/camera_navigator.py`: the loop of the experiment.
+   - Calibration while GNSS works: the motion matrix from the first 300 m; three test fixes at a third, two thirds and the end of that stretch, with zoom 0.60 to 1.00 in steps of 0.05 and angles -10 to 35 in steps of 5, on the 7 reference images nearest to the true position. Their medians give zoom0, angle0 and the fix offset.
+   - Dead reckoning: step = shift @ A0 times (zoom / zoom0).
+   - Fix every N metres of estimated travel. Fixed search: 7 nearest images, zoom within 0.10 of the last zoom in steps of 0.05 clipped to 0.5 to 1.1, angles angle0 - 5, angle0, angle0 + 5. Sized search: all images within max(60 m, 3 sigma), and zoom 0.60 to 1.10 when more than 400 m have passed since the last fix.
+   - Uncertainty: predicted variance = variance + (0.10 times distance since the last fix) squared, starting at 3 m squared. A fix has 15 m. It is used if it lies within 3 sigma of sqrt(predicted variance + 15 squared) and its score is high enough. Then the estimate moves by the gain, the variance becomes (1 - gain) times the predicted variance, the scale becomes new zoom / zoom0, and the distance since the last fix is reset.
+5. `src/evaluation/navigation_metrics.py`: median, 90 percent, worst and end error; fixes used and rejected; used but wrong by more than 50 m; rejected although within 30 m.
+6. `src/visualization/navigator_plot.py`: path and error over distance, like `docs/figures/alto_end_to_end.png`.
+7. `scripts/run_alto_navigator.py` and `configs/alto_navigator.yaml`.
+8. Tests on the synthetic flight: `test_navigator_core.py`, `test_map_matching.py`, `test_camera_navigator.py`. A regression test on ALTO that is skipped when the data is missing and checks the table above.
+9. Then, if time is left: the status logic, degraded images (blur, darkness, haze), and the held-out test on the training section.
+10. Update `baseline/README.md`, the findings and the plan, then push.
+
+**The ALTO training section** was downloading at 00:47 as `data/raw/alto/Unconfirmed 150932.crdownload`. When the browser finishes, the file should be named `Train.zip` in that folder. `load_alto_flight(AltoConfig(section="Train"))` then reads it.
+
+**Working rules from Dustin:** pull, then commit, then push, and say what the pull brought in. No assistant attribution in commits. Plain language in documents, no "not X but Y" phrasing, no middle dots.
 
 ## Current objective
 
