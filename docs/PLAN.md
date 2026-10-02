@@ -265,6 +265,8 @@ Ideas from our mentor for the gaps we do not close this weekend.
 
 On our straight test section the direction is the smaller part of the camera-only drift. At the end, the error is 575 m along the route, from the scale, and 198 m across it, from the direction. A heading reference matters most in turns.
 
+On the sun sensor: the paper our mentor most likely meant is [Micro digital sun sensor with linear detector](https://doi.org/10.1063/1.4958696) by Fan, Peng and Gao, Beihang University, 2016. To be confirmed with him. A V-shaped slit sits above a single row of light-sensitive pixels, and a microcontroller reads the row. The sensor gives the direction to the sun to 0.1 degrees, 25 times per second, on 200 mW. It was built for small satellites and measures a direction, not a position. Two related papers: the same idea with an N-shaped slit, open access, from [Tsinghua University, 2011](https://doi.org/10.3390/s111009764), and a low-cost build with a photodiode row and a small microcontroller from [York University, 2013](https://onlinelibrary.wiley.com/doi/10.1155/2013/549080).
+
 On radio over water: by the usual rule for radio range, a drone at 100 m hears a mast on a 1,000 m mountain at up to about 170 km. The Taiwan Strait is 130 to 180 km wide. This is an estimate from the rule and not a measurement.
 
 ## What we claim and what we do not
@@ -371,7 +373,7 @@ Conditions that trouble a drone navigating with a downward camera, an IMU and a 
 - Do we download the ALTO training section (9.93 GB) for the held-out test?
 - Answered: existing products do not work at night with an ordinary camera. Raptor uses an infrared camera, and VNS01 falls back on a radar altimeter. Details and sources are in [landscape.md](landscape.md).
 - Answered: besides the sun, the mentor named radio signals of opportunity for finding the position. See "Mentor feedback" below.
-- What did the mentor mean by "lightex technology", and which paper on a line sensor for the sun did he refer to?
+- What did the mentor mean by "lightex technology"? And is the sun sensor paper named under "Next steps" the one he had in mind?
 - Who records the phone walk, and with which phone and app?
 - How long is the demo slot, what are the judging weights, and what is the submission format?
 
