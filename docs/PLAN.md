@@ -185,6 +185,79 @@ Do not claim:
 - Performance at a flight height we have not tested.
 - That drift is removed. Camera speed slows it. Only a position fix resets it.
 
+## Challenges the drone could face
+
+Conditions that trouble a drone navigating with a downward camera, an IMU and a barometer. To think through before building: which of these the software must handle, which it must detect, and which are out of scope.
+
+### Ground below
+
+- Open water. Nothing fixed to see, and waves move on their own.
+- Coastline and tidal flats. The shore moves with the tide, so it differs from any stored picture.
+- Featureless ground. Snow, sand, mudflats and large fields of one crop give the camera nothing to hold on to.
+- Repeating ground. Fields, forest, plantations and housing blocks look the same in many places.
+- Hills and mountains. The ground rises and falls under the drone, so height above take-off is not the distance to the ground.
+- Tall objects at low flight height. Buildings and trees look different from every angle and hide the ground.
+- Moving things. Traffic, ships, crowds, tree tops in wind and water surfaces move independently of the drone.
+- A changed landscape. Construction, floods, harvest, fire or battle damage make the ground differ from what was recorded earlier.
+
+### Light and weather
+
+- Night. A normal camera sees nothing.
+- Cloud or fog below the drone. The ground is hidden.
+- Haze, smoke and dust. Contrast fades with distance.
+- Rain, spray and condensation on the lens. Blur and droplets.
+- Low sun. Long shadows that move during the day.
+- Glare. Sun reflecting off water, wet roads or roofs.
+- Sudden brightness changes. Crossing from dark land to bright sea, or in and out of cloud shadow.
+- Seasons. Snow, leaf fall and crop cycles change how the same place looks.
+- Changing air pressure. A weather front shifts the barometer reading during a flight.
+- Wind and gusts. They push the drone sideways and shake it.
+- Cold and heat. Temperature changes shift the IMU's errors, and ice or fog can form on the lens.
+
+### The flight
+
+- Fast rotation. Turns and corrections blur the image and swamp the motion signal.
+- Low and fast. The ground crosses the image too quickly to follow.
+- High flight. Small tilt errors become large position errors on the ground.
+- Climbing and descending. The scale of the image changes continuously.
+- Vibration from motors and propellers, into both IMU and camera.
+- Long duration. Every slowly growing error has more time to grow.
+- Airflow over the barometer. Speed and propeller wash change the pressure it reads.
+
+### Sensors and hardware
+
+- IMU drift. Its small errors add up quickly when nothing corrects them.
+- No compass. Heading has no absolute reference.
+- Camera mounting and calibration. A slightly tilted or miscalibrated camera gives a constant error.
+- Timing between sensors. Camera and IMU readings a few milliseconds apart do not describe the same instant.
+- Camera limitations. Motion blur, rolling shutter, limited resolution, slow exposure adjustment.
+- Limited computing and power on board. Image processing may not keep up.
+- A sensor failing in flight. A blocked lens, a frozen barometer, a saturated IMU.
+
+### The adversary
+
+- Jamming from take-off. There is never a trusted GNSS position to start from.
+- Intermittent jamming. GNSS comes and goes, and each return may or may not be trustworthy.
+- Spoofing. False GNSS signals that look valid and lead the drone astray.
+- Smoke screens and camouflage. Deliberate hiding of the ground.
+- Dazzling. Lasers or strong lights aimed at the camera.
+- No link to the operator. Nobody can correct the drone from outside.
+
+### Knowledge the drone starts with
+
+- Unknown start position or heading.
+- No map of the area, or an outdated one.
+- A route never flown before.
+- A map taken in a different season or at a different time of day.
+
+### Most serious for Taiwan
+
+1. Open water, because of the Strait and the outlying islands.
+2. Cloud, haze and rain, because of the climate.
+3. Night, because that is when incursions are hardest to see.
+4. Mountains, because about two thirds of the island is steep terrain.
+5. Jamming from take-off and spoofing, because the interference is already there before the drone launches.
+
 ## Known weak points for the limits slide
 
 - The barometer gives height above the start point. Over hills the true distance to the ground differs, and the speed estimate is off by the same proportion.
