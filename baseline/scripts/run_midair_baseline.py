@@ -107,6 +107,10 @@ def main() -> int:
     if check["accel_residual_median"] > ACCEL_RESIDUAL_WARN or check["gyro_residual_median"] > GYRO_RESIDUAL_WARN:
         print("WARNING: the IMU does not match the ground truth. Check quaternion order, world frame "
               "and gravity sign in the config before trusting the results.")
+    if check["gyro_residual_median_other_frame"] < check["gyro_residual_median"]:
+        print(f"WARNING: the gyroscope fits a {'world' if traj.gyroscope_frame == 'body' else 'body'}-frame "
+              f"rate better ({check['gyro_residual_median_other_frame']:.4f} rad/s) than the configured "
+              f"{traj.gyroscope_frame!r}. Check conventions.gyroscope_frame.")
 
     result = run_dead_reckoning(traj, cutoff)
     series = error_series(result, traj)

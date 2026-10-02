@@ -15,9 +15,7 @@ midair:
   sensor_file: sensor_records.hdf5
   imu_rate_hz: 100.0            # used to build timestamps when keys.timestamp is null
   gps_rate_hz: 1.0
-  # HDF5 dataset paths inside one flight group. VERIFY against the downloaded file:
-  # imu/* and groundtruth/attitude are used by experiments/e_midair_imu_noise.py;
-  # groundtruth/position and groundtruth/velocity are assumed from the dataset documentation.
+  # HDF5 dataset paths inside one flight group (verified on Kite_training sunny and cloudy).
   keys:
     accelerometer: imu/accelerometer
     gyroscope: imu/gyroscope
@@ -26,12 +24,13 @@ midair:
     attitude: groundtruth/attitude
     gps_position: null          # GNSS is not used by the baseline
     timestamp: null
-  # Conventions of the files (taken from experiments/e_midair_imu_noise.py; the run checks them).
+  # Conventions of the files (checked on the downloaded files; every run re-checks them).
   conventions:
     quaternion_order: wxyz      # wxyz or xyzw
     world_frame: NED            # NED or ENU
     gravity: 9.81               # m/s^2
     accelerometer: specific_force
+    gyroscope_frame: world      # Mid-Air gyro is a world-frame rate, despite its 'body' attribute
 
 synthetic:
   scenario: circle              # stationary, constant_velocity, circle, spinning_hover

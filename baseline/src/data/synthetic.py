@@ -131,6 +131,7 @@ def make_synthetic_trajectory(
     rate_hz: float = 100.0,
     noise: ImuNoise | None = None,
     gravity: float = STANDARD_GRAVITY,
+    gyroscope_frame: str = "body",
 ) -> Trajectory:
     """Build a synthetic flight in NED with IMU readings derived from the motion.
 
@@ -140,6 +141,7 @@ def make_synthetic_trajectory(
         rate_hz: sample rate of IMU and ground truth.
         noise: IMU errors to add; ``None`` gives ideal measurements.
         gravity: magnitude of gravity in m/s^2.
+        gyroscope_frame: "body" (a real strapdown gyro) or "world" (as Mid-Air records it).
     """
     if scenario not in SCENARIOS:
         raise ValueError(f"unknown scenario {scenario!r}, choose from {sorted(SCENARIOS)}")
@@ -151,6 +153,8 @@ def make_synthetic_trajectory(
 
     accel = m.attitude.inv().apply(m.acceleration - g_world)
     gyro = m.angular_velocity_body.copy()
+    if gyroscope_frame == "world":
+        gyro = m.attitude.apply(gyro)
     rng = np.random.default_rng(noise.seed)
     accel += np.asarray(noise.accel_bias) + noise.accel_white_std * rng.standard_normal((n, 3))
     gyro += np.asarray(noise.gyro_bias) + noise.gyro_white_std * rng.standard_normal((n, 3))
@@ -164,6 +168,7 @@ def make_synthetic_trajectory(
         gyroscope=gyro,
         world_frame="NED",
         gravity_world=g_world,
+        gyroscope_frame=gyroscope_frame,
         name=f"synthetic_{scenario}",
         metadata={"source": "synthetic", "scenario": scenario, "noise": noise.__dict__},
     )

@@ -89,3 +89,11 @@ def test_noise_is_deterministic():
 def test_unknown_scenario():
     with pytest.raises(ValueError, match="unknown scenario"):
         make_synthetic_trajectory("loop_the_loop")
+
+
+@pytest.mark.parametrize("frame", ["body", "world"])
+def test_gyro_frame_check_prefers_the_right_frame(frame):
+    traj = make_synthetic_trajectory("spinning_hover", duration=10.0, gyroscope_frame=frame)
+    check = imu_consistency(traj)
+    assert check["gyro_residual_median"] < 1e-6
+    assert check["gyro_residual_median_other_frame"] > 0.1

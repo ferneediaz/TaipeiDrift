@@ -123,3 +123,19 @@ def test_gyro_bias_causes_growing_drift(scenario):
     res = run_dead_reckoning(traj, 5.0)
     e = np.linalg.norm(res.position - traj.position_gt[res.start_index:], axis=1)
     assert e[-1] > 10.0 * e[len(e) // 4] > 0
+
+
+@pytest.mark.parametrize("scenario", ["circle", "spinning_hover"])
+def test_world_frame_gyro_reproduces_truth(scenario):
+    """Mid-Air records world-frame rates; with gyroscope_frame='world' the estimate still matches."""
+    traj = make_synthetic_trajectory(scenario, duration=60.0, gyroscope_frame="world")
+    res = run_dead_reckoning(traj, 5.0)
+    assert np.max(np.linalg.norm(res.position - traj.position_gt[res.start_index:], axis=1)) < 1e-2
+
+
+def test_world_frame_gyro_read_as_body_drifts():
+    """The Mid-Air failure mode: a world-frame gyro integrated as a body rate gives a large error."""
+    traj = make_synthetic_trajectory("spinning_hover", duration=60.0, gyroscope_frame="world")
+    traj.gyroscope_frame = "body"
+    res = run_dead_reckoning(traj, 5.0)
+    assert np.linalg.norm(res.position[-1] - traj.position_gt[-1]) > 100.0
