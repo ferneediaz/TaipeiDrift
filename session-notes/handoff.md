@@ -1,41 +1,36 @@
 # Handoff
 
-Last updated: 2 October 2026, night before kickoff.
+Last updated: Friday 2 October 2026, afternoon, after the opening.
 
 ## Current objective
 
-Arrive at kickoff with a working environment, data on disk and a shortlist, then choose the challenge with the team.
+Choose the challenge as a team of six, then start building.
 
 ## Completed
 
-- All nine challenges read and condensed in `docs/challenges.md`.
-- Shortlist with demo, approach, roles and plan in `docs/pitches.md`: Challenge 2, Challenge 7 with 8, Challenge 3. Challenge 6 is reported as taken.
-- Weekend playbook in `docs/playbook.md`: timeline with gates, idea filter, demo script, slide skeleton, working rules.
+- Team of six formed, team name Taipei Drift. Repository renamed to github.com/dwn97/TaipeiDrift (private), collaborators invited.
+- Decision briefing for the team in `docs/challenge-decision.md`: all nine challenges with data, tools, earlier entries, roles and risks.
+- Demo scripts and weekend plans for Challenges 2, 7, 3 and 6 in `docs/plans.md`.
+- Timeline, idea filter, slide skeleton and working rules in `docs/playbook.md`. Code freeze Sunday 10:00, Demo Day 13:00.
+- Condensed briefs of all nine challenges in `docs/challenges.md`.
 - Python 3.12 arm64 environment via uv (`pyproject.toml`, `uv.lock`). Imports verified, PyTorch MPS available, laptop microphone detected.
-- Audio datasets for Challenge 7 in `data/raw/` (drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB).
-- Evidence from earlier EDTH hackathons added to `docs/pitches.md`. Timeline corrected to Demo Day on Sunday 13:00.
-- Repository initialised and pushed to github.com/dwn97/TaipeiDrift (private). Team name: Taipei Drift.
+- Audio datasets for Challenge 7 in `data/raw/`: drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB.
 
-- Team decision briefing in `docs/challenge-decision.md` (all nine challenges, links, roles, risks). Its mentor table must be removed before the repository goes public.
+## Proposal on the table
 
-## Files changed
-
-- `README.md`, `pyproject.toml`, `uv.lock`, `.gitignore`
-- `docs/challenges.md`, `docs/pitches.md`, `docs/kickoff.md`, `docs/playbook.md`
-- `data/README.md`, `scripts/fetch_data.sh`
-- `session-notes/handoff.md`
+Challenge 2 (navigation without GPS) with the mentor's design: optical flow with altitude for speed, a sun compass for heading and cold start, map matching for position fixes. Gate on Friday 22:00. Fallback: Challenge 7 (acoustic drone detection), without Challenge 8 as a separate entry.
 
 ## Open issues
 
-- Challenge not chosen. Team of six formed. Proposal: Challenge 2 with a gate on Friday 22:00, Challenge 7 as fallback.
-- Venue unclear: Nangang District (EDTH page) or National Taiwan University (tdth.org). Check the acceptance email.
-- Unknown whether pre-written code is allowed, so no product code exists.
-- No navigation dataset for Challenge 2. The organisers suggest one; ask for it.
+- The team has not voted yet.
+- The second item the mentor named for the cold start, besides the position of the sun, is not known. Ask him again.
+- No data yet for Challenge 2. Plan: simulate a flight over an aerial image. The organiser dataset has not been seen.
+- No stereo microphone for direction finding in Challenge 7. Ask whether one can be borrowed.
 - Dataset licences need a check with the organisers (see `data/README.md`).
-- The native uv is at `~/.local/bin/uv`; the `uv` on the shell path is still the Intel build.
-- Docker is installed but not running. Needed only for the Challenge 8 benchmark.
+- The mentor table in `docs/challenge-decision.md` must be removed before the repository is made public. `docs/challenges.md` paraphrases the members-only challenge page.
+- The native uv is at `~/.local/bin/uv` on Dustin's laptop; the `uv` on the shell path is still the Intel build.
 - No project-specific CLAUDE.md yet. Write one once the challenge is fixed.
 
 ## Next exact step
 
-At kickoff, ask the questions in `docs/kickoff.md`, form the team, pick the challenge with "How to choose" in `docs/pitches.md`. Then run the idea filter and write the demo script from `docs/playbook.md`, and scaffold the chosen challenge.
+Team reads `docs/challenge-decision.md` and votes. Then follow "First hour after choosing" in `docs/playbook.md`. If Challenge 2 is chosen, build the gate test first: simulated flight frames and speed from optical flow against the true speed.

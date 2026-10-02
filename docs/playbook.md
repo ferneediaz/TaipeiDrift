@@ -1,6 +1,6 @@
 # Weekend playbook
 
-A plan that works for whichever challenge the team picks. The hackathon runs Friday 12:00 to Sunday 17:00. According to the official site (tdth.org), doors open Friday at 12:00, the opening is at 14:00, and Demo Day starts Sunday at 13:00 after arrival at 08:30. Confirm these times and the submission deadline at kickoff.
+A plan that works for whichever challenge the team picks. The hackathon runs Friday 12:00 to Sunday 17:00. According to the official site (tdth.org), doors open Friday at 12:00, the opening is at 14:00, and Demo Day starts Sunday at 13:00 after arrival at 08:30. Confirm these times and the submission deadline with the organisers.
 
 ## Timeline
 
@@ -8,7 +8,7 @@ A plan that works for whichever challenge the team picks. The hackathon runs Fri
 
 | Time | What | Done when |
 |---|---|---|
-| 12:00 to 14:00 | Doors open, questions to the organisers, team forming | Team of 3 to 6, challenge and fallback agreed |
+| 12:00 to 14:00 | Doors open, questions to the organisers, team forming | Team of six, challenge and fallback agreed |
 | 14:00 to 17:00 | Opening, then idea filter, demo script, roles, setup | Demo script written, every laptop runs the environment |
 | 17:00 to 22:00 | Thinnest end-to-end version | Real input goes in, something shows on screen, however crude |
 
@@ -34,6 +34,13 @@ Gate at 14:00: if the core method does not beat the baseline yet, switch to the 
 | 10:00 to 13:00 | Rehearse three times with a timer, submit | Submission confirmed |
 | 13:00 to 17:00 | Demo Day | |
 
+## First hour after choosing
+
+- Each teammate runs the setup in the [README](../README.md) and the data script.
+- Write the decision and the owner of each part into the README.
+- Run the idea filter below and write the demo script, starting from [plans.md](plans.md).
+- Fix shared conventions in writing: units, coordinate frames, file formats, branch names.
+
 ## Idea filter
 
 Before writing code, answer these in writing. If one answer is weak, change the idea or narrow it.
@@ -57,7 +64,7 @@ Write this on Friday and build only what it needs.
 - Step 4: a failure case shown on purpose, and what it means for use.
 - Closing line: who would deploy this, on what hardware, at what cost.
 
-Length: check the demo slot at kickoff. Plan for two to three minutes of demo.
+Length: ask the organisers how long the demo slot is. Plan for two to three minutes of demo.
 
 ## Slide skeleton
 

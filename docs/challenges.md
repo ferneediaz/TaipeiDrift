@@ -45,7 +45,6 @@ Every challenge also asks for a non-technical part: who the user or customer is,
 - Must show: historical and current tracks, detection of stopping, deviation, clustering, zone entry or reporting gaps, a risk score, timeline and explanation per alert, operator feedback (false alarms, notes, thresholds), a rule-based against a statistical or ML comparison.
 - Resources: shared or simulated AIS tracks with labelled events.
 - Scored on: detection performance, false-alarm control, explainability, visualisation, handling of incomplete data.
-- Status: reported as already taken.
 
 ## 07 Low-cost acoustic drone detection
 

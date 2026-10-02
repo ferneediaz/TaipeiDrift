@@ -35,7 +35,7 @@ About 1.8 GB in total.
 
 ### Challenge 2, navigation
 
-The brief says the organisers suggest a dataset with IMU, speed, heading and reference position. Ask for it at kickoff. Alternatives if it is not provided:
+The brief says the organisers suggest a dataset with IMU, speed, heading and reference position. Ask the organisers for it. Alternatives if it is not provided:
 
 - Record a short walk with a smartphone IMU logger (the brief allows this).
 - Simulate a trajectory and add sensor noise, which also gives exact ground truth.
