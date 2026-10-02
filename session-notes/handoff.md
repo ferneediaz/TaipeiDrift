@@ -23,6 +23,7 @@ The team decides tonight whether to stay with Challenge 2, and if so confirms th
   - Keypoint matching fails on ALTO, brightness matching works.
 - `docs/data.md` (Alessandro) proposes the pretrained DenseUAV network for position fixes. Findings propose it as an optional upgrade.
 - Branch `simulations` (Dan): a Gazebo simulator in Docker, now with a world of two islands. Not merged into main.
+- Branch `mid-air-baseline` (Alessandro, 22:06): product code for the IMU-only baseline on Mid-Air. It uses the textbook gyroscope rule and needs the eight-line change described in findings section 2.2. A tested patch is in the session scratchpad as `midair_gyro_axes.patch`; it has not been pushed. 10 of its 50 tests fail with the locked scipy version, all in the synthetic circle flight.
 
 ## Open issues
 

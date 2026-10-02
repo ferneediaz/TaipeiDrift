@@ -40,6 +40,8 @@ The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 
 | ALTO validation section | A real helicopter flight over rural Ohio, August 2017 | 1,684 camera frames and 459 reference images with coordinates (1.73 GB) | Raw IMU, height above ground |
 | Our simulator (branch `simulations`) | Gazebo in Docker, a drone with camera, IMU, barometer and GNSS | Runs on a MacBook according to its README. A second world with two islands was added at 22:19 | The GNSS cut, recorded flights, export in our format |
 
+Product code so far: branch `mid-air-baseline` holds a first IMU-only baseline for Mid-Air, pushed at 22:06. Everything else on this page is experiment scripts.
+
 ## 2. Mid-Air
 
 ### 2.1 What a flight looks like
@@ -78,6 +80,18 @@ The evidence: each signal compared with the change of the true attitude from one
 | PLE fall | 24 | 0.140 | 0.002 | 0.148 | 0.020 |
 
 Values are the typical difference in rad/s. The 0.02 that remains for the gyroscope in map axes is its noise. The accelerometer fits to 0.06 m/s² in the drone's axes and misses by more than 1 m/s² in map axes. We did not find the axes stated on the Mid-Air data organisation page.
+
+There are two consistent ways to handle this, and they do not give the same drift. Median over the 30 sunny flights, GNSS cut after 10 seconds:
+
+| Reading | Needs the true attitude after the jam | Error at the end | Passes 50 m after |
+|---|---|---|---|
+| A. Use the rates as given, with the turn step on the left | No | 485 m | 36 s |
+| B. Convert the rates to the drone's axes with the true attitude, then use the textbook rule | Yes, at every sample | 719 m | 29 s |
+| Textbook rule on the rates as given, which is wrong | No | 7,479 m | 12 s |
+
+We use A, because the baseline must not read ground truth after the jam. A and B agree during the first 10 seconds and then drift apart, more so in flights with many turns: a constant gyroscope offset partly cancels in A when the drone turns, and it adds up in B.
+
+The baseline code on branch `mid-air-baseline` used the textbook rule when it was pushed at 22:06 and ends 3,758 m off on flight 0003. With reading A it ends 247 m off on that flight, the same value to the centimetre as `experiments/j_midair_imu_only.py`. The change is eight lines.
 
 ### 2.3 How large the IMU errors are
 
@@ -288,7 +302,7 @@ Neither page shows what happens between fixes or when a fix is wrong. More in [l
 
 | Result | Data | State | Owner |
 |---|---|---|---|
-| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Needs the shared data format and the plot for the demo | |
+| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Product code with loader, metrics, plots and tests is on branch `mid-air-baseline`; it needs the gyroscope rule from 2.2 | |
 | 2. Camera dead reckoning plus position fixes | ALTO | Experiment done (3.4). Needs a held-out test, turns, and a cleaner filter | |
 | 3. Integrity check and drift budget | ALTO | First version done (3.4). Needs degraded images: blur, darkness, haze | |
 | All sensors in one flight, and the demo view | Simulator | Needs the GNSS cut, recording and export | |
