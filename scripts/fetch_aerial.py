@@ -12,9 +12,17 @@ from pathlib import Path
 os.environ.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
 os.environ.setdefault("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif")
 os.environ.setdefault("GDAL_HTTP_TIMEOUT", "60")
+os.environ.setdefault("GDAL_HTTP_MAX_RETRY", "5")
+os.environ.setdefault("GDAL_HTTP_RETRY_DELAY", "2")
 
+import numpy as np
 import rasterio
 from rasterio.enums import Resampling
+from rasterio.errors import RasterioIOError
+from rasterio.windows import Window
+
+STRIP_ROWS = 2048  # output rows per request, so one failed tile only repeats one strip
+ATTEMPTS = 5
 
 BASE = "https://oin-hotosm-temp.s3.amazonaws.com"
 IMAGES = {
@@ -23,13 +31,28 @@ IMAGES = {
 }
 
 
+def read_strip(src: rasterio.DatasetReader, window: Window, out_shape: tuple[int, int, int]) -> np.ndarray:
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            return src.read(window=window, out_shape=out_shape, resampling=Resampling.average)
+        except RasterioIOError:
+            if attempt == ATTEMPTS:
+                raise
+            print(f"  read failed at row {window.row_off}, retry {attempt}", flush=True)
+    raise AssertionError("unreachable")
+
+
 def fetch(name: str, url: str, factor: int, out_dir: Path) -> Path:
     out_path = out_dir / f"{name}_x{factor}.tif"
     if out_path.exists():
         return out_path
     with rasterio.open(f"/vsicurl/{url}") as src:
         height, width = src.height // factor, src.width // factor
-        data = src.read(out_shape=(src.count, height, width), resampling=Resampling.average)
+        data = np.zeros((src.count, height, width), dtype=src.dtypes[0])
+        for row in range(0, height, STRIP_ROWS):
+            rows = min(STRIP_ROWS, height - row)
+            window = Window(0, row * factor, width * factor, rows * factor)
+            data[:, row : row + rows, :] = read_strip(src, window, (src.count, rows, width))
         transform = src.transform * src.transform.scale(src.width / width, src.height / height)
         profile = {
             "driver": "GTiff",
