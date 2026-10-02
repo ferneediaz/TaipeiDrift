@@ -16,6 +16,7 @@ Choose the challenge as a team of six, then start building.
 - Python 3.12 arm64 environment via uv (`pyproject.toml`, `uv.lock`). Imports verified, PyTorch MPS available, laptop microphone detected.
 - Audio datasets for Challenge 7 in `data/raw/`: drone audio 803 MB, ESC-50 846 MB, outdoor test set 152 MB.
 
+- Research on Challenge 2 in `docs/challenge-2-research.md`; two aerial images of one Taichung site (2018, 2020) fetched by `scripts/fetch_aerial.py`.
 - Research on Challenge 4 in `docs/challenge-4-research.md`; drone video set (190 MB) in `data/raw/drone_video`.
 
 ## Proposal on the table
@@ -26,7 +27,7 @@ Challenge 2 (navigation without GPS) with the mentor's design: optical flow with
 
 - The team has not voted yet.
 - The second item the mentor named for the cold start, besides the position of the sun, is not known. Ask him again.
-- No data yet for Challenge 2. Plan: simulate a flight over an aerial image. The organiser dataset has not been seen.
+- Challenge 2 data: aerial images are available; the flight simulator over them is not built. The organiser dataset has not been seen.
 - No stereo microphone for direction finding in Challenge 7. Ask whether one can be borrowed.
 - Dataset licences need a check with the organisers (see `data/README.md`).
 - The mentor table in `docs/challenge-decision.md` must be removed before the repository is made public. `docs/challenges.md` paraphrases the members-only challenge page.

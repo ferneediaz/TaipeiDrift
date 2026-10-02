@@ -41,11 +41,18 @@ About 1.8 GB in total for the audio.
 - Limit: the bounding-box labels (`*_LABELS.mat`) are MATLAB `groundTruth` objects that `scipy.io.loadmat` cannot decode. Use the class from the file name, or convert the boxes in MATLAB or Octave.
 - The visible and infrared clips are separate recordings, not synchronised pairs.
 
+## Challenge 2, navigation: aerial images (`data/raw/aerial`)
+
+- Source: [OpenAerialMap](https://openaerialmap.org/), licence CC BY 4.0, credit the image providers named there
+- Two images of the same site in Wufeng, Taichung, about 2.1 by 2.9 km, map projection EPSG:3826 (TWD97): 3 May 2018 and 23 March 2020
+- Fetch with `python scripts/fetch_aerial.py`. It reads a quarter-resolution version over HTTP (about 20 and 14 cm per pixel) instead of the full 115 MB and 385 MB files. Pass a different factor as the first argument for more or less detail.
+- Use: fly a simulated drone over the 2020 image, and use the 2018 image as the on-board map.
+
 ## Not downloaded
 
 ### Challenge 2, navigation
 
-The brief says the organisers suggest a dataset with IMU, speed, heading and reference position. Ask the organisers for it. Alternatives if it is not provided:
+The brief says the organisers suggest a dataset with IMU, speed, heading and reference position. Ask the organisers for it. Other sources besides the aerial images above:
 
 - Record a short walk with a smartphone IMU logger (the brief allows this).
 - Simulate a trajectory and add sensor noise, which also gives exact ground truth.

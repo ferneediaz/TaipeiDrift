@@ -12,9 +12,11 @@ dependencies = [
     "scikit-learn",
     "jupyterlab",
     "ipykernel",
-    # challenge 2: state estimation
+    # challenge 2: state estimation, camera and map imagery
     "filterpy",
     "pyproj",
+    "opencv-python",
+    "rasterio",
     # challenge 7: audio
     "librosa",
     "soundfile",

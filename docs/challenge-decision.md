@@ -34,7 +34,7 @@ All coding is done with AI assistance, so missing experience in a method (a Kalm
 | # | Challenge | Interest | Data | Checkable | Split | Mentor | Record | Demo |
 |---|---|---|---|---|---|---|---|---|
 | 1 | Offline collaboration | Low | None needed | Yes | Good | None specific | Entries, no wins found | Good |
-| 2 | Navigation without GPS | High | Simulate, or organiser set | Yes, exactly | Good | Strong | Placed twice | Strong |
+| 2 | Navigation without GPS | High | Aerial images ready, flight simulated | Yes, exactly | Good | Strong | Placed twice | Strong |
 | 3 | Task allocation | Medium | None needed | Partly | Tight | Strong | Placed, many entries | Strongest |
 | 4 | Drone detection and tracking | Medium | Download and train | Yes | Medium | Weak | Strongest, most contested | Strong |
 | 5 | Visible and thermal fusion | Medium | Download | Hard | Poor | Partial | None found | Medium |
@@ -46,6 +46,8 @@ All coding is done with AI assistance, so missing experience in a method (a Kalm
 The full briefs are in [challenges.md](challenges.md).
 
 ## Challenge 2: navigation without GPS
+
+A fuller study of this challenge, with fielded systems, their limits, the situation in Taiwan and the data we have, is in [challenge-2-research.md](challenge-2-research.md).
 
 ### What it asks
 
@@ -63,7 +65,7 @@ The optical-flow and sun-compass ideas came from a mentor who works on GNSS secu
 
 ### Data
 
-- **Simulated flight:** take a large aerial image, fly a virtual drone over it on a known path, and cut out what a downward camera would see. This gives camera frames, altitude and an exact true path, so every result can be checked.
+- **Simulated flight:** take a large aerial image, fly a virtual drone over it on a known path, and cut out what a downward camera would see. This gives camera frames, altitude and an exact true path, so every result can be checked. Two free aerial images of the same site in Taichung, from 2018 and 2020, are available for this: one as the world the drone sees, the other as the on-board map.
 - **Organiser dataset:** the brief mentions a suggested dataset with IMU, speed, heading and reference position. We have not seen it yet.
 - **Real footage for validation:** [UAV-VisLoc](https://github.com/IntelliSensing/UAV-VisLoc) is a public dataset for drone visual localisation. Check size and licence before using it (the repository states no licence).
 

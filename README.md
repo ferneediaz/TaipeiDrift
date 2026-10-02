@@ -8,6 +8,7 @@ The challenge is not chosen yet. This repository currently holds the shared envi
 
 - [docs/challenge-decision.md](docs/challenge-decision.md): **start here**, the briefing for choosing our challenge, with links to data, tools and earlier entries
 - [docs/challenges.md](docs/challenges.md): the nine challenges, condensed
+- [docs/challenge-2-research.md](docs/challenge-2-research.md): fielded systems, limits and options for the navigation challenge
 - [docs/challenge-4-research.md](docs/challenge-4-research.md): existing products, limits and options for the drone detection challenge
 - [docs/plans.md](docs/plans.md): target user, demo script and weekend plan for each candidate challenge
 - [docs/playbook.md](docs/playbook.md): timeline, idea filter, demo script, slide skeleton and working rules
