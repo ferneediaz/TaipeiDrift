@@ -10,7 +10,8 @@ the IMU's gravity, then IMU prediction, barometer height and GNSS position (with
     python scripts/fused_replay.py --flight wufeng_corridor_100m --cut --camera --fixes   # step 4: plus the map fixes
     python scripts/fused_replay.py --all [--camera-model realistic]                 # every development flight and draw
 
-Never run on the sealed flights; the development flights are listed in baseline/configs/sim_navigator.yaml.
+The flights and their roles are listed in baseline/configs/sim_navigator.yaml. Single flights are development
+flights only. ``--sealed`` is the declared run on the two sealed flights (docs/simulation-results.md): once.
 """
 from __future__ import annotations
 
@@ -80,6 +81,14 @@ def settled_start(rec: dict, samples: int) -> int:
     raise ValueError("the IMU never settles: the recording does not start on the ground")
 
 
+def route_of(cfg: dict, flight_name: str) -> str:
+    """The route file of a flight, whatever its role (development, held out or sealed)."""
+    for flights in cfg["flights"].values():
+        if flight_name in flights:
+            return flights[flight_name]
+    raise KeyError(f"no flight {flight_name!r} in the config")
+
+
 def camera_measurements(cfg: dict, flight_name: str, camera: str, seed: int, heading_source: str | None = None) -> dict:
     """What the camera navigator measures on one flight, for the filter: per frame the sun sensor's heading and the
     ground speed from the down camera.
@@ -90,7 +99,7 @@ def camera_measurements(cfg: dict, flight_name: str, camera: str, seed: int, hea
     """
     if heading_source:  # another heading sensor of the config: compass, sun_digital or sun_photodiode
         cfg = {**cfg, "heading": {**cfg["heading"], "source": heading_source}}
-    fc = flight_cfg(cfg, flight_name, cfg["flights"]["development"][flight_name], camera, {})
+    fc = flight_cfg(cfg, flight_name, route_of(cfg, flight_name), camera, {})
     flight0 = S.flight_for(fc, "2018")
     heading = S.heading_reading(fc, flight0, seed)
     flight = with_heading(flight0, heading)
@@ -347,16 +356,17 @@ def one_flight(job: tuple) -> dict:
     return out
 
 
-def all_flights(camera_model: str, workers: int, heading_source: str | None = None, yaw_sigma_deg: float = 1.5) -> int:
+def all_flights(camera_model: str, workers: int, heading_source: str | None = None, yaw_sigma_deg: float = 1.5,
+                role: str = "development") -> int:
     cfg = yaml.safe_load((REPO / "baseline" / "configs" / "sim_navigator.yaml").read_text())
-    jobs = [(name, camera_model, seed, heading_source, yaw_sigma_deg) for name in cfg["flights"]["development"] for seed in cfg["seeds"]]
+    jobs = [(name, camera_model, seed, heading_source, yaw_sigma_deg) for name in cfg["flights"][role] for seed in cfg["seeds"]]
     with ProcessPoolExecutor(max_workers=workers) as pool:
         rows = list(pool.map(one_flight, jobs))
     (REPO / "outputs").mkdir(exist_ok=True)
     source = heading_source or cfg["heading"].get("source", "compass")
-    (REPO / "outputs" / f"fused_replay_{camera_model}_{source}.json").write_text(json.dumps(rows, indent=1))
-    print(f"development flights, camera {camera_model}, heading from {source}, GNSS lost after 450 m; medians over the draws {cfg['seeds']} (metres)")
-    for name in cfg["flights"]["development"]:
+    (REPO / "outputs" / f"fused_replay_{role}_{camera_model}_{source}.json").write_text(json.dumps(rows, indent=1))
+    print(f"{role} flights, camera {camera_model}, heading from {source}, GNSS lost after 450 m; medians over the draws {cfg['seeds']} (metres)")
+    for name in cfg["flights"][role]:
         mine = [r for r in rows if r["flight"] == name]
         med = lambda part, key: float(np.median([r[part][key] for r in mine]))  # noqa: E731
         print(f"\n{name}")
@@ -364,10 +374,12 @@ def all_flights(camera_model: str, workers: int, heading_source: str | None = No
         print(f"  filter: IMU, barometer, sun, camera    median {med('filter', 'median'):6.1f}  90% {med('filter', 'p90'):6.1f}  worst {med('filter', 'worst'):6.1f}"
               f"  | within its 3 sigma {min(r['filter']['within_3_sigma'] for r in mine):.1%} (lowest draw) | heading error {med('filter', 'yaw_rms_deg'):.1f} deg rms")
         print(f"  the frozen navigator (camera and map)  median {med('navigator', 'median'):6.1f}  90% {med('navigator', 'p90'):6.1f}  worst {med('navigator', 'worst'):6.1f}"
-              f"  | within its 3 sigma {min(r['navigator']['within_3_sigma'] for r in mine):.1%}; wrong fixes {[int(r['navigator']['used_but_wrong']) for r in mine]}")
+              f"  | within its 3 sigma {min(r['navigator']['within_3_sigma'] for r in mine):.1%}; wrong fixes {[int(r['navigator']['used_but_wrong']) for r in mine]}; "
+              f"per draw {[round(r['navigator']['median'], 1) for r in mine]}")
         print(f"  filter with the navigator's map fixes  median {med('filter_and_fixes', 'median'):6.1f}  90% {med('filter_and_fixes', 'p90'):6.1f}  worst {med('filter_and_fixes', 'worst'):6.1f}"
               f"  | within its 3 sigma {min(r['filter_and_fixes']['within_3_sigma'] for r in mine):.1%}; fixes fused {[r['filter_and_fixes']['fixes_used'] for r in mine]}, "
-              f"rejected {[r['filter_and_fixes']['fixes_rejected'] for r in mine]}, resets {[r['filter_and_fixes']['resets'] for r in mine]}")
+              f"rejected {[r['filter_and_fixes']['fixes_rejected'] for r in mine]}, resets {[r['filter_and_fixes']['resets'] for r in mine]}; "
+              f"per draw {[round(r['filter_and_fixes']['median'], 1) for r in mine]}, worst per draw {[round(r['filter_and_fixes']['worst'], 1) for r in mine]}")
     return 0
 
 
@@ -389,7 +401,10 @@ def main() -> int:
     p.add_argument("--heading-source", help="compass, sun_digital or sun_photodiode (default: as configured, the sun)")
     p.add_argument("--yaw-sigma", type=float, default=1.5, help="degrees, noise the filter assumes for the heading sensor")
     p.add_argument("--no-speed", action="store_true", help="fuse the heading only, not the camera's ground speed")
+    p.add_argument("--sealed", action="store_true", help="the declared run on the two sealed flights (docs/simulation-results.md): once")
     args = p.parse_args()
+    if args.sealed:
+        return all_flights(args.camera_model, args.workers, role="sealed")
     if args.all:
         return all_flights(args.camera_model, args.workers, args.heading_source, args.yaw_sigma)
 

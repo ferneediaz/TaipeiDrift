@@ -221,3 +221,22 @@ python scripts/fused_replay.py --flight wufeng_corridor_100m --cut --camera     
 python scripts/fused_replay.py --flight wufeng_corridor_100m --cut --camera --fixes  # plus the map fixes
 python scripts/fused_replay.py --all [--camera-model realistic] [--heading-source compass --yaw-sigma 4.1]
 ```
+
+### The fused filter on the sealed flights
+
+**Declared on Saturday 3 October 2026 at 20:06, before the run** (tag `frozen-fused-replay`):
+
+- `python scripts/fused_replay.py --sealed` as committed, on the two sealed flights, three draws of the heading
+  sensor, once with the ideal and once with the realistic camera.
+- Its settings were chosen on the development flights only and are fixed here: 1 m/s of noise for the camera's speed;
+  a reading weakened when its squared size against what the filter expects is above 9.21; steps shorter than 0.3 of
+  the cruising step not fused; 1.5 degrees of noise for the heading; fixes behind a 99 percent gate with a reset
+  after three rejections; an uncertainty of 10 percent of the distance since the last fix.
+- The frozen navigator runs on these flights again, unchanged, only to hand over the fixes it used. Its numbers stay
+  as quoted above.
+- Known beforehand: the dropped pictures on `wufeng_north_90m`, and the navigator's own result on these flights
+  (36.3 and 16.2 m). So this is the fused filter's first run on them; for the navigator they are no longer unseen.
+- Reported: median, 90 percent and worst error after the GNSS loss, and how often the true error is within the
+  filter's 3 sigma, next to the navigator's. Whatever comes out is reported here.
+
+Result: not run yet.
