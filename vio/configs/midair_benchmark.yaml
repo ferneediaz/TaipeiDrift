@@ -1,0 +1,28 @@
+# Frozen benchmark of the current estimators on every Mid-Air trajectory available on disk.
+# The estimator settings come unchanged from vio_config (camera, tracker, pose, fusion).
+
+vio_config: vio/configs/midair_vio.yaml
+baseline_config: baseline/configs/midair_baseline.yaml   # Mid-Air keys and conventions
+camera: left                     # forward camera (color_left), as validated
+gnss_cutoff_s: 5.0
+horizons_s: [10, 30, 60]         # plus "final"; horizons beyond a flight are NaN
+output_dir: outputs/midair_benchmark
+
+discovery:
+  min_duration_s: 10.0           # shorter flights are skipped as IMU-invalid
+  min_frames: 50                 # fewer listed camera frames: visual unavailable
+
+# "Unchanged" when |visual - imu| <= max(abs, rel * imu)
+paired_tolerance:
+  position_m: {abs: 1.0, rel: 0.02}
+  attitude_deg: {abs: 0.05, rel: 0.02}
+
+# Percentage changes are only computed when the IMU value is at least this large
+percent_min_denominator:
+  position_m: 5.0
+  attitude_deg: 0.5
+
+# Strata by IMU-only final attitude error. null = tertiles of the paired trajectories;
+# or give [low_max_deg, high_min_deg], e.g. [1.0, 5.0].
+drift_strata:
+  thresholds_deg: null

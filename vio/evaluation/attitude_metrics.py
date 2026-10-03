@@ -60,3 +60,22 @@ def attitude_at_horizons(series: AttitudeErrorSeries, horizons: list[float]) -> 
     """Attitude error at fixed times after GNSS loss; None beyond the end of the flight."""
     return {h: (None if h > series.time_since_loss[-1] else float(np.interp(h, series.time_since_loss, series.error_deg)))
             for h in horizons}
+
+
+def tilt_heading_error_deg(q_est: np.ndarray, q_gt: np.ndarray, gravity_unit_world: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Split the attitude error into tilt and heading without Euler angles (swing-twist about gravity).
+
+    Error E = R_gt R_est^T (world side). Twist = the part of E about the gravity axis (heading,
+    signed, deg); swing = E twist^-1 (tilt: the angle by which the estimated gravity direction is off).
+    """
+    from scipy.spatial.transform import Rotation as _R
+    a = np.asarray(gravity_unit_world, float) / np.linalg.norm(gravity_unit_world)
+    E = _R.from_quat(np.atleast_2d(q_gt)[:, [1, 2, 3, 0]]) * _R.from_quat(np.atleast_2d(q_est)[:, [1, 2, 3, 0]]).inv()
+    q = E.as_quat()  # x, y, z, w
+    w, v = q[:, 3], q[:, :3]
+    p = v @ a
+    heading = np.degrees(2.0 * np.arctan2(p, w))
+    heading = (heading + 180.0) % 360.0 - 180.0
+    twist = _R.from_rotvec(np.radians(heading)[:, None] * a)
+    tilt = np.degrees((E * twist.inv()).magnitude())
+    return tilt, heading

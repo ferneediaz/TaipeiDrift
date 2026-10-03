@@ -78,7 +78,8 @@ def run_front_end(traj: Trajectory, setup: CameraSetup, tracker_cfg: TrackerConf
 
     Only images are read here: no ground truth and no estimator state.
     """
-    frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream)
+    frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream,
+                         traj.metadata.get("frames_dir"))
     rng = frame_range(frames, setup, imu_rate_hz, start_index, len(traj))
     first = frames.read_gray(rng.start, setup.downscale)
     K = setup.intrinsics(first.shape[1], first.shape[0])

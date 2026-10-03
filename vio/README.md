@@ -171,3 +171,31 @@ The earlier fusion (`run_midair_vio.py`) moved the attitude 5 % towards the came
 - **The flow model assumes locally flat ground below the camera,** and the plane-inlier check skips frames where the ground is not flat.
 - **The prior gyro-bias σ of 0.003 rad/s gives `IMU + baro` visible horizontal jumps** when barometer updates move the tilt through the cross-covariance.
 - **The raw angular-flow measurement** (height as a filter state, flow residual in rad/s) is the next step for the down camera. It would move the height uncertainty from `R` into the state.
+
+## Experiment: gyro bias from relative visual rotations (bias-only filter)
+
+Question: can the forward camera's relative rotations estimate the Mid-Air gyro bias well enough to slow future attitude drift? Code: [estimation/gyro_bias_kf.py](estimation/gyro_bias_kf.py), [bias_experiment.py](bias_experiment.py), [scripts/run_bias_experiment.py](scripts/run_bias_experiment.py). Settings: [configs/midair_bias_kf.yaml](configs/midair_bias_kf.yaml). Results: `outputs/midair_bias_eskf/`.
+
+**Model.** The gyro measures world-frame rates, the attitude error sits on the world side (`R = Exp(δθ) R̂`), and the bias error is `δb = b − b̂`. Then `δθ̇ = ω × δθ − δb`; a finite-difference test confirms the `ω × δθ` term. Over a non-overlapping interval i→j the residual is `r = Log(R̂_i C R̂_jᵀ) = (M − I) δθ_i − A δb`, where `M` is the interval's world rotation and `A ≈ Δt I` is accumulated exactly, giving `H_bg = −Mᵀ A`. Only `b̂` is corrected; the attitude is never pulled towards the camera.
+
+**Why the attitude error is a consider state.** A pure 3-state filter mistakes `(M − I) δθ_i` for bias. Synthetic check, zero bias with 2.7 deg initial attitude error: the invented bias grows with rotation rate (0.11, 0.24 and 0.47 deg/s at 0.25, 0.5 and 1× rate). With `δθ` as a Schmidt consider state it stays at 0.005–0.017 deg/s. That is honest but not exactly unbiased: the leaked term is still not subtracted. The unbiased fix is to clone `δθ` at each keyframe (a 9-state filter).
+
+**Note on the earlier ESKF** (`estimation/eskf.py`, world-gyro mode): its attitude-error propagation uses `δθ̇ = −δb` and omits the `ω × δθ` term derived above. That term is correct for a body-frame gyro, but the first plan copied the body-frame form. The nominal propagation is unaffected; the covariance cross-terms are. This should be fixed before the ESKF results are trusted.
+
+**Synthetic results** (world-frame bias, camera rotations generated from the true attitude):
+
+- With an ideal camera (0.005 deg), every axis and sign is recovered: 0.02 deg/s per axis to within 0.002, and mixed (0.02, −0.01, 0.015) as (0.020, −0.006, 0.017). Zero bias gives ≤ 0.003 deg/s.
+- With Mid-Air-like noise (0.2 deg camera, 1.2 deg/s gyro white noise), the detection floor is about 0.07–0.1 deg/s.
+  - Biases of 0.2 deg/s are recovered: attitude 23.3 → 2.2 deg, drift slope 0.21 → 0.02 deg/s.
+  - Biases of 0.02 deg/s are not, and the estimate's error then makes attitude worse.
+
+**Real flights** (GNSS lost at 5 s; 0.5 s intervals, σ_vis 0.2 deg, bias walk 1e-5 rad/s/√s, chosen on 0001 by NIS closest to 3):
+
+| Flight | Attitude final, IMU / complementary / bias KF (deg) | Slope 60 s–end, IMU / bias KF (deg/s) | Position final, IMU / bias KF (m) |
+|---|---|---|---|
+| sunny 0000 (high drift) | 6.42 / 4.85 / **3.15** | 0.066 / 0.057 | 684 / 451 |
+| sunny 0001 (low, tuning) | 0.58 / 0.68 / 4.05 | −0.045 / 0.023 | 381 / 824 |
+| cloudy 3000 (very high) | 20.3 / 14.5 / **14.4** | 0.319 / **0.172** | 912 / 610 |
+| cloudy 3001 (low) | 0.92 / 1.66 / 3.83 | 0.004 / 0.001 | 338 / 1,333 |
+
+**Why the low-drift flights get worse.** Measured against the true attitude (evaluation only), the camera's relative rotations have a mean error equivalent to 0.02–0.14 deg/s. A mounting or scale map explains almost none of it. The filter cannot separate this camera bias from gyro bias, so it helps only where the gyro bias is clearly larger (0000, 3000) and imposes the camera's error where the gyro is already good.
