@@ -31,7 +31,7 @@ sys.path.insert(0, str(BASELINE_DIR))
 from src.data.camera_model import CameraModel  # noqa: E402
 from src.data.sim_replay import SimReplayConfig, load_sim_flight, with_camera, with_heading  # noqa: E402
 from src.estimation.camera_navigator import NavigatorConfig, calibrate, navigate  # noqa: E402
-from src.estimation.image_motion import detail_for_flight, shifts_for_flight  # noqa: E402
+from src.estimation.image_motion import shifts_for_flight  # noqa: E402
 from src.evaluation.navigation_metrics import integrity_summary, navigation_errors, summarize_navigation  # noqa: E402
 from src.sensors.heading import compass_heading, sun_position  # noqa: E402
 from src.sensors.sun_sensor import SunSensorModel, sun_heading_readings  # noqa: E402
@@ -117,20 +117,11 @@ def flow_path(cfg: dict, seed: int) -> Path:
     return Path(_path(cfg, "cache_dir")) / f"sim_flow_{recording.name}_{hashlib.sha1(content).hexdigest()[:10]}_{source}_seed{seed}.npy"
 
 
-def detail_path(cfg: dict, seed: int) -> Path:
-    """Where the picture detail of one draw is cached: next to its camera motion."""
-    path = flow_path(cfg, seed)
-    return path.with_name(path.stem + "_detail.npy")
-
-
 def flow_job(job: tuple) -> str:
     """Camera motion for one heading-sensor draw: the frames are turned north up by its readings."""
     cfg, seed = job
     flight0 = flight_for(cfg, "2018")
-    flight = with_heading(flight0, heading_reading(cfg, flight0, seed))
-    shifts_for_flight(flight, flow_path(cfg, seed))
-    if cfg["navigator"].get("detail_scaling"):
-        detail_for_flight(flight, detail_path(cfg, seed))
+    shifts_for_flight(with_heading(flight0, heading_reading(cfg, flight0, seed)), flow_path(cfg, seed))
     return f"seed {seed}"
 
 
@@ -142,10 +133,9 @@ def one_run(job: tuple) -> dict:
     flight = with_heading(flight0, reading)
     shifts = shifts_for_flight(flight, flow_path(cfg, seed))
     run = replace(NavigatorConfig(**cfg["navigator"]), **settings)
-    detail = detail_for_flight(flight, detail_path(cfg, seed)) if run.detail_scaling else None
     t0 = time.time()
-    calibration = calibrate(flight, shifts, run, detail)
-    result = navigate(flight, shifts, calibration, run, detail)
+    calibration = calibrate(flight, shifts, run)
+    result = navigate(flight, shifts, calibration, run)
     errors = navigation_errors(result, flight)
     out = {
         "run": name, "seed": seed,

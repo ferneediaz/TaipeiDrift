@@ -74,28 +74,3 @@ def shifts_for_flight(flight: CameraFlight, cache_path: str | Path | None = None
         Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
         np.save(cache_path, shifts)
     return shifts
-
-
-def picture_detail(frame: np.ndarray) -> float:
-    """How much fine detail a frame holds: the spread of its texture 1 to 4 pixels across, over its mean brightness.
-
-    Fog, haze and blur wash this detail out; a frame that is only darker or brighter keeps it. Measured on the
-    simulated flight over Wufeng with the realistic camera: about 0.071 in clear air, 0.038 in fog with 1 km of
-    visibility (54 percent of it), 0.015 at 300 m (21 percent).
-    """
-    g = frame.astype(np.float32)
-    band = cv2.GaussianBlur(g, (0, 0), 1.0) - cv2.GaussianBlur(g, (0, 0), 4.0)
-    return float(np.std(band) / max(float(np.mean(g)), 1.0))
-
-
-def detail_for_flight(flight: CameraFlight, cache_path: str | Path | None = None) -> np.ndarray:
-    """Picture detail of every frame of a flight (see ``picture_detail``), stored at ``cache_path`` like the shifts."""
-    if cache_path is not None and Path(cache_path).is_file():
-        cached = np.load(cache_path)
-        if cached.shape == (len(flight),):
-            return cached
-    detail = np.array([picture_detail(flight.frame(k)) for k in range(len(flight))])
-    if cache_path is not None:
-        Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
-        np.save(cache_path, detail)
-    return detail
