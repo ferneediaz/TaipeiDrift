@@ -104,7 +104,6 @@ What it says:
 
 - **Ilhan:** ~~rerun the ALTO Train test with the map search~~ done at 13:00 (131 m). Next: the same with the current navigator, and the zoom from the height.
 - **Alessandro:** the heading error of the visual-inertial odometry after 30, 60 and 80 s without GNSS; it becomes our compass model. And what the "graph-map layer" in your architecture sketch is, before anyone builds it.
-- **Felix:** one slide on terrain navigation for forest and night (forest is 76 percent of Taiwan, where camera fixes fail).
 - **Anyone with an iPhone, today until 14:30 or tomorrow 09:00 to 09:45:** the mentor's sun-compass test (below).
 - **Dustin:** the story and slides; ask the organisers what the brief's "suggested dataset" is.
 
@@ -125,7 +124,7 @@ What the jury scores (the challenge brief), and how we answer each point:
 | Reduction in positioning error | Where developed: 472 → 31 m (ALTO), 822 → 28 m (UAV-VisLoc 03). Never seen: 219 → 131 m (ALTO, 8 sections), 675 → 60 m (UAV-VisLoc 04); no gain where the ground changed (01) | Measured |
 | Technical validity | Tested on flights we never tuned on, from another country, camera and map source | Done: UAV-VisLoc 01 and 04 (ours), ALTO Round 2 (Ilhan) |
 | Noise tolerance | Error as the picture gets darker, blurred, hazy, and as the heading sensor gets worse | Done: light, blur, haze (top of page); compass against sun sensor |
-| Computing and integration | One fix takes about 0.1 s on one laptop core; output is a position with an uncertainty, the form an autopilot takes | Timing open |
+| Computing and integration | One laptop core: 11 ms per camera frame; one map fix 0.07 s for the smallest search (60 m) up to 2 s for the widest (600 m), against about 30 s between fixes; output is a position with an uncertainty, the form an autopilot takes | Measured (`baseline/scripts/time_navigator.py`) |
 | Deployment feasibility | Free maps (Taiwan's government orthophotos), an ordinary camera, no GPU | Slide |
 | The user | Operators of small drones near Taiwan's coast and islands, where GNSS is jammed | Slide |
 
@@ -212,7 +211,7 @@ A position with its uncertainty is the form in which an autopilot takes a positi
 
 - **Sensors:** a downward camera; a heading from the compass every drone has, or a sun sensor (35 g, 0.2 W, Fan et al. 2016); GNSS for the first few hundred metres.
 - **Map:** free aerial images, about 1 MB per km² before compression.
-- **Computing:** one fix in about 0.1 s on one laptop core, no graphics processor. Not yet timed on a drone's small computer.
+- **Computing:** one laptop core, no graphics processor: 11 ms per camera frame (94 frames per second possible, the camera gives 25); one map fix 0.07 s for the smallest search (60 m), 0.27 s at 150 m, 0.8 s at 300 m, 2 s at the 600 m cap. A fix comes about every 30 s, so even the widest search uses under 7 percent of one core. Measured under Intel emulation on an Apple Silicon Mac; not yet timed on a drone's small computer.
 - **Setup:** none by hand; it calibrates itself while GNSS works. That also means a drone jammed from take-off is not covered.
 
 ### 2.5 What it does not do yet, and what would close each gap
@@ -224,7 +223,7 @@ A position with its uncertainty is the form in which an autopilot takes a positi
 | Wrong fixes that still pass | A second motion source to cross-check (Alessandro's IMU filter); a forecast of where the map has look-alikes | Open |
 | Night | An infrared camera against the same map, as Raptor does | Not started |
 | Water, the Strait | Nothing to match; IMU and camera dead reckoning with the sun heading | Alessandro's filter; not combined |
-| Forest, 76 percent of Taiwan | Terrain navigation (Felix) | Separate |
+| Forest, 76 percent of Taiwan | Another position source, such as terrain matching with a laser altimeter | Not in this system |
 | Jammed from take-off | A start without GNSS | Not covered |
 
 ### 2.6 Against what a buyer can get today
@@ -274,7 +273,7 @@ Sources in [landscape.md](landscape.md).
 - **Held-out ALTO test done.** He downloaded ALTO Round 2 Train (37.4 km, with positions) through the second Dropbox link. With our navigator frozen and fixes every 300 m, the median error per section is 94 m (20 to 339 m), against 31 m on the validation section; only 3 of 8 sections reproduce it. His runs still used the search that knew the true path; they need repeating with the map search, which on the validation section changed nothing.
 - **Main cause there: the zoom** (image scale), learned from three fixes, goes wrong when the helicopter's height changes. With a better zoom, right fixes rise from 21 to 43 percent to 86 to 100 percent in three sections.
 - **His integrity rule "quad ≥ 3":** cut the frame into four quarters; at least three must land where the whole frame landed. On 300 real ALTO frames: 44 accepted, 0 wrong. Learned matchers (XFeat) failed on real aerial images; matching OpenStreetMap roads, magnetic anomalies and a shadow compass were tried and dropped.
-- **Taiwan:** forest covers 76 percent of the island, where map fixes are unlikely; there, terrain navigation (Felix) carries the load.
+- **Taiwan:** forest covers 76 percent of the island, where map fixes are unlikely.
 
 Two independent held-out tests, his on ALTO and ours on UAV-VisLoc, say the same: the first version does not carry over to unseen flights, and the score threshold is its weak point.
 
@@ -368,6 +367,7 @@ Code freeze Sunday 10:00, demo 13:00. Updated 14:15.
 | **One branch with everything**, `integration`: every team branch merged, 297 tests pass | [pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2) |
 | **The simulated flight over Wufeng**: route, aerial ground, recorded flight, camera navigator with the 2018 and the 2020 map, demo clip | top of this page |
 | The phone sun test, written up for the teammate | [phone-sun-test.md](phone-sun-test.md) |
+| Computing time: 11 ms per camera frame, 0.07 to 2 s per map fix, 4 MB of map per km² | section 2.4, `outputs/timing/timing.json` |
 
 **Left:**
 
@@ -375,13 +375,11 @@ Code freeze Sunday 10:00, demo 13:00. Updated 14:15.
 |---|---|---|
 | **The fused navigator on the simulated flight:** Alessandro's IMU filter as the core; the down camera's motion with its tilt removed by the IMU; our map fixes as position measurements, each corrected for the drone's tilt (2 to 5 m instead of 16 to 22), behind his 99 percent gate and our confirmation of large jumps; the barometer sets the matcher's zoom; a compass (later the sun) for the heading, since the simulated drone has no forward camera | Claude | Next, about two hours |
 | **Merge pull request 2 into `main`** | Dustin and team | Open |
-| Computing time per fix and per frame, map storage per square kilometre | Claude | Open |
 | README for the submission (one sentence, headline number, how to run, limits, each part, data and licences) | Claude | Open |
 | Fold today's numbers into `findings.md` | Claude | Open |
 | Slides and the one story | Dustin and team | Open; charts from Claude |
 | ~~Rerun the ALTO Train test with the map search~~ Done at 13:00: 131 m (top of page). Next: the same test with the current navigator (new checks), and the zoom from the height | Ilhan | Asked |
 | The heading drift of the visual-inertial odometry; fix the term he flagged; who adds the fix input to his filter | Alessandro | Asked |
-| One slide on terrain navigation for forest and night | Felix | Asked |
 | Phone photos for the sun compass: [phone-sun-test.md](phone-sun-test.md), tomorrow 09:00 to 09:45 | anyone with an iPhone | Asked |
 
 **The story for the slides** (proposal): the drone's camera as a GNSS replacement on cheap hardware and free maps. Dead reckoning drifts (Alessandro's visual-inertial odometry, our camera motion). Map fixes reset it. The check keeps it honest, shown on flights from another country that we never tuned on. Next steps: the sun sensor for heading, terrain navigation for forest and night, a thermal camera for night, the water crossing.
