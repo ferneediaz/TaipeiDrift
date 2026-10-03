@@ -57,6 +57,15 @@ navigator:                # the settings frozen for the UAV-VisLoc held-out test
   # next fix. Kept at 16:00 on the development flights: 2018 map, flight 1 26.5 -> 18.5 m median (now works),
   # 120 m 30.9 -> 28.6 m and its 3 wrong fixes gone (now works), 65 m 39.8 -> 26.6 m (still fails: 1 wrong fix).
   scale_from_fixes: false
+  # The zooms searched after the jam must cover the heights flown too (the defaults, 0.60 to 1.10, miss the 65 m
+  # flight's 0.51: after 400 m without a fix it searched only wrong scales). And a jump from a search wider than
+  # 100 m (default 150 m) waits for the next fix to confirm it: the 65 m flight has a look-alike 74 m off at
+  # 1.32 km, found by a 134 m search and accepted before. Kept at 17:00: every development flight works
+  # (no wrong fix, bound held 99 percent, never "within 50 m" while further off); the price is fewer fixes used
+  # and a median 4 to 10 m higher.
+  wide_zooms: [0.45, 1.05]
+  zoom_limits: [0.45, 1.05]
+  confirm_above_radius_m: 100.0
 
 heading:                  # src/sensors/heading.py and sun_sensor.py; choose with source (sim_dev_check.py --heading)
   source: compass         # compass, sun_digital or sun_photodiode

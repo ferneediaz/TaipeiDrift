@@ -33,12 +33,14 @@ import run_sim_navigator as S  # noqa: E402
 
 
 def parse_value(text: str):
-    """'false' -> False, '0.3' -> 0.3, 'none' -> None, anything else stays text."""
+    """'false' -> False, '0.3' -> 0.3, 'none' -> None, '[0.45,1.05]' -> [0.45, 1.05], anything else stays text."""
     low = text.lower()
     if low in ("true", "false"):
         return low == "true"
     if low in ("none", "null"):
         return None
+    if text.startswith("["):
+        return json.loads(text)
     try:
         return float(text) if any(c in text for c in ".e") else int(text)
     except ValueError:
