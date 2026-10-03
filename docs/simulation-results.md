@@ -252,13 +252,13 @@ three draws:
 
 How to read it:
 
-- **The fused filter is more accurate than the navigator alone on both sealed flights, with both cameras:** 4 to 5 m
+- **The fused filter is more accurate than the navigator alone on both sealed flights, with both cameras:** 3.5 to 4.7 m
   better in the median, and a smaller worst error. Per draw on the 90 m flight: 14.5, 32.2 and 38.2 m, against the
   navigator's 20.4, 36.3 and 42.2 m.
 - **It fused every fix the navigator handed over** (12, 7 and 7 on the 90 m flight; 14, 15 and 15 on the 110 m flight);
   none was rejected and no reset was needed.
 - **Its stated error is a little less reliable than the navigator's.** On the 90 m flight the true error was outside
-  the filter's 3 sigma 1.6 to 1.8 percent of the time; the navigator's bound held all the time. By the rule we set
+  the filter's 3 sigma 1.6 to 1.8 percent of the time in its worst draw; the navigator's bound held all the time. By the rule we set
   for the navigator (at least 99 percent), the fused filter passes on the 110 m flight and misses on the 90 m flight.
 - **Without map fixes** the filter with the sun heading and the camera's speed drifts less than the camera alone on
   the 110 m flight (26 against 59 m) and about the same on the 90 m flight.

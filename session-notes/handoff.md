@@ -1,8 +1,16 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 19:27. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
+Last updated: Saturday 3 October 2026, 20:10. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
 
 ## Resume here
+
+**Saturday 20:10: the fused filter works and has its own sealed result.**
+
+- **`scripts/fused_replay.py`** replays a recorded flight through Alessandro's ESKF as his live adapter runs it, and feeds it our sun heading (yaw update), our camera ground speed (tilt-corrected with the filter's own attitude; `soft_update` weakens a reading that is far from what the filter expects; steps under 0.3 of the cruising step are not fused), the frozen navigator's used map fixes (position update behind a 99 percent gate, reset after three rejections, as Dan's RF fix) and the navigator's uncertainty rule (10 percent of the distance since the last fix, added to the horizontal position covariance). Settings fixed at tag `frozen-fused-replay` (20:06), chosen on the development flights only.
+- **Sealed flights, run once (20:07 to 20:09, log `outputs/fused_sealed_run.log`), median / 90 percent / worst:** 90 m flight 32.2 / 64 / 78 m (navigator alone 36.3 / 70 / 90), 110 m flight 11.5 / 27 / 42 m (navigator 16.2 / 38 / 58); realistic camera 18.3 and 11.2 m (navigator 21.8 and 15.3). Every fix fused, no reset. Its stated error holds 98.2 and 99.7 percent (lowest draw); the navigator's holds 100. Development flights: 18.4 / 31.0 / 11.0 m (navigator 16.5 / 32.3 / 18.0). With a compass in place of the sun: 21.6 / 36.3 / 20.5 m. Step by step on the 100 m flight: IMU and barometer alone 3 km median; plus sun heading 2.4 km (heading 1.3 degrees, from 55); plus camera speed 57 m; plus map fixes 18 m. All in `docs/simulation-results.md`.
+- **What it is not yet:** the navigator still finds the fixes on its own (the filter does not steer the map search); nothing of it runs live in the simulator (there is no node that publishes the sun heading, the camera step or the map fix; Dan would integrate that into his adapter); the tilt correction assumes flat ground; the stated error is a little optimistic on one flight.
+- **Dustin's decisions today:** finish the simulation before the demo; if Ilhan can add his map, ours is removed (his fixes would enter the filter the same way; his Tuniu flight has no IMU recording, so the filter cannot run on it as it is). Pull request 4 (`integration` to `main`) is open; merging needs his word.
+- **Since 19:36 also merged:** Ilhan's closed-loop results on the real flight (3.3 m median over 4.0 km without GNSS, no loss of lock in 20 of 20 runs, no wrong fix among 1,646; `docs/research/tuniu-level2-results.md`) and his plan for the runs with his own survey map; Dan's `strait-eskf-velfit` (identical to our join except one comment).
 
 **Saturday 19:27: the navigator is frozen, the sealed flights are run, everyone's work is in `integration`.**
 
