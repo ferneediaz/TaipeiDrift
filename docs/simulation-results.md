@@ -1,6 +1,6 @@
 # The simulated flights: what we measured
 
-Saturday 3 October 2026, 17:30. Every number here comes from the recordings in `recordings/` and the scripts
+Saturday 3 October 2026, 18:46. Every number here comes from the recordings in `recordings/` and the scripts
 named next to it; `python scripts/sim_progress.py` and `python scripts/sim_figures.py` redo the tables and figures.
 
 ## The setup
@@ -71,11 +71,61 @@ On flight 1, at the settings of stage 2 (compass), median / 90 percent / worst i
 | Fog, visibility 300 m | 608 / 2,807 / 2,958 | 25% | the camera loses the ground |
 | Heavy rain (set by eye) | 40.1 / 118 / 187 | 84% | one wrong fix |
 
-Fog is the weak spot: no camera sees through it, and today the navigator does not notice that its picture has
-gone flat, so its stated bound fails. The next step makes it notice.
+At save point 4, on all three development flights (100 m / 120 m / 65 m, over three draws):
 
-## Still to come
+| Condition | Median error | Stated bound held (lowest draw) | Wrong fixes used |
+|---|---|---|---|
+| The simulator's ideal camera | 16.5 / 32.3 / 18.0 m | 100% / 100% / 100% | none |
+| The realistic camera, clear weather | 18.2 / 31.3 / 16.7 m | 100% / 100% / 97.8% | one on the 65 m flight, in 2 of 3 draws |
+| The realistic camera, fog with 1 km of visibility | 61.3 / 93.6 / 22.3 m | 88.9% / 75.2% / 97.8% | one on the 65 m flight, in 1 of 3 draws |
 
-1. The navigator notices fog (picture detail falls) and widens its uncertainty; kept if the fog flights then hold
-   the bound and the clear flights do not change.
-2. Freeze; the two sealed flights run once. Those are the numbers we quote.
+Two limits, stated plainly:
+
+- **Fog.** No camera sees through it. At 1 km of visibility the median error grows up to three and a half times,
+  and the stated bound fails 2 to 25 percent of the time: the navigator does not notice that its picture has gone flat.
+- **Turns, with a realistic camera.** The wrong fix on the 65 m flight lands 54 m from the truth (our line is 50 m).
+  It is taken while the drone turns on the spot at the end of a leg, at about 30 degrees per second and tilted up to
+  20 degrees, so the camera does not look straight down. A navigator with only a camera also cannot tell that the
+  drone has stopped to turn: it counts on at cruising speed and, on that flight, is about 50 m off after the turn.
+  An IMU can tell; that is what fusing with the team's filter (`vio/`) would add.
+
+## Tried after save point 4, and not kept
+
+Each was measured on the three development flights with both cameras. The logs are in `outputs/` and the code is
+kept as patches in `outputs/experiments/`; neither is in git.
+
+| Change | What it did | Why it is not in |
+|---|---|---|
+| Noticing fog: widen the uncertainty when the picture loses fine detail, compared with the pictures before the jam | Nothing in fog: the bound held 75 to 98 percent with it and without it | With fog from take-off the pictures before the jam are as dull as the rest; in clear weather it cost flight 1 5 m |
+| The same, compared with a clear day | Flying on camera motion alone, the bound holds again at 1 km (99.6 to 100 percent, from 92) | With map fixes, wrong fixes remain (the 120 m flight, 2 of 3 draws) |
+| Search only the scale learned before the jam, one step either side | Removes one of the realistic camera's two wrong fixes | Not both |
+| No fix while the heading turns faster than 10 degrees per second | Worse: wrong fixes on two of three flights with either camera | It moves every later attempt, and look-alikes at other scales get through |
+| Those two together | No wrong fix on any flight with either camera | 4 to 10 m worse with the ideal camera (23.9 / 35.9 / 27.5 m) |
+| Those two, and believing the camera when the drone stops to turn | No wrong fix; the camera alone improves on the 65 m flight (64 to 54 m) | 4 to 6 m worse with the ideal camera (20.5 / 35.8 / 24.2 m); with the realistic camera flight 1 is for a moment "within 50 m" while further off |
+
+The rule was set before these tests: a change stays only if every development flight works and none gets worse.
+None of them met it, so the navigator of save point 4 is the one we freeze. The last row is where we would start
+again: with an IMU telling the navigator when the drone turns or stops.
+
+## The freeze and the sealed flights
+
+**Frozen on Saturday 3 October 2026 at 18:46** (tag `frozen-navigator`): the navigator of save point 4, its code
+unchanged since.
+
+Declared before the run:
+
+- The two sealed flights are run once, with `baseline/configs/sim_navigator.yaml` as it stands and three draws of
+  the heading sensor: `wufeng_north_90m` (90 m, 9 m/s, 4.8 km) and `wufeng_south_110m` (110 m, 8 m/s, 5.1 km).
+  Neither was run or looked at before.
+- The numbers we quote are those with the camera as configured, the simulator's pictures. Next to them, also run
+  once: the realistic camera, because of the weakness above.
+- Known beforehand: on `wufeng_north_90m` the recorder dropped pictures under CPU load (3,326 instead of about
+  3,600). It is run as recorded.
+- "Works" means what it meant in the loop. Whatever comes out is reported here.
+
+```bash
+python baseline/scripts/run_sim_navigator.py --recording recordings/wufeng_north_90m --route sim/scenarios/wufeng_north_90m.json [--camera realistic]
+python baseline/scripts/run_sim_navigator.py --recording recordings/wufeng_south_110m --route sim/scenarios/wufeng_south_110m.json [--camera realistic]
+```
+
+Results: not run yet.
