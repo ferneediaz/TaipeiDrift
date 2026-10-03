@@ -1,3 +1,7 @@
+# Baseline package
+
+Two parts share this package: the IMU-only baseline on Mid-Air, and the camera navigator on ALTO, further below.
+
 # IMU-only baseline
 
 How fast does a plain inertial estimate drift away from the true path once GNSS is lost at time t0? This folder answers that for Mid-Air flights, and for synthetic flights until the Mid-Air files are in place. It is the baseline later methods are compared against.
@@ -37,11 +41,55 @@ Mid-Air is the exception for the gyroscope: its files store the turn rate around
 
 Each run prints how well the IMU matches the ground truth. If the frame, the gravity sign or the quaternion order is wrong, the accelerometer mismatch is of the order of g, and the run warns.
 
+# Camera navigator on ALTO
+
+The camera a drone already has, used as a position sensor once GNSS is jammed. GNSS works for the first 300 m. After that the position is carried forward by how the ground slides through the image, and every few hundred metres the camera frame is matched against aerial reference images that have coordinates. A check decides whether each of these position fixes is believed.
+
+## Run
+
+```bash
+python baseline/scripts/run_alto_navigator.py                    # ALTO validation section
+python baseline/scripts/run_alto_navigator.py --section Train    # the section the settings were not tuned on
+python baseline/scripts/run_alto_navigator.py --synthetic        # generated flight, no download needed
+python baseline/scripts/run_alto_navigator.py --only camera_only every_300
+```
+
+The ALTO zip files go into `data/raw/alto/` (see `data/README.md`). The runs and their settings are in [configs/alto_navigator.yaml](configs/alto_navigator.yaml). Results go to `outputs/alto_navigator/<flight>/`, which is not committed: `metrics.json`, `errors.csv` (error and stated uncertainty per frame), `fixes.csv` (every attempted fix, used or not and why) and `navigator.png`. The image shifts are computed once per flight and kept in `data/processed/`. The whole validation section takes about a minute.
+
+## Method
+
+1. **While GNSS works,** the navigator learns everything it needs: a 2 by 2 matrix that turns image shift in pixels into ground steps in metres, and the zoom, rotation and offset of the camera against the reference images. It reads no altitude, no orientation and no camera calibration.
+2. **After the jam,** the image shift alone carries the position forward. The navigator states its uncertainty, which grows by 10 percent of the distance flown since the last fix.
+3. **Every so many metres** it matches the frame against the reference images near its estimate, with normalised correlation of brightness patterns. A fix is used only if its score is high enough and it lies within 3 sigma of the estimate. A used fix is blended in according to the two uncertainties.
+4. **The search** is either the 7 nearest reference images or all images within 3 sigma of the estimate, so it grows when the navigator is less certain.
+
+The logic is in [src/estimation/navigator_core.py](src/estimation/navigator_core.py), with a worked example for each function. The true position after the jam is read only by [src/evaluation/navigation_metrics.py](src/evaluation/navigation_metrics.py); a test checks that the navigator gives the same result when it is hidden.
+
+## Results on the validation section
+
+GNSS lost after 300 m, then 4.3 km with the camera alone. Errors in metres.
+
+| Run | Median | Worst | End | Fixes used / rejected |
+|---|---|---|---|---|
+| Camera alone | 472.4 | 657.0 | 608.2 | |
+| Fix every 100 m | 25.5 | 50.3 | 26.3 | 39 / 0 |
+| Fix every 300 m, larger search, score check | 30.9 | 72.8 | 37.7 | 12 / 1 |
+| Fix every 400 m, no check | 285.1 | 897.9 | 897.9 | 7 / 0, of which 5 wrong |
+| Fix every 1,000 m, 7 nearest images, score check | 472.4 | 657.0 | 608.2 | 0 / 3 |
+| Fix every 1,000 m, larger search, score check | 56.3 | 278.1 | 10.0 | 4 / 0 |
+
+These are the numbers of `experiments/h_alto_end_to_end.py`, reproduced exactly; [tests/test_alto_navigator.py](tests/test_alto_navigator.py) checks them whenever the data is present. The settings were chosen on this same section, so they still need the test on the training section.
+
+**A known limit, shown by a test:** if the map's coordinates are 200 m off, the first fixes are rejected, but after 600 m without a fix the allowed distance has grown past 200 m and a confident wrong fix is believed. The distance check alone cannot catch a wrong place that lies inside the stated uncertainty.
+
 ## Layout
 
 - `src/data/trajectory.py`: the common `Trajectory` and the convention check
 - `src/data/synthetic.py`: four exact flights (stationary, constant velocity, banked climbing circle, spinning hover) with optional IMU noise
 - `src/data/midair.py`: the Mid-Air adapter. Every assumption about the file format is listed at its top
-- `src/estimation/`, `src/evaluation/`, `src/visualization/`: estimator, metrics, plots
-- `scripts/run_midair_baseline.py`: the command line
-- `tests/`: frame, gravity, attitude, integration-order and metric tests
+- `src/data/camera_flight.py`, `alto.py`, `synthetic_camera.py`: camera flights with reference images, the ALTO adapter and a generated flight for tests
+- `src/estimation/inertial_dead_reckoning.py`: the IMU estimator
+- `src/estimation/image_motion.py`, `map_matching.py`, `navigator_core.py`, `camera_navigator.py`: the camera navigator
+- `src/evaluation/`, `src/visualization/`: metrics and plots for both
+- `scripts/run_midair_baseline.py`, `scripts/run_alto_navigator.py`: the command lines
+- `tests/`: frame, gravity, attitude, integration-order and metric tests; navigator tests on the generated flight; the ALTO regression

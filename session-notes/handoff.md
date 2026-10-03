@@ -1,105 +1,73 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 01:00.
+Last updated: Saturday 3 October 2026, 08:35.
 
 ## Resume here
 
-Written on Saturday at 01:00, right before the chat was compacted. Dustin wants to work until 03:00 or 04:00, and he decided that the assistant writes all the code.
+**Where we are.** Branch `alto-navigator` holds the camera navigator as shared code inside `baseline/` (commit d29b300). It is `main` plus the Mid-Air gyroscope fix plus the navigator. It reproduces all seven numbers of `experiments/h_alto_end_to_end.py` exactly; 91 tests pass. Run it with `python baseline/scripts/run_alto_navigator.py`. How it works and the results table are in `baseline/README.md`.
 
-**Where we are.** Branch `alto-navigator` is checked out. It is `main` plus a merge of `origin/mid-air-baseline-fix` plus the new files below. Goal for tonight: result 2 as shared code inside the `baseline/` package, reproducing `experiments/h_alto_end_to_end.py`.
+**Rules from Dustin for the repo.** Never push to `main`; work on a branch and push only that branch, by name. Pull, then commit, then push, and say what the pull brought in. No assistant attribution in commits. Documents for the team also go on the working branch now; the team merges into `main`.
 
-**Numbers the shared code has to reproduce** (ALTO validation section, GNSS cut after 300 m):
+**Next, in this order:**
 
-| Run | Median | Worst | End |
-|---|---|---|---|
-| Camera only | 472.4 m | 657.0 m | 608.2 m |
-| Fix every 100 m, 7 nearest images | 25.5 m | 50.3 m | 26.3 m |
-| Fix every 300 m, 7 nearest images | 30.6 m | 83.1 m | 15.7 m |
-| Fix every 400 m, 7 nearest images (the cliff) | 285.1 m | 897.9 m | 897.9 m |
-| Fix every 1,000 m, 7 nearest, score at least 0.33 | 472.4 m | 657.0 m | 608.2 m |
-| Fix every 1,000 m, search sized by uncertainty, score at least 0.33 | 56.3 m | 278.1 m | 10.0 m |
+1. **Held-out test on the training section** (build step 2). Blocked: the download of `Train.zip` stopped at 01:44 at 10.25 of about 10.66 GB (`data/raw/alto/Unconfirmed 150932.crdownload`, downloaded with Brave). Dustin has to press Resume in Brave's download list. The missing tail holds the three position files (query, reference, matches), which the archive stores last; all camera frames and the main reference images are already in the file. When the download is complete it is called `Train.zip`, and `python baseline/scripts/run_alto_navigator.py --section Train` runs the test with the settings untouched.
+2. **What to expect on the training section,** from a look at the images: 28.5 km and 10,436 frames, six times the validation section; fields, long dark forest, villages, a town; about 16 percent of frames with very low contrast, in stretches of up to roughly 760 m; and probably heading changes, which the fixed angle learned before the jam does not follow.
+3. **Wrong-fix numbers and a stronger check** (build step 4). The reading suggests checks that need no tuned threshold: agreement of consecutive frames (Tomahawk) or of crops of one frame (UASTHN). See `docs/reading-notes.md`. Build only after the held-out test shows whether the 0.33 threshold holds.
+4. Then the rest of the build order in `docs/PLAN.md`: limits with darkened and blurred frames, the demo view, turns, the phone walk.
 
-**Done and checked** (both flights load, 53 existing tests pass):
+**Found last night:**
 
-- `baseline/src/data/camera_flight.py`: `CameraFlight`, `ReferenceMap`, `prepare`. Positions are (north, east) in metres from the first frame.
-- `baseline/src/data/alto.py`: `load_alto_flight`, reads `Val.zip` without unpacking.
-- `baseline/src/data/synthetic_camera.py`: `make_synthetic_camera_flight`, a small generated flight for tests (160 pixel images, zoom 0.85, rotation 15 degrees).
+- The navigator now states its own uncertainty and a status (tracking, degraded, lost). In the runs that work, the error stays within 3 times the stated uncertainty in 97 to 100 percent of frames; in the run that breaks (400 m between fixes, no check) only in 24 percent.
+- A limit, kept as a test: with a map whose coordinates are 200 m off, the first five fixes are rejected, but after 600 m without a fix the allowed distance has grown past 200 m and a confident wrong fix is believed. The distance check alone cannot catch a wrong place inside the stated uncertainty.
+- Right after each fix the error grows again by 10 to 15 percent of the distance flown. That drift is mostly systematic (scale and direction), so two consecutive fixes could re-fit the motion matrix in flight. Not built.
 
-**Still to write, in this order:**
-
-1. `src/estimation/image_motion.py`: `image_shift(previous, current)`, the median optical flow in pixels (Farneback with 0.5, 4, 21, 3, 7, 1.5 on frames reduced to about 250 pixels, median over the centre, scaled back to full-size pixels), and `shifts_for_flight(flight, cache_path)`.
-2. `src/estimation/map_matching.py`: `make_template(frame, zoom, angle, keep=0.8)` and `match(frame, reference_map, candidates, zooms, angles)`, returning score, position, zoom, angle and reference index. Position is the reference position plus (-(cy - H/2), (cx - H/2)) times metres per pixel, as (north, east).
-3. `src/estimation/navigator_core.py`: `fit_motion_matrix(shifts, steps)` by least squares so that steps is about shifts @ A; `blend(estimate, variance, fix, fix_variance)` with gain = variance / (variance + fix_variance); `fix_decision(score, distance, allowed, min_score)` returning use and a reason (OK, LOW_SCORE, DISAGREES_WITH_ESTIMATE); `status(sigma)` giving TRACKING, DEGRADED or LOST.
-4. `src/estimation/camera_navigator.py`: the loop of the experiment.
-   - Calibration while GNSS works: the motion matrix from the first 300 m; three test fixes at a third, two thirds and the end of that stretch, with zoom 0.60 to 1.00 in steps of 0.05 and angles -10 to 35 in steps of 5, on the 7 reference images nearest to the true position. Their medians give zoom0, angle0 and the fix offset.
-   - Dead reckoning: step = shift @ A0 times (zoom / zoom0).
-   - Fix every N metres of estimated travel. Fixed search: 7 nearest images, zoom within 0.10 of the last zoom in steps of 0.05 clipped to 0.5 to 1.1, angles angle0 - 5, angle0, angle0 + 5. Sized search: all images within max(60 m, 3 sigma), and zoom 0.60 to 1.10 when more than 400 m have passed since the last fix.
-   - Uncertainty: predicted variance = variance + (0.10 times distance since the last fix) squared, starting at 3 m squared. A fix has 15 m. It is used if it lies within 3 sigma of sqrt(predicted variance + 15 squared) and its score is high enough. Then the estimate moves by the gain, the variance becomes (1 - gain) times the predicted variance, the scale becomes new zoom / zoom0, and the distance since the last fix is reset.
-5. `src/evaluation/navigation_metrics.py`: median, 90 percent, worst and end error; fixes used and rejected; used but wrong by more than 50 m; rejected although within 30 m.
-6. `src/visualization/navigator_plot.py`: path and error over distance, like `docs/figures/alto_end_to_end.png`.
-7. `scripts/run_alto_navigator.py` and `configs/alto_navigator.yaml`.
-8. Tests on the synthetic flight: `test_navigator_core.py`, `test_map_matching.py`, `test_camera_navigator.py`. A regression test on ALTO that is skipped when the data is missing and checks the table above.
-9. Then, if time is left: the status logic, degraded images (blur, darkness, haze), and the held-out test on the training section.
-10. Update `baseline/README.md`, the findings and the plan, then push.
-
-**The build order** is in `docs/PLAN.md` under "Build order: a baseline first, then one step at a time". Tonight's goal is the baseline row of that table. Items 1 to 8 below are that baseline. The mentor's main advice governs the scope: pick one thing, do it really well, and name a next step for every limit.
-
-**The ALTO training section** was downloading at 00:47 as `data/raw/alto/Unconfirmed 150932.crdownload`. At 01:18 that file had 10.0 GB and still carried the temporary name. When the browser finishes, the file should be named `Train.zip` in that folder. `load_alto_flight(AltoConfig(section="Train"))` then reads it.
-
-**Read since the last note:** the ALTO paper in full and the IMU sections of the Mid-Air paper. The Mid-Air documentation says the gyroscope is in the Body frame; the data only fits as rates around the world axes (`docs/findings.md`, 2.2).
-
-**Working rules from Dustin:** pull, then commit, then push, and say what the pull brought in. No assistant attribution in commits. Plain language in documents, no "not X but Y" phrasing, no middle dots.
+**Reading:** about 15 papers read, notes in `docs/reading-notes.md`.
 
 ## Current objective
 
-The team stays with Challenge 2 (decided Friday night). Saturday morning: agree roles, merge the open branches, record the phone walk, and move the ALTO experiment into shared code.
+The team stays with Challenge 2. Saturday: agree roles, decide how the branches reach `main`, record the phone walk in daylight, run the held-out test, then the next build steps.
 
 ## State
 
-- Challenge 2, navigation without GNSS. Team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private). Six members have write access: dwn97, alessandrodipiano, ferneediaz (Dan), IlhanTech, FelixZukunft, rychardsandreireyes-rgb. The last two have not pushed anything yet.
+- Challenge 2, navigation without GNSS. Team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private). Six members have write access: dwn97, alessandrodipiano, ferneediaz (Dan), IlhanTech, FelixZukunft, rychardsandreireyes-rgb.
 - We build software, not a drone. Target, set with the mentor: low-cost drones, with about 500 dollars as an orientation and not a hard cap. The one thing: position fixes from the drone's own camera against free aerial images, with a check that rejects a wrong fix.
-- `docs/PLAN.md` is the plan (three results, roles, timeline, slide story, next steps, mentor feedback). `docs/findings.md` holds every measurement. `docs/landscape.md` holds the research on Raptor and VNS01.
+- `docs/PLAN.md` is the plan (three results, roles, timeline, build order, slide story, next steps). `docs/findings.md` holds every measurement, `docs/landscape.md` the research on Raptor and VNS01, `docs/reading-notes.md` the papers.
 - Data is on Dustin's laptop under `data/raw/` (not committed). `data/README.md` says how to get it.
   - Mid-Air: all 38 archives, complete and verified (9.8 GB).
-  - ALTO: the validation section (1.73 GB). The training section (9.93 GB) is not downloaded.
-- Experiments on `main`, scripts `e` to `m` in `experiments/`. Headline numbers:
-  - Mid-Air IMU-only drift: 485 m after 78 s in the median, 50 m after 36 s.
-  - ALTO end to end: camera only 472 m median error, 26 to 31 m with a fix every 100 to 300 m.
-  - One fix costs 285 ms on one laptop core, 20 ms at 125 pixels, with the same fix error.
+  - ALTO: the validation section (1.73 GB) complete; the training section stopped at 96 percent.
 
 ## Branches on GitHub
 
 | Branch | Owner | Content | State |
 |---|---|---|---|
-| `mid-air-baseline` | Alessandro | Package `baseline/`: Mid-Air loader, IMU dead reckoning, metrics, plots, 50 tests | Uses the textbook gyroscope rule, which is wrong on Mid-Air |
-| `mid-air-baseline-fix` | pushed from Dustin's laptop | The same plus one commit: gyroscope rule, scipy fix, 3 tests | 53 tests pass. Median 491 m on the 30 sunny flights. Waiting for Alessandro to confirm |
-| `simulations` | Dan | Gazebo in Docker, drone with camera, IMU, barometer, GNSS; worlds `terrain` and `islands` | Pull request 1 is open, without description or review. No recording or export code yet |
-| `docs/denseuav-critical-review` | Ilhan | A review of the DenseUAV idea with a proposal for verified fixes | One document, 547 lines |
-
-Merge test on Saturday 00:35: each branch merges into `main` cleanly. Merged one after the other, the only conflict is in `.gitignore` (the baseline and the simulator both add lines at the end). After merging all three, 53 tests pass.
+| `main` | | Plan, findings, product research, experiment scripts | Felix pushed `TRN/` directly to `main` on Saturday 08:29 (3a9f96d): a terrain-navigation plan, data inspection scripts, candidate routes. Not reviewed yet |
+| `alto-navigator` | Dustin and the assistant | `main` + the Mid-Air fix + the camera navigator | 91 tests pass |
+| `mid-air-baseline` | Alessandro | Package `baseline/`: Mid-Air loader, IMU dead reckoning, metrics, plots | Textbook gyroscope rule, wrong on Mid-Air |
+| `mid-air-baseline-fix` | pushed from Dustin's laptop | The same plus the gyroscope fix, the scipy fix and 3 tests | Alessandro has made his own version of the fix in `mid-air-vio` |
+| `mid-air-vio` | Alessandro, new on Saturday 08:14 | A `vio/` package, 53 files: error-state Kalman filter, optical flow, feature tracking, tests on Mid-Air | Not reviewed yet |
+| `simulations` | Dan | Gazebo in Docker, drone with camera, IMU, barometer, GNSS; worlds `terrain` and `islands` | Pull request 1 open, no description or review |
+| `docs/denseuav-critical-review` | Ilhan | A review of the DenseUAV idea with a proposal for verified fixes | One document |
 
 ## Notes for building on the team's code
 
-- The baseline's `Trajectory` type requires accelerometer, gyroscope and attitude for every sample. ALTO has none of these, so the ALTO loader needs its own type or the fields have to become optional. The metrics only need a timestamp and a position, so they can be reused.
-- The baseline imports its code as `src.*` with `baseline/` on the path. New code for ALTO fits next to it: `src/data/alto.py`, `src/estimation/`, `src/evaluation/`.
-- The simulator publishes `/imu/data`, `/air_pressure`, `/gps/fix`, `/ground_truth/odom` and `/camera/down/image_raw`. Its IMU is in the drone's own axes. The image has rosbag with mcap storage installed, but nothing records yet. Its frames are East, North, Up.
-- The simulator's gyroscope noise bounds are below what Mid-Air contains (median 0.014 to 0.021 rad/s per sample).
-- Ilhan's review specifies states (ACQUIRING, TRACKING, DEGRADED, LOST), rejection reasons and metrics. It proposes SIFT keypoints as the verifier; on ALTO keypoints fail and brightness matching works (`docs/findings.md`, 3.2).
+- The camera navigator lives next to Alessandro's code in `baseline/`: `src/data/camera_flight.py`, `alto.py`, `synthetic_camera.py`; `src/estimation/image_motion.py`, `map_matching.py`, `navigator_core.py`, `camera_navigator.py`; `src/evaluation/navigation_metrics.py`; `src/visualization/navigator_plot.py`.
+- Positions in the camera code are (north, east) in metres from the first frame.
+- The simulator publishes `/imu/data`, `/air_pressure`, `/gps/fix`, `/ground_truth/odom` and `/camera/down/image_raw`. Nothing records flights yet. Its frames are East, North, Up.
+- Ilhan's review specifies states, rejection reasons and metrics. It proposes keypoints as the verifier; on ALTO and in the papers, keypoints fail between camera and map.
 - ALTO orientation: x forward, y right, z down. The camera frame needs a rotation of 90 degrees minus the heading (`experiments/m_alto_orientation.py`).
 
 ## Open issues
 
 - Roles are not assigned. Targets for the integrity check are not agreed.
-- Results 2 and 3 exist only as experiment scripts.
-- ALTO results are tuned and reported on the same 4.6 km section. The training section has to be downloaded in a browser.
-- Turns are not handled on ALTO.
+- The ALTO results are tuned and reported on the same 4.6 km section until the training section is complete.
+- Turns are not handled.
 - The phone walk has no owner. It needs daylight.
 - Nothing has been timed on a small board.
+- Two lines of work on Mid-Air now exist (`mid-air-baseline-fix` and Alessandro's `mid-air-vio`); the team has to decide which one `main` gets.
+- The team now works on four separate approaches: the camera navigator on ALTO, visual-inertial odometry on Mid-Air (Alessandro), terrain navigation (Felix, `TRN/`), and the simulator (Dan). The mentor's advice was to pick one thing; the team should decide what the one thing is and how the others support it.
 - `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
 - Mid-Air is licensed for non-commercial use.
-- The formulas in `docs/data.md` and in the review use `\[ ... \]`, which GitHub does not render.
-- The native uv is at `~/.local/bin/uv` on Dustin's laptop; the `uv` on the shell path is still the Intel build.
 
 ## Next exact step
 
-Saturday morning, in this order: Alessandro confirms `mid-air-baseline-fix`; merge the three branches into `main`; the team fills the roles table; then `experiments/h_alto_end_to_end.py` is turned into shared code for result 2.
+Press Resume on the `Train.zip` download, then run `python baseline/scripts/run_alto_navigator.py --section Train` and write the result into the findings.
