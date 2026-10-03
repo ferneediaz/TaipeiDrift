@@ -1,0 +1,9 @@
+# raw rasters are read-only and large — never commit
+Data/
+data/processed/
+results/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
