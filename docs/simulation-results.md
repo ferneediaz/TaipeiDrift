@@ -398,3 +398,81 @@ error):
 **What follows.** His measurement works where its assumption holds, so the buildings and the bare city ground
 explain the city result. The live filter now has a ground speed that works over our Wufeng ground. Against our
 replay it still lacks the sun heading, the weakened update in place of the gate, and the map fixes.
+
+## Live in the strait world: 3.5 minutes on the current version
+
+Saturday 3 October 2026, 21:46 to 21:53, one run. `sim/run.sh` with its defaults (strait world, the ships, the
+drone with the four-antenna direction finder, Dan's dashboard of 21:33), GNSS cut 20 s after the first fix, flown to
+227 s. All three estimators logged against the truth by `sim/scripts/log_two_estimators.py --topics
+eskf=/nav/odom eskf_rf=/nav_rf/odom rf=/rf_nav/odom`. The run folder is not in git.
+
+| Estimator, after the GNSS loss | Median | 90 percent below | Worst | Inside its own 2 sigma | First over 100 m |
+|---|---|---|---|---|---|
+| Ships' bearings only (`/rf_nav/odom`) | 55 m | 96 m | 211 m | 96 percent of the time | 28 s, briefly |
+| ESKF with the ships' fix (`/nav_rf/odom`, the dashboard's headline) | 83 m | 119 m | 170 m | 26 percent | 51 s |
+| ESKF alone (`/nav/odom`) | 374 m | 1.4 km | 1.56 km | 66 percent | 56 s |
+
+- **Nothing crashed:** every process and both windows ran from start to end, no error and no restart in the log,
+  memory steady. (The earlier RF display could be killed for asking a 17 GB canvas; Dan's commit c41f73f caps it.)
+- **About one minute in, both ESKF estimators pass 100 m** (30 s after the loss). The headline estimator then stays
+  at 80 to 110 m, outside its own stated bound three quarters of the time, and is worse than the ships' bearings
+  alone.
+- **Why:** its own speed is wrong by 7.4 m/s in the median at a flight speed of 7.6 m/s (17 m/s at 60 s, pointing
+  sideways at 100 s). The ships' fixes drag the position back; nothing corrects the speed. The same weakness as in
+  the flat-ground run above, where the flow speed removed it; over open water the downward camera has nothing to
+  track, so that remedy was not tried here.
+
+## A second navigator on the same flights: Ilhan's matcher, checked by us
+
+Saturday 3 October 2026, 21:35 to 22:08. Ilhan's branch `ilhan/sim-demo` (commits 629af5c and ff83733; **not
+merged**) is a second navigator for the same simulated flights and the same 2018 map: every second the picture is
+flattened with the camera's tilt, matched against the map by correlation and by XFeat feature points, and a fix is
+kept only if the two agree within 4 m; between fixes the motion comes from matching consecutive pictures. He reports
+1.7 m median on his own flight and asks that nobody trusts it before testing it on a flight he has not seen.
+
+**What we checked.** His code, unchanged, in a separate checkout (`~/Projects/TaipeiDrift-ilhan-check`, his locked
+environment with torch and XFeat), on our three development flights, which he never had. One draw (seed 0), clean
+pictures, about 4.3 to 4.5 km without GNSS. The sealed flights were not touched. Scripts and logs:
+`outputs/ilhan_check/` (not in git).
+
+| Median / worst error | 100 m flight | 120 m flight | 65 m flight |
+|---|---|---|---|
+| His own filter, as he runs it (tilt from the truth) | 2.7 / 5.6 m | 2.6 / 5.6 m | 1.8 / 9.4 m |
+| The same, tilt from the recorded gyroscope and accelerometer (a textbook filter of ours) | 3.7 / 17.6 m | 5.2 / 25.9 m | 1.9 / 7.6 m |
+| His chain with Alessandro's ESKF, tilt from the truth (his "B") | 2.4 / 6.7 m | 2.2 / 7.3 m | lost: 1.07 km / 3.7 km |
+| His chain with Alessandro's ESKF, nothing from the truth after the cut (his "C") | 3.2 / 35 m | 9.2 / 63 m | lost: 1.01 km / 4.0 km |
+| Our frozen navigator (median of 3 draws) | 16.5 m | 32.3 m | 18.0 m |
+
+**What holds.**
+
+- **No truth leak in the position.** The pictures are the simulated camera's recorded frames, the map is our 2018
+  photo, the search window is centred on his own estimate. His three checks (truth file removed, map shifted 30 m,
+  wrong map) are sound.
+- **It is better than ours in the median on every flight it completes**, also with the truth removed: his fixes are
+  2 to 4 m from the truth and come every second; ours come every 300 m and our navigator knows no tilt at all.
+  In these flights the camera is tilted 6 to 11 degrees in cruise and up to 20 in turns, and each degree moves the
+  picture's centre by 1.1 to 2.1 m on the ground.
+
+**What does not hold yet.**
+
+- **His headline uses the true tilt** (and a heading and a height made from the truth plus his own simulated errors;
+  of the recorded sensors his own filter reads only the camera). His "truth removed" check keeps those inputs.
+  With the tilt from the recorded IMU the worst error is two to five times larger on two of three flights.
+- **The truth-free chain is lost on the 65 m flight.** Right after the cut the ground gives almost no fix for 225 m
+  (2 fixes in 37 attempts, for his own filter as well). His own filter crosses that with a heading made from the
+  truth; the ESKF has no heading sensor, its heading runs off (16 degrees after 300 m, 45 after 600 m; the
+  recorded gyroscope of that flight has a bias of 1.4 degrees per second), the estimate leaves the search window
+  (at most 120 m) and never finds the map again. This is what our sun sensor is for.
+- **His program stops with an error on that flight** (XFeat on a map window without any data); the numbers above
+  are with the guard he uses in his own Tuniu script.
+- **The filter turns down correct fixes.** On the 120 m flight, truth-free: 175 of 334 fixes refused, 174 of them
+  correct.
+- **The stated uncertainty cannot be used:** the true error is inside his 3 sigma 58 to 96 percent of the time
+  (ours: 100 percent). He says so himself.
+- **One draw per flight, clean pictures only, no sealed flight.** And the simulator flatters any matcher: the
+  camera sees a flat aerial photo, which is the same kind of picture as the map (83 percent of his attempts give a
+  fix here, about 30 percent on the real Tuniu photos).
+
+**Where this leaves us (Dustin, Saturday 22:08, in his words "maybe we won't use it at all for our main solution
+and he can try to integrate it as a 2nd option in parallel"):** our frozen navigator and the fused filter stay the
+main solution; Ilhan's navigator is a second option that he brings in himself, in parallel.
