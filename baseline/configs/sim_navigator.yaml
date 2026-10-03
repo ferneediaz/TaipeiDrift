@@ -56,6 +56,23 @@ navigator:                # the settings frozen for the UAV-VisLoc held-out test
 heading:                  # src/sensors/heading.py
   compass: {offset_sd_deg: 4.0, noise_sd_deg: 1.0}
 
+cameras:                  # src/data/camera_model.py; choose one with --camera (default ideal)
+  ideal: null             # the simulator's frames: a perfect pinhole in still, clear air
+  realistic:              # cloud shadows drifting with the wind, haze, lens, vibration, auto-exposure, noise, JPEG
+    cloud_cover: 0.3
+    cloud_shadow: 0.35
+    cloud_size_m: 400.0
+    wind_east_mps: 4.0
+    wind_north_mps: 2.0
+    haze_contrast: 0.9
+    vignetting: 0.4
+    distortion_k1: 0.004
+    blur_px: 0.6
+    gain_wobble: 0.05
+    light: 1.0
+    jpeg_quality: 80
+    seed: 0               # the weather of the day: one draw of clouds for every compass seed
+
 runs:
   camera_alone:   {map: "2018", fix_every_m: null}
   map_2018:       {map: "2018"}

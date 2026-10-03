@@ -27,7 +27,8 @@ BASELINE_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = BASELINE_DIR.parent
 sys.path.insert(0, str(BASELINE_DIR))
 
-from src.data.sim_replay import SimReplayConfig, load_sim_flight, with_heading  # noqa: E402
+from src.data.camera_model import CameraModel  # noqa: E402
+from src.data.sim_replay import SimReplayConfig, load_sim_flight, with_camera, with_heading  # noqa: E402
 from src.estimation.camera_navigator import NavigatorConfig, calibrate, navigate  # noqa: E402
 from src.estimation.image_motion import shifts_for_flight  # noqa: E402
 from src.evaluation.navigation_metrics import integrity_summary, navigation_errors, summarize_navigation  # noqa: E402
@@ -45,6 +46,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--workers", type=int, default=6)
     p.add_argument("--recording", help="another recorded flight, e.g. recordings/wufeng_south_80m")
     p.add_argument("--route", help="its route file, e.g. sim/scenarios/wufeng_south_80m.json")
+    p.add_argument("--camera", default="ideal", help="a camera from the config's cameras: ideal (the simulator's frames) or realistic")
     return p.parse_args()
 
 
@@ -55,12 +57,15 @@ def _path(cfg: dict, key: str) -> str:
 
 def flight_for(cfg: dict, map_name: str):
     """The recorded flight with the chosen map, with the true heading (loaded once per process)."""
-    if map_name not in _FLIGHTS:
+    key = f"{cfg['recording']}|{map_name}|{json.dumps(cfg.get('camera'), sort_keys=True)}"
+    if key not in _FLIGHTS:
         tif = Path(cfg["maps"][map_name])
-        _FLIGHTS[map_name] = load_sim_flight(SimReplayConfig(
+        flight = load_sim_flight(SimReplayConfig(
             recording=_path(cfg, "recording"), map_tif=str(tif if tif.is_absolute() else REPO_ROOT / tif),
             route=_path(cfg, "route"), cache_dir=_path(cfg, "cache_dir")))
-    return _FLIGHTS[map_name]
+        camera = cfg.get("camera")
+        _FLIGHTS[key] = with_camera(flight, CameraModel(**camera) if camera else None)
+    return _FLIGHTS[key]
 
 
 def compass(cfg: dict, flight, seed: int) -> np.ndarray:
@@ -75,6 +80,8 @@ def flow_path(cfg: dict, seed: int) -> Path:
     """
     recording = Path(_path(cfg, "recording"))
     content = (recording / "images.csv").read_bytes() + json.dumps(cfg["heading"]["compass"], sort_keys=True).encode()
+    if cfg.get("camera"):  # the ideal camera keeps the fingerprint it always had
+        content += json.dumps(cfg["camera"], sort_keys=True).encode()
     return Path(_path(cfg, "cache_dir")) / f"sim_flow_{recording.name}_{hashlib.sha1(content).hexdigest()[:10]}_compass_seed{seed}.npy"
 
 
@@ -116,6 +123,11 @@ def main() -> int:
     if args.recording:
         cfg["recording"], cfg["route"] = args.recording, args.route or cfg["route"]
         cfg["output_dir"] = f"{cfg['output_dir']}_{Path(args.recording).name}"
+    cfg["camera"] = cfg.get("cameras", {}).get(args.camera)
+    if args.camera != "ideal":
+        if args.camera not in cfg.get("cameras", {}):
+            raise SystemExit(f"no camera {args.camera!r} in {args.config}")
+        cfg["output_dir"] = f"{cfg['output_dir']}_{args.camera}_camera"
     seeds = args.seeds or cfg["seeds"]
     runs = {n: s for n, s in cfg["runs"].items() if not args.only or n in args.only}
     out = Path(args.output_dir or REPO_ROOT / cfg["output_dir"])

@@ -1,13 +1,15 @@
 """Start Gazebo with the Mid-Air-like drone, the ROS bridge and the sensor noise node.
 
     ros2 launch sim/launch/sim.launch.py [cam_res:=1024] [gps:=true] [gui:=true] [world:=terrain]
-        [demo:=false] [gnss_cut_s:=-1] [stereo:=false] [stereo_baseline_m:=0.30]
+        [demo:=false] [gnss_cut_s:=-1] [stereo:=false] [stereo_baseline_m:=0.30] [wind:=none]
 
 gnss_cut_s          absolute simulation time in seconds; negative keeps GNSS enabled
 stereo              true adds a right down-camera by generating a temporary model variant
 stereo_baseline_m   right camera offset along body -Y, in metres
+wind                SPEED_MPS,FROM_DEG, for example 6,20: 6 m/s from the north-north-east, with gusts
 """
 import copy
+import math
 import os
 import socket
 import subprocess
@@ -30,8 +32,45 @@ WORLD_ASSETS = {
 }
 
 
-def drone_sdf(cam_res: int, gps: bool, stereo: bool, stereo_baseline_m: float) -> Path:
+WIND_FORCE_FACTOR = 0.15  # Gazebo pushes each link with this share of mass times the air's speed past it (WindEffects);
+# 0.15 lets a hovering drone in a 6 m/s wind lean about 5 degrees, as a small quadcopter does
+
+
+def windy_world(world: Path, speed_mps: float, from_deg: float) -> Path:
+    """A copy of the world with wind: ``speed_mps`` from the bearing ``from_deg`` (20: from north-north-east),
+    with gusts of about 20 percent in strength and 10 degrees in direction."""
+    tree = ET.parse(world)
+    w = tree.find("world")
+    towards = math.radians(from_deg + 180.0)
+    wind = ET.SubElement(w, "wind")
+    ET.SubElement(wind, "linear_velocity").text = f"{speed_mps * math.sin(towards):.3f} {speed_mps * math.cos(towards):.3f} 0"
+    plugin = ET.fromstring(f"""
+      <plugin filename="gz-sim-wind-effects-system" name="gz::sim::systems::WindEffects">
+        <force_approximation_scaling_factor>{WIND_FORCE_FACTOR}</force_approximation_scaling_factor>
+        <horizontal>
+          <magnitude>
+            <time_for_rise>10</time_for_rise>
+            <sin><amplitude_percent>0.2</amplitude_percent><period>15</period></sin>
+            <noise type="gaussian"><mean>0</mean><stddev>0.05</stddev></noise>
+          </magnitude>
+          <direction>
+            <time_for_rise>30</time_for_rise>
+            <sin><amplitude>10</amplitude><period>30</period></sin>
+            <noise type="gaussian"><mean>0</mean><stddev>0.03</stddev></noise>
+          </direction>
+        </horizontal>
+        <vertical><noise type="gaussian"><mean>0</mean><stddev>0.05</stddev></noise></vertical>
+      </plugin>""")
+    w.insert(0, plugin)
+    out = Path(f"/tmp/taipeidrift_{world.stem}_wind.sdf")
+    tree.write(out, xml_declaration=True, encoding="utf-8")
+    return out
+
+
+def drone_sdf(cam_res: int, gps: bool, stereo: bool, stereo_baseline_m: float, wind: bool = False) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
+    if wind:
+        ET.SubElement(tree.find("model"), "enable_wind").text = "true"
     link = tree.find(".//link[@name='sensor_link']")
     image = link.find("sensor[@name='camera_down']/camera/image")
     image.find("width").text = image.find("height").text = str(cam_res)
@@ -90,11 +129,19 @@ def setup(context):
 
     for script in WORLD_ASSETS.get(world.stem, []):
         subprocess.run([sys.executable, str(SIM / "scripts" / script), "--if-missing"], check=True)
-    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m)
+    wind = LaunchConfiguration("wind").perform(context).strip().lower()
+    world_file = world
+    if wind not in ("", "none"):
+        try:
+            speed, from_deg = (float(v) for v in wind.split(","))
+        except ValueError:
+            sys.exit(f"wind must be SPEED_MPS,FROM_DEG (for example 6,20), not {wind!r}")
+        world_file = windy_world(world, speed, from_deg)
+    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, wind=world_file != world)
     sim_time = {"use_sim_time": True}
 
     actions = [
-        ExecuteProcess(output="screen", cmd=["gz", "sim", "-r", str(world), *(
+        ExecuteProcess(output="screen", cmd=["gz", "sim", "-r", str(world_file), *(
             ["--gui-config", str(SIM / "config/gui.config")] if gui else ["-s"])]),
         Node(package="ros_gz_sim", executable="create", output="screen",
              arguments=["-world", world.stem, "-file", str(model), "-name", "midair_quad", "-z", "0.05"]),
@@ -140,6 +187,7 @@ def generate_launch_description():
         DeclareLaunchArgument("gnss_cut_s", default_value="-1"),
         DeclareLaunchArgument("stereo", default_value="false"),
         DeclareLaunchArgument("stereo_baseline_m", default_value="0.30"),
+        DeclareLaunchArgument("wind", default_value="none"),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])
