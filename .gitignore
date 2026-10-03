@@ -1,6 +1,7 @@
 # datasets are fetched with scripts/fetch_data.sh, never committed
 data/raw/
 data/processed/
+data/sim/
 
 # python
 .venv/

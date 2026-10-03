@@ -12,7 +12,8 @@ Taiwan Strait. Island A holds the start pad; island B lies about 700 m of open w
   texture, which is what makes navigating over it hard.
 
 The world origin is the helipad on island A, so the drone starts at z = 0 and the sea is at
-z = -PAD_ASL. The pad positions go to layout.json for the demo flight.
+z = -PAD_ASL. layout.json lists the helipads, houses, lighthouse and trees; terrain.npz holds the
+height grids. make_topo_map.py draws the map from both.
 
 Usage: python3 sim/scripts/make_islands.py [--seed S] [--if-missing]
 """
@@ -29,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from make_trees import tree  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "models" / "islands"
-VERSION = "1"  # bump when the scenery changes, so --if-missing rebuilds old copies
+VERSION = "2"  # bump when the scenery changes, so --if-missing rebuilds old copies
 PAD_ASL = 4.0  # m: helipad tops above the sea; the sea surface is at z = -PAD_ASL
 
 # name, centre (x, y) in m, mean radius in m, highest ground in m above the sea,
@@ -193,8 +194,9 @@ def house(rng, tag, x, y, ground):
     base, wall = min(hs) - 1.0, max(hs) + rng.uniform(3.0, 4.5)
     walls = rng.choice(["0.86 0.82 0.74 1", "0.93 0.92 0.88 1", "0.72 0.66 0.58 1"])
     roof = rng.choice(["0.68 0.30 0.22 1", "0.62 0.60 0.58 1", "0.30 0.42 0.55 1"])
-    return (box(f"house_{tag}", x, y, (base + wall) / 2, sx, sy, wall - base, walls, yaw)
-            + box(f"house_{tag}_roof", x, y, wall + 0.2, sx + 0.6, sy + 0.6, 0.4, roof, yaw))
+    sdf = (box(f"house_{tag}", x, y, (base + wall) / 2, sx, sy, wall - base, walls, yaw)
+           + box(f"house_{tag}_roof", x, y, wall + 0.2, sx + 0.6, sy + 0.6, 0.4, roof, yaw))
+    return sdf, dict(x=x, y=y, size=[sx + 0.6, sy + 0.6], yaw=yaw, roof_z=wall + 0.4)
 
 
 def lighthouse(x, y, z):
@@ -277,6 +279,7 @@ def build(seed):
     (OUT / "meshes").mkdir(parents=True, exist_ok=True)
     (OUT / "materials" / "textures").mkdir(parents=True, exist_ok=True)
     body, tree_i = [], 0
+    features = dict(houses=[], lighthouse=None, trees=[])
     for isl in ISLANDS:
         isl["h"], isl["tile"] = terrain(rng, isl)
         cx, cy = isl["centre"]
@@ -294,13 +297,17 @@ def build(seed):
             spots = place(rng, isl, 40, 5, keep_out, lo=isl["top"] * 0.4)
             lx, ly = max(spots, key=lambda p: isl["ground"](*p))
             body.append(lighthouse(lx, ly, isl["ground"](lx, ly) - PAD_ASL))
+            features["lighthouse"] = dict(x=lx, y=ly, top_z=isl["ground"](lx, ly) - PAD_ASL + 14)
             keep_out.append((lx, ly, 10.0))
         homes = place(rng, isl, isl["houses"], 16, keep_out)
         for k, (x, y) in enumerate(homes):
-            body.append(house(rng, f"{name}{k}", x, y, isl["ground"]))
+            sdf, footprint = house(rng, f"{name}{k}", x, y, isl["ground"])
+            body.append(sdf)
+            features["houses"].append(footprint)
         keep_out += [(x, y, 9.0) for x, y in homes]
         for x, y in place(rng, isl, isl["trees"], 4, keep_out, lo=2.2):
             body.append(tree(rng, tree_i, x, y, isl["ground"](x, y) - PAD_ASL - 0.3))
+            features["trees"].append([round(x, 2), round(y, 2)])
             tree_i += 1
     sea, (sx, sy) = sea_texture(rng, ISLANDS)
     cv2.imwrite(str(OUT / "materials" / "textures" / "sea.jpg"), cv2.cvtColor(sea, cv2.COLOR_RGB2BGR),
@@ -310,10 +317,15 @@ def build(seed):
     (OUT / "model.config").write_text(
         '<?xml version="1.0"?>\n<model><name>islands</name><version>1.0</version>'
         '<sdf version="1.11">model.sdf</sdf></model>\n')
+    # Height grids for maps: h[row, col] in m above the sea, row = +y, over a tile centred on the island
+    np.savez_compressed(OUT / "terrain.npz", **{f"h_{i['name']}": i["h"] for i in ISLANDS},
+                        **{f"tile_{i['name']}": i["tile"] for i in ISLANDS})
     (OUT / "layout.json").write_text(json.dumps({
         "sea_z": -PAD_ASL,
         "pads": {i["name"]: list(i["pad"]) for i in ISLANDS},
         "islands": {i["name"]: {"centre": list(i["centre"]), "radius": i["radius"]} for i in ISLANDS},
+        "seabed_m": 14.0,  # depth away from the islands
+        **features,
     }, indent=2) + "\n")
     return tree_i
 
