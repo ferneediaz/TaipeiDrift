@@ -42,6 +42,49 @@
     }
    },
    "seconds": 218
+  },
+  {
+   "name": "sp2-scale-kept",
+   "commit": "0102e35",
+   "date": "2026-10-03 16:14",
+   "note": "Scale kept from calibration on the simulated flights; realistic camera, fog and rain available; flight split fixed",
+   "tests": {
+    "passed": 297,
+    "failed": 0,
+    "skipped": 0,
+    "summary": "297 passed, 3 warnings in 232.66s (0:03:52)"
+   },
+   "visloc_03_confirm_body_seed1": {
+    "median": 28.0,
+    "p90": 176.7,
+    "worst": 368.2,
+    "fixes_used": 119.0,
+    "used_but_wrong": 0.0
+   },
+   "sim_wufeng_seed3": {
+    "camera_alone": {
+     "median": 75.9,
+     "p90": 160.1,
+     "worst": 211.3,
+     "fixes_used": 0.0,
+     "used_but_wrong": 0.0
+    },
+    "map_2018": {
+     "median": 15.0,
+     "p90": 41.5,
+     "worst": 66.0,
+     "fixes_used": 15.0,
+     "used_but_wrong": 0.0
+    },
+    "map_2020_fresh": {
+     "median": 15.8,
+     "p90": 41.7,
+     "worst": 65.2,
+     "fixes_used": 17.0,
+     "used_but_wrong": 0.0
+    }
+   },
+   "seconds": 380
   }
  ]
 }
