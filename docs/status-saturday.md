@@ -2,6 +2,23 @@
 
 **Last updated: Saturday 3 October, 14:15.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch **`integration`**, which holds every team branch and is up for merging into `main` as [pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2); the details are in [findings.md](findings.md).
 
+## Save points: how we build from here
+
+Since Saturday 15:00 we build in steps that each leave something working, so that nothing new can break what we already have.
+
+- **A save point** is a tagged commit where `python scripts/check_save_point.py --record <name>` passed: every test, plus the key numbers, stored in `scripts/save_points.json`.
+- **Everything new is built on the latest save point**, on branch `integration`.
+- **Before a change is kept**, `python scripts/check_save_point.py` (about five minutes) must say "same as save point". If a number moves, the change is explained, and if it is better it becomes the next save point.
+- **The demo uses the latest save point.** Something new replaces it only when it is itself a save point and measurably better.
+- **At the code freeze, Sunday 10:00, the latest save point is the submission.**
+
+| Save point | Tag | What works | Key numbers |
+|---|---|---|---|
+| 1 | `sp1-merged-camera-navigator` (f3a755f) | All team branches merged; camera navigator on ALTO, UAV-VisLoc and the simulated flight; three demo videos | 297 tests pass; UAV-VisLoc 03, seed 1: 28.0 m, 0 wrong fixes; simulated flight, seed 3: camera alone 75.9 m, 2018 map 26.5 m, 2020 map 17.3 m |
+| 2, next | `sp2-submission` | Plus a README for the jury, the computing time, the open gaps from the review closed | The same numbers |
+| 3, stretch | `sp3-fused` | Plus Alessandro's filter with our map fixes on the simulated flight | Must beat save point 2 on the simulated flight, or show the tilt correction, with save point 2's numbers unchanged |
+| 4, Sunday 09:00 to 10:00 | `sp4-sun` | Plus the phone's measured sun-compass error in the heading model | Reruns with the measured number |
+
 ## Now, in short
 
 The system works on real data from two countries, and we now know how well. On the flights it was developed on, it holds about 30 m where the camera alone drifts 470 to 820 m. On flights it never saw, the fixes cut the drift by 40 percent (ALTO, 219 to 131 m, Ilhan's test at 13:00) to tenfold (UAV-VisLoc 04, 675 to 60 m); where the ground was rebuilt since the map (UAV-VisLoc 01) they do not help. Fielded systems claim 15 to 20 m. **Section 2 explains in detail what the system does and what it gives a user.** All team branches now sit in one branch, `integration` (297 tests pass), up for merging as pull request 2.
