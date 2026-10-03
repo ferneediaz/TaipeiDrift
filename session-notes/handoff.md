@@ -1,10 +1,19 @@
 # Handoff
 
-Last updated: Sunday 4 October 2026, 00:12. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
+Last updated: Sunday 4 October 2026, 00:47. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
 
 ## Resume here
 
-**THE DEMO VIDEO, as of Sunday 4 October 00:12 (read this first; it is what is being worked on).**
+**THE DEMO VIDEO IS RECORDED, as of Sunday 4 October 00:47 (read this first).**
+
+- **The take:** `outputs/demo/take1` (frames, `estimators.csv`, `status.jsonl`; not in git), recorded at 0.12 of real time with the recipe in the block below. Flight: GNSS lost at 26.2 s, coast A 41 s, coast B 72 s, over pad B 80 s, on the ground 99 s, landed 0.6 m from the pad centre. At the slow pace the flight starts about 5 s earlier in simulated time than in the earlier flights, and the filter gets every camera picture (186 camera speed readings used, none refused; at the normal pace it got about 5 of 25 pictures per second).
+- **Scores of that flight, from the loss to pad B (53 s):** ours (camera speed and the ships' fix) 8.5 m median, 65.6 m worst (a few seconds over water, 60 to 65 s), 6.4 m at pad B; camera only 7.0 / 80.9 / 13.1 m; ships only 16.6 m median; inertial only 117.7 m median, 404 m at pad B, 690 m at the landing. Our filter is inside its own 2 sigma 23 percent of the time, so the dashboard shows EXCEEDED often. Two flights with the final settings so far: 8.1 and 8.5 m median, 36 and 66 m worst.
+- **The video:** `scripts/make_demo_video.py` now draws a caption bar under the 3D view (five captions; the last one says the autopilot flies on the true position), a small map with the true path, our estimate and the inertial-only estimate with their errors at that moment, and appends Felix's cart clip at 6x under its own caption. Every number on screen is read from the take's log. Pitch cut: `outputs/demo/take1/TaipeiDrift_demo_pitch.mp4` (climb at 4x, cruise at 1.5x, landing at 3x; the command is in the script's first lines).
+- **Capture:** `--max-s` of `sim/scripts/capture_desktop.py` counts wall seconds (default 600); a slow take needs `--max-s 1500`. A first take was lost to this.
+- **Felix pushed a pitch deck and a sensor cost report** to `integration` at 00:30 (`PPT/`); merged, not yet read. Dustin's order: the video first, then the presentation.
+- **Not done:** more flights with the same settings (the seeds stay random; a fixed seed would not make the simulator repeat exactly, its programs' timing varies); the backup slides (AIS off, night, simulated, the autopilot flies on the truth, the filter's own bound is too small); Dan is not told about the changes to his files (Dustin: not needed in the last hours).
+
+**THE DEMO VIDEO, as of Sunday 4 October 00:12 (how it was built).**
 
 - **What Dustin wants** (Saturday 22:25 on): a flight of about 75 s for the demo video. Start on land, climb, a few seconds of cruise, GNSS lost, more land, about 30 s over water to show the ships' radio, then landing on the island. The pitch is: a few slides, then the demo, then a final slide, plus backup slides. He agreed to: showing what happens without us (inertial only), captions readable without sound, flying it 3 to 5 times and fixing the seed, one honest sentence that the autopilot steers by the truth, the two expected questions (AIS off; night) on backup slides, a piece of real data (Felix's cart video), telling Dan, recording a safe version. He wants the drone to look faster (play the cruise at 1.5x) and the 3D view not to stutter.
 - **Done, committed locally on `integration` (not pushed; fetch, merge, run the full tests, then push):**
