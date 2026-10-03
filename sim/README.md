@@ -92,10 +92,11 @@ The Gazebo window appears in the browser tab. Launch options:
 | `gps` | `true` | `false` removes the GNSS receiver |
 | `gnss_cutoff_s` | `20.0` | Seconds since the first raw GPS fix when the gate closes; negative means never |
 | `record_mode` | `light` | `light` records sensor/pose topics but no images; `full` also records down and forward images |
+| `run_label` | empty | Optional run folder under `outputs/sim_runs/velocity_phase/` |
 | `stereo` | `false` | `true` adds a second down camera at `/camera/down_right/image_raw` |
 | `stereo_baseline_m` | `0.30` | Stereo camera offset along body -Y (right), used when `stereo:=true` |
 | `gui` | `true` | `false` runs Gazebo without its window |
-| `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods) or `islands` (two islands and open sea) |
+| `world` | `terrain` | A world file in `worlds/`: `terrain`, `islands`, or `city` |
 | `demo` | `false` | `true` flies circles and opens the camera view and sensor monitor |
 
 Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=terrain gnss_cutoff_s:=60 stereo:=true`.
@@ -104,15 +105,17 @@ Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=te
 
 The `city` world is generated on first launch and contains roads, irregular building footprints and heights, a plaza and simple vegetation. `demo:=true` flies a loop across the city at 80 m. GNSS begins available and the gate closes 20 simulation seconds after its first fix by default. The cutoff is logged by the gate and published on `/nav/gnss_available`; raw GPS remains visible on `/sim/gps_raw`, while `/gps/fix` stops publishing after denial.
 
-Every launch creates `outputs/sim_runs/<world>_YYYYMMDD_HHMMSS/` with the rosbag, `metadata.json`, `config.json`, `sim.log`, `trajectory.csv`, `estimator_debug.csv` and `gnss_debug.csv`. Light mode records ground truth (evaluation only), raw and gated GPS, status, IMU, barometer, camera calibration, TF/TF-static, and estimator output. Full mode also records both image streams.
+Every launch creates `outputs/sim_runs/<world>_YYYYMMDD_HHMMSS/` with the rosbag, `metadata.json`, `config.json`, `sim.log`, `trajectory.csv`, `estimator_debug.csv`, `gnss_debug.csv` and `velocity_debug.csv`. Supplying `run_label:=V1_gnss_velocity_fit_open` places it under `outputs/sim_runs/velocity_phase/V1_gnss_velocity_fit_open/`. Light mode records ground truth (evaluation only), raw and gated GPS, status, IMU, barometer, camera calibration, TF/TF-static, and estimator output. Full mode also records both image streams.
 
-The live adapter does not subscribe to ground truth. It converts `/gps/fix` WGS84 coordinates into local ENU using the world's declared spherical-coordinate origin, initializes position from GNSS, initializes tilt and IMU biases from a settled stationary IMU window (yaw is unobservable and starts at 0), then fuses GNSS position and non-overlapping finite-difference velocity observations while fixes are available. After cutoff it propagates IMU, barometer, and enabled visual updates only. GNSS velocity uses a 5 s fix separation; its covariance comes from both endpoint position covariances. The estimator publishes `/nav/odom` in ENU with covariance. `/nav/estimator_status`, `estimator_debug.csv`, and `gnss_debug.csv` contain update decisions and diagnostics. `vision_rotation:=false` and `vision_direction:=false` independently disable those updates without removing the code.
+The live adapter does not subscribe to ground truth. It converts `/gps/fix` WGS84 coordinates into local ENU using the world's declared spherical-coordinate origin, initializes position from GNSS, initializes tilt and IMU biases from a settled stationary IMU window (yaw is unobservable and starts at 0), then fuses GNSS position updates and a robust generalized least-squares velocity fit from GNSS positions. The fit uses an 8 s window, at least six fixes spanning six seconds, the per-fix position covariance, and one normalized-residual outlier rejection pass. Velocity covariance is the slope block of the GLS parameter covariance. Fits use non-overlapping fix windows before being passed to the existing ESKF velocity update. After cutoff the estimator propagates IMU, barometer, and enabled visual updates only. Ground truth stays in the logger for evaluation. `velocity_debug.csv` records estimate and fit errors in ENU; the logger rotates Gazebo odometry's body-frame GT velocity into ENU before scoring it. `/nav/estimator_status`, `estimator_debug.csv`, and `gnss_debug.csv` contain update decisions and diagnostics. `vision_rotation:=false` and `vision_direction:=false` independently disable those updates without removing the code.
 
 PowerShell commands from `sim/`:
 
 ```powershell
 docker compose up -d --build
-docker compose exec -d sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=city demo:=true cam_res:=512 gnss_cutoff_s:=20 record_mode:=full vision_rotation:=true vision_direction:=true > /tmp/sim.log 2>&1"
+docker compose exec sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=city demo:=true gui:=false cam_res:=512 gnss_cutoff_s:=-1 record_mode:=light vision_rotation:=true vision_direction:=true run_label:=V1_gnss_velocity_fit_open"
+# Stop V1 with Ctrl+C, then run V2:
+docker compose exec sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=city demo:=true gui:=false cam_res:=512 gnss_cut_s:=20 record_mode:=light vision_rotation:=true vision_direction:=true run_label:=V2_gnss_velocity_fit_denial"
 ```
 
 Watch Gazebo at http://localhost:6080. In a second terminal, inspect the launch and gate logs with `docker compose exec sim bash -ic "tail -f /tmp/sim.log"`. End the launch with Ctrl+C in its attached terminal, or restart the container; stop the container with `docker compose down`.

@@ -39,7 +39,9 @@ outputs/sim_runs/*
 !outputs/sim_runs/city_20261003_091945/
 !outputs/sim_runs/city_20261003_092854/
 !outputs/sim_runs/city_20261003_093825/
-outputs/sim_runs/*/rosbag2/
+!outputs/sim_runs/velocity_phase/
+!outputs/sim_runs/velocity_phase/*/
+outputs/sim_runs/**/rosbag2/
 
 # simulator: generated ground model and recorded bags
 sim/models/ground/

@@ -58,7 +58,10 @@ sim_gnss:                           # Gazebo NavSatFix covariance is empty in th
   fallback_sigma_m: [1.5, 1.5, 3.0] # matches the simulator SDF's documented sensor noise
   gate_prob: 0.999
   attitude_init_samples: 50         # 0.5 s IMU gravity average; yaw remains unobservable
-  velocity_baseline_s: 5.0          # conservative finite difference over 1 Hz fixes; endpoint covariance propagated
+  velocity_window_s: 8.0            # local WLS fit; non-overlapping windows avoid correlated repeated updates
+  velocity_min_samples: 6
+  velocity_min_span_s: 6.0
+  velocity_outlier_mahalanobis_sq: 16.27  # one-pass 3D residual rejection (~99.9% chi-square threshold)
 
 bias_injection:                     # used with --inject-bias
   gyro: [0.003, -0.002, 0.0025]     # rad/s, gyroscope axes (world for Mid-Air)

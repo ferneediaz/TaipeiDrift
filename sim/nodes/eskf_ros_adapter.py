@@ -28,6 +28,7 @@ from vio.vision.measurements import measurements_from_tracks
 from vio.vision.relative_pose import PoseConfig
 from vio.vision.camera import pinhole_intrinsics
 from gnss_projection import geodetic_to_enu, geodetic_covariance_to_enu
+from gnss_velocity_fit import fit_position_velocity
 from frame_conversions import gazebo_optical_to_flu, gazebo_down_optical_to_flu
 from visual_update_math import direction_update_terms
 
@@ -67,7 +68,8 @@ class FrozenEskfAdapter(Node):
         self.filter = None
         self.gnss_origin = None
         self.last_gnss = None
-        self.gnss_velocity_anchor = None
+        self.gnss_position_history = []
+        self.last_velocity_fit_stamp = None
         self.last_gnss_update_stamp = None
         self.gnss_updates = 0
         self.gnss_rejections = 0
@@ -108,9 +110,15 @@ class FrozenEskfAdapter(Node):
         t = msg_time(msg)
         if not (math.isfinite(msg.latitude) and math.isfinite(msg.longitude) and math.isfinite(msg.altitude)):
             return
+        if self.gnss_position_history and t <= self.gnss_position_history[-1][0]:
+            return
         position = geodetic_to_enu(msg.latitude, msg.longitude, msg.altitude, self.world_origin)
         covariance = geodetic_covariance_to_enu(msg.position_covariance, msg.latitude,
                                                  self.gnss_cfg["fallback_sigma_m"])
+        self.gnss_position_history.append((t, position.copy(), covariance.copy()))
+        keep_s = max(20.0, 2.0 * self.gnss_cfg["velocity_window_s"])
+        while self.gnss_position_history and t - self.gnss_position_history[0][0] > keep_s:
+            self.gnss_position_history.pop(0)
         if self.filter is None:
             self.last_gnss = (t, position, covariance)
             self.try_initialize_from_measurements()
@@ -120,16 +128,36 @@ class FrozenEskfAdapter(Node):
         position_result = self.filter.update_position(position, covariance, self.gnss_cfg["gate_prob"])
         velocity_result = None
         velocity_observation = velocity_covariance = None
-        anchor_t, anchor_p, anchor_cov = self.gnss_velocity_anchor
-        dt = t - anchor_t
-        if dt >= self.gnss_cfg["velocity_baseline_s"]:
-            # Difference separated fixes; uncertainty is propagated from both endpoint covariances.
-            velocity_observation = (position - anchor_p) / dt
-            velocity_covariance = (covariance + anchor_cov) / (dt * dt)
-            velocity_result = self.filter.update_velocity(velocity_observation, velocity_covariance,
-                                                           self.gnss_cfg["gate_prob"])
-            # Use disjoint baselines to avoid pretending overlapping differences are independent.
-            self.gnss_velocity_anchor = (t, position.copy(), covariance.copy())
+        fit_diag = None
+        window = self.gnss_cfg["velocity_window_s"]
+        previous_fit = self.last_velocity_fit_stamp if self.last_velocity_fit_stamp is not None else -math.inf
+        lower = max(t - window, previous_fit + 1e-6)
+        samples = [item for item in self.gnss_position_history if lower <= item[0] <= t]
+        if self.last_velocity_fit_stamp is not None and t - self.last_velocity_fit_stamp >= window:
+            fit_diag = fit_position_velocity(
+                samples, window, self.gnss_cfg["velocity_min_samples"],
+                self.gnss_cfg["velocity_min_span_s"],
+                self.gnss_cfg["velocity_outlier_mahalanobis_sq"])
+            if fit_diag.get("reason") == "ok":
+                velocity_observation = fit_diag["velocity"]
+                velocity_covariance = fit_diag["covariance"]
+                velocity_result = self.filter.update_velocity(velocity_observation, velocity_covariance,
+                                                               self.gnss_cfg["gate_prob"])
+                # Consume this time window even if the ESKF gates it, so later fits
+                # do not reuse fixes and masquerade as independent measurements.
+                self.last_velocity_fit_stamp = t
+                self.status_pub.publish(String(data=json.dumps({
+                    "event": "gnss_velocity_fit", "stamp": t,
+                    "velocity_observation": velocity_observation.tolist(),
+                    "velocity_covariance": velocity_covariance.tolist(),
+                    "sample_count": fit_diag["sample_count"], "span_s": fit_diag["span_s"],
+                    "residual_rms_m": fit_diag["residual_rms_m"],
+                    "rejected_stamps": fit_diag["rejected_stamps"],
+                    "accepted": velocity_result.accepted, "nis": velocity_result.nis,
+                    "reason": velocity_result.reason,
+                    "estimator_velocity": self.filter.v.tolist()})))
+        fit_reason = fit_diag.get("reason") if fit_diag else "window_not_ready"
+        fit_sample_count = fit_diag.get("sample_count", len(samples)) if fit_diag else len(samples)
         self.last_gnss_update_stamp = t
         self.gnss_updates += int(position_result.accepted)
         self.gnss_rejections += int(not position_result.accepted)
@@ -140,7 +168,11 @@ class FrozenEskfAdapter(Node):
             "velocity_covariance": velocity_covariance.tolist() if velocity_covariance is not None else None,
             "velocity_accepted": velocity_result.accepted if velocity_result else None,
             "velocity_nis": velocity_result.nis if velocity_result else None,
-            "velocity_reason": velocity_result.reason if velocity_result else None,
+            "velocity_reason": velocity_result.reason if velocity_result else fit_reason,
+            "velocity_sample_count": fit_diag.get("sample_count", fit_sample_count) if fit_diag else fit_sample_count,
+            "velocity_span_s": fit_diag.get("span_s") if fit_diag else None,
+            "velocity_residual_rms_m": fit_diag.get("residual_rms_m") if fit_diag else None,
+            "velocity_rejected_stamps": fit_diag.get("rejected_stamps", []) if fit_diag else [],
             "updates": self.gnss_updates, "rejections": self.gnss_rejections})))
 
     def try_initialize_from_measurements(self):
@@ -173,7 +205,7 @@ class FrozenEskfAdapter(Node):
         self.vel_history = [self.filter.v.copy() for _ in self.time_history]
         self.t0 = t
         self.last_gnss_update_stamp = t
-        self.gnss_velocity_anchor = (t, position.copy(), covariance.copy())
+        self.last_velocity_fit_stamp = t
         self.get_logger().info(f"initialized from GNSS at sim t={t:.3f}s; origin={self.world_origin}; "
                                f"yaw=0 ENU; settled IMU window (ba={ba0.tolist()}, bg={bg0.tolist()})")
         self.status_pub.publish(String(data=json.dumps({"event": "gnss_initialized", "stamp": t,
