@@ -22,6 +22,9 @@ Added on Saturday:
 11. **Visual-inertial odometry on Mid-Air works** (Alessandro, branch `mid-air-vio`): 13 to 33 m after 83 s without GNSS on three flights it was not tuned on, against 338 to 912 m for the IMU alone (section 2.6). It is the missing layer between our fixes.
 12. **The test on the ALTO training section is blocked.** Dropbox has disabled the dataset link for the day. The images are on disk, but the files with the positions are in the part that did not arrive (section 3.7).
 13. **A mistake found and repaired: our search knew the true path.** ALTO's reference images are centred on the true path, so every fix landed near it. The navigator now searches one map of the area in a circle around its own estimate. The results stay within half a metre of the earlier ones, so they hold; the cliff at 400 m disappears (section 3.8).
+14. **A second dataset, from China, never tuned on** (UAV-VisLoc: real drone photos from 2018 against satellite maps from 2021 to 2023). The matcher, unchanged, finds 80 percent of the photos within 30 m. On the development flight (03) the first version used about 12 wrong fixes per flight; with two new checks, 0 to 2 (section 3.9).
+15. **The held-out result is mixed, and we report it as it is.** On flight 04 (83 km) the typical error falls from 675 m without fixes to 60 m with them, but 18 to 32 wrong fixes still pass. On flight 01 (66 km) the ground has changed since the map was made (bare land became high-rise estates) and map fixes do not beat dead reckoning (section 3.9).
+16. **The limits of the camera picture, and a dangerous failure closed.** Down to 1/64 of the light the error stays at 31 m. When the picture is so poor that the camera cannot see the motion, the estimate used to stand still while claiming a few metres of uncertainty, 1 to 2 km off; now the navigator flies on at cruising speed and says LOST (section 3.10).
 
 ## What the team has to decide
 
@@ -362,6 +365,52 @@ What this means:
 - **What is still easier than reality:** the map is a strip 380 m wide around the flown route, so a wide search meets fewer look-alike places than it would on a full map. The next test, on UAV-VisLoc with full satellite maps, removes that.
 - The runs on the reference images stay in `baseline/configs/alto_navigator.yaml` for comparison. The map runs are the ones to report.
 
+### 3.9 A second dataset, held out: UAV-VisLoc (Saturday)
+
+**Data.** UAV-VisLoc (Xu et al. 2024): real drone photos looking straight down, one every 95 m, 400 to 550 m above ground, with GPS, height, heading (`Phi1`, where the nose points) and course (`Phi2`) per photo, and a Google Earth satellite map at 0.3 m taken 2.5 to 5 years after the photos. No IMU, no video, no forward camera. Flight 03 (Taizhou, 74 km) was used to develop; flights 01 (Changjiang, 66 km) and 04 (Taizhou, 83 km) were chosen as held out before they were looked at.
+
+**What is real and what is simulated.** The fixes are real: real photos against the real map, searched around the estimate (`search: area`, map resampled to 1 m per pixel). The photos are too far apart for optical flow, so the dead reckoning between them is simulated: the true step, turned by the error of a heading sensor model, with a slowly wandering scale error and noise (`baseline/src/sensors/`). GNSS is lost after 1 km. Three seeds per run, each drawing its own heading and dead-reckoning errors.
+
+**Facts measured on flight 03.** 80 percent of the photos are found within 30 m of the truth when searched around it (median 16 m). The matched position lies about 13 m ahead of the recorded one along the flight direction on every leg; learned in the drone's own frame (forward, right) instead of north and east, the median fix error falls from 18.6 to 13.1 m. The camera points along `Phi1`, which differs from the course by the crab angle against the wind, 4 to 13 degrees.
+
+**Why the first version failed on unseen data.** After a few rightly refused fixes the stated uncertainty grows, the search widens to 300 to 450 m, and a look-alike place with a borderline score is found there and believed, although the estimate was right to within 13 to 33 m. Two checks were added: a fix out of a search wider than 150 m that would move the estimate by more than 30 m is held until the next fix, over different ground, agrees with it (both are then used); and the search is capped at 600 m. Ilhan's quarters rule (four quarters of the frame must land where the whole frame did) was also implemented; it refuses too many right fixes on ALTO and is off.
+
+**Results** (median over 3 seeds; "all clear while wrong": the share of the flight where the stated bound is within 50 m but the error is above it):
+
+| Flight | Run | Median | 90% below | Worst | Wrong fixes used, per seed | Error within 3 sigma | All clear while wrong |
+|---|---|---|---|---|---|---|---|
+| 03 (development) | Dead reckoning only | 822 m | 1,391 m | 1,571 m | | 100% | 0% |
+| | First version | 41 m | 427 m | 1,301 m | 11, 12, 12 | 73% | 2.5% |
+| | New checks, compass | 28 m | 180 m | 368 m | 0, 0, 2 | 97% | 0.0% |
+| 01 (held out) | Dead reckoning only | 227 m | 596 m | 973 m | | 100% | 0% |
+| | First version | 474 m | 1,604 m | 2,051 m | 17, 18, 24 | 48% | 3.1% |
+| | New checks, compass | 306 m | 851 m | 1,493 m | 6, 7, 4 | 97% | 0.9% |
+| | New checks, sun sensor | 177 m | 556 m | 1,514 m | 5, 6, 3 | 98% | 1.0% |
+| 04 (held out) | Dead reckoning only | 675 m | 1,235 m | 1,805 m | | 100% | 0% |
+| | First version | 285 m | 1,592 m | 2,244 m | 37, 31, 53 | 39% | 6.5% |
+| | New checks, compass | 60 m | 1,723 m | 2,620 m | 18, 27, 32 | 77% | 3.0% |
+| | New checks, sun sensor | 64 m | 1,206 m | 1,860 m | 17, 29, 35 | 76% | 3.2% |
+
+What it says: the new checks cut wrong fixes by a third to three quarters on unseen flights and make the stated uncertainty far more honest, but they are not safe enough yet. Flight 01 crosses an area that was built up between the photos and the map: bare land in 2018, high-rise estates in 2023; no matcher can recognise that ground. The sun sensor helps where the compass is the weak part (flight 01). Independently, Ilhan's held-out test on ALTO Round 2 Train found the same weakness (94 m per section instead of 31 m), with the zoom as the main cause there (branch `research/offline-nav-evidence`).
+
+### 3.10 The limits: a worse camera picture (Saturday)
+
+On the ALTO validation flight every frame after the jam was made worse in one of three ways, five levels each (`baseline/src/data/degrade.py`): less light (sensor noise of a camera that turns its gain up), blur (Gaussian, in metres on the ground) and haze (a bright veil leaving a share of the contrast, plus sensor noise). Fixes every 300 m, map search (`baseline/scripts/run_limits.py`).
+
+- **It holds** down to 1/64 of the light (31 m, no wrong fix), blur up to 2 m and haze down to half the contrast. Worse pictures make the check refuse fixes; across all fifteen levels one wrong fix passed.
+- **A dangerous failure.** When the picture is bad enough that the camera cannot see the motion (blur from 4 m, haze below 25 percent), the dead reckoning reported no motion: the estimate stood still, its stated uncertainty stopped growing because it was tied to the distance the camera measured, and no fixes were tried. The navigator reported tracking, sure to a few metres, while 1 to 2 km off; the bound held in 0 percent of the frames.
+- **The repair** (`camera_motion_floor: 0.3`): while GNSS works the navigator learns the cruising speed. A camera step shorter than 30 percent of the cruising step is not believed; the navigator flies on at cruising speed along the last good direction, and its uncertainty grows by 30 instead of 10 percent of the distance. Clean frames are unchanged.
+
+| Picture after the jam | Without the repair | With it |
+|---|---|---|
+| Haze, 10 percent of the contrast left | 1,640 m, bound held 0% | 54 m, status LOST, bound held 100% |
+| Haze, 2 percent | 2,045 m, 0% | 93 m, 100% |
+| Blur 16 m | 2,048 m, 0% | 42 m, 91% |
+| 1/1024 of the light | 556 m, 30% | 530 m, 59% |
+| Blur 4 m | 1,091 m, 1% | 897 m, 1%, 4 wrong fixes used |
+
+The last row is the blind spot that remains: the camera's motion is wrong but looks plausible, so the check rarely triggers. Catching it needs a second source of motion to cross-check, as Alessandro's IMU filter does. The fallback direction is the last good one, which suits a straight flight; through turns it needs a heading sensor.
+
 ## 4. How this compares with existing products
 
 Both product pages describe the same building blocks.
@@ -418,6 +467,7 @@ Changes against the current plan:
 ## 7. Limits of these findings
 
 - ALTO: one section of 4.6 km of one flight, in daylight, in summer, over rural land, on a nearly straight course.
+- UAV-VisLoc: the fixes are real, the dead reckoning between photos is simulated (section 3.9). Two held-out flights, three seeds each.
 - The settings for ALTO were chosen while looking at this same section: the zoom and rotation ranges, the score threshold of 0.33, the assumed drift of 10 percent and the fix accuracy of 15 m. Nothing has been tested on data we did not tune on.
 - The map covers only a strip about 380 m wide around the flown route (section 3.8). Places that look alike further away cannot confuse the match, so a wide search is easier than on a map of a whole area.
 - The rotation is learned once before the jam and kept. That works on a straight course, and the validation section is one: its course stays between 77 and 84 degrees. Turns need a heading from the drone's own attitude, or a search over rotation at every fix.
@@ -441,6 +491,9 @@ Run from the repository root after `uv sync`. The data has to be in `data/raw/` 
 | `experiments/l_alto_cost_and_drift.py` | Computing time of one fix at three image sizes, and the sources of camera-only drift | 3.4 | 10 s |
 | `experiments/m_alto_orientation.py` | What the orientation values in ALTO mean: heading, and how far the camera looks away from straight down | 3.1 | 5 s |
 | `baseline/scripts/run_alto_navigator.py` (branch `alto-navigator`) | The navigator as shared code: the runs of 3.4 with stated uncertainty, every fix and why it was used or not, figure | 3.6 | 1 min |
-| `python -m pytest` (branch `alto-navigator`) | 91 tests, including the regression of 3.4 on ALTO and the limit of the distance check | 3.6 | 1 min |
+| `baseline/scripts/run_visloc_navigator.py` (`--flights 01 04` for the held-out run) | UAV-VisLoc runs with heading sensors, simulated dead reckoning and the integrity regions | 3.9 | 4 to 14 min |
+| `baseline/scripts/run_limits.py` (`--floor 0.3` with the repair) | The camera picture made worse after the jam; chart and example frames | 3.10 | 3 min |
+| `baseline/scripts/make_replay.py alto` or `visloc --flight 04` | The demo videos | | 1 to 5 min |
+| `python -m pytest` (branch `alto-navigator`) | 134 tests, including the regressions on ALTO, the limit of the distance check and the camera losing track | 3.6 | 1.5 min |
 
 `e` takes the path of another sensor file as its argument, for example the foggy one. `i` fetches a small piece of the Copernicus elevation model on its first run.
