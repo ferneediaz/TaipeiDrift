@@ -9,6 +9,7 @@ from src.estimation.navigator_core import (
     LOW_SCORE,
     OK,
     TRACKING,
+    agreeing_fixes,
     allowed_distance,
     blend,
     fit_motion_matrix,
@@ -72,6 +73,21 @@ def test_fix_decision_reasons():
     assert fix_decision(score=0.2, distance=150.0, allowed=100.0, min_score=0.33) == (False, LOW_SCORE)
     # the limits themselves pass
     assert fix_decision(score=0.33, distance=100.0, allowed=100.0, min_score=0.33) == (True, OK)
+
+
+def test_agreeing_fixes_example_from_the_docstring():
+    group = agreeing_fixes(np.array([[0.0, 0.0], [3.0, 4.0], [200.0, 0.0]]), radius=10.0, needed=2)
+    np.testing.assert_array_equal(group, [0, 1])
+
+
+def test_agreeing_fixes_needs_enough_frames():
+    scattered = np.array([[0.0, 0.0], [50.0, 0.0], [0.0, 50.0]])
+    assert agreeing_fixes(scattered, radius=10.0, needed=2) is None
+    together = np.array([[0.0, 0.0], [5.0, 0.0], [0.0, 5.0]])
+    np.testing.assert_array_equal(agreeing_fixes(together, radius=10.0, needed=3), [0, 1, 2])
+    # every member of the group has to be close to every other, not only to one of them
+    chain = np.array([[0.0, 0.0], [8.0, 0.0], [16.0, 0.0]])
+    assert len(agreeing_fixes(chain, radius=10.0, needed=2)) == 2
 
 
 def test_status_follows_the_uncertainty():

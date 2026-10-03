@@ -1,6 +1,6 @@
-# Findings from Friday night
+# Findings
 
-What we measured on Friday 2 October between 21:00 and 22:40, on the data we now have on disk. Every number on this page comes from a script in `experiments/`; the list is at the end. Read this before the team decides how to go on.
+What we measured on Friday 2 October between 21:00 and 22:40, and on Saturday 3 October (sections 2.6, 3.6 and 3.7), on the data we have on disk. Every number on this page comes from a script in `experiments/` or from the shared code in `baseline/`; the list is at the end. Read this before the team decides how to go on.
 
 The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 says what they change.
 
@@ -14,6 +14,13 @@ The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 
 6. **Fixes have a cliff, and we know where it is.** Once the drift since the last fix is larger than the area that is searched, the match lands in a wrong place and is accepted. This happens between 300 and 400 m of flight, and the run then ends further off than with no fixes at all. Two additions repair it: a minimum match score, and a search area that grows with the uncertainty. With both, fixes 1,000 m apart give a median error of 56 m.
 7. **Plain brightness matching is enough to start.** Keypoint matching fails completely on these images. Sliding the camera frame over the reference image works, at about 14 m per fix. The pretrained DenseUAV model is not needed for a first version.
 8. **Proposal.** Mid-Air keeps the IMU baseline. Camera speed, position fixes, the integrity check and the drift budget move to ALTO. The simulator is where all sensors run in one flight.
+
+Added on Saturday:
+
+9. **The camera navigator is shared code now** (branch `alto-navigator`, one command, 91 tests). It reproduces every number of section 3.4 exactly, and it states its own uncertainty. When it breaks at the cliff, its error is larger than 3 times the uncertainty it states in 76 percent of frames; when it works, in 0 to 3 percent (section 3.6).
+10. **Agreement of nearby frames does not catch wrong fixes here.** Frames 14 m apart see almost the same ground and land on the same wrong place. The score check stays (section 3.6).
+11. **Visual-inertial odometry on Mid-Air works** (Alessandro, branch `mid-air-vio`): 13 to 33 m after 83 s without GNSS on three flights it was not tuned on, against 338 to 912 m for the IMU alone (section 2.6). It is the missing layer between our fixes.
+12. **The test on the ALTO training section is blocked.** Dropbox has disabled the dataset link for the day. The images are on disk, but the files with the positions are in the part that did not arrive (section 3.7).
 
 ## What the team has to decide
 
@@ -156,6 +163,24 @@ Limits of this test: two flights, a simple measurement of image motion with no c
 
 What follows: on Mid-Air, camera speed needs another source of scale, which is the hard part of full visual-inertial odometry. On data where the aircraft flies high above the ground, the problem is much smaller. See section 3.3.
 
+### 2.6 Visual-inertial odometry on Mid-Air (Alessandro, branch `mid-air-vio`)
+
+Pushed on Saturday at 08:14; the numbers below are copied from `vio/README.md` on that branch and were not re-run here. An error-state Kalman filter estimates position, speed, attitude and both IMU offsets. It takes three kinds of updates: a barometer (simulated from the true altitude with noise and a drifting offset), the turn measured by the forward camera, and the speed measured by the downward camera, whose size the filter trusts only loosely because of the height problem of section 2.5. Settings were tuned on flight 0001 only.
+
+GNSS is lost after 5 s, then about 83 s follow without it. Position error at the end of the flight, in metres:
+
+| Flight | IMU only | IMU + barometer | + both cameras |
+|---|---|---|---|
+| sunny 0000 | 684 | 114 | 12.7 |
+| sunny 0001 (used for tuning) | 381 | 145 | 12.6 |
+| cloudy 3000 | 912 | 441 | 33.1 |
+| cloudy 3001 | 338 | 116 | 17.3 |
+
+- On the three flights not used for tuning, both cameras together bring the error to 13 to 33 m, 4 to 9 times lower than IMU and barometer.
+- The downward camera alone helps the position but loses the heading, which flow cannot observe, and the filter then claims far more certainty than it has.
+- The error still grows. Absolute fixes stay necessary, which is the part section 3 covers.
+- Caveats from the branch itself: the barometer is simulated, four flights, one of them used for tuning.
+
 ## 3. ALTO
 
 ### 3.1 What the data is
@@ -274,6 +299,48 @@ The idea: the zoom of a match measures the height above ground. Altitude minus t
 
 The test: the zoom does follow the height, but loosely. The correlation is 0.64, and on frames not used for fitting the zoom misses the prediction by 32 m of height in the median. That is too imprecise for a check. The test seemed to work, catching 58 of 60 wrong fixes, but for another reason: wrong matches prefer the smallest zoom (section 3.2). We keep the score check and drop this idea.
 
+### 3.6 The navigator as shared code (Saturday)
+
+The chain of section 3.4 now lives in `baseline/` on branch `alto-navigator`: `python baseline/scripts/run_alto_navigator.py`, about a minute for the validation section. It reproduces all seven runs that section 3.4 reports with the score check or the sized search, and the cliff, to the tenth of a metre; `baseline/tests/test_alto_navigator.py` checks that whenever the data is present.
+
+**The navigator states its own uncertainty.** For every frame it gives sigma: 3 m at the jam, growing by 10 percent of the distance flown since the last fix, shrinking at every fix it uses. A status follows from it: tracking up to 30 m, degraded up to 100 m, lost above. How often the true error stays within 3 sigma:
+
+| Run | Median error | Frames with error within 3 sigma |
+|---|---|---|
+| Camera alone | 472 m | 89% |
+| Fix every 100 m | 26 m | 90% |
+| Fix every 300 m | 31 m | 97% |
+| Fix every 300 m, sized search, score check | 31 m | 100% |
+| Fix every 1,000 m, sized search, score check | 56 m | 100% |
+| Fix every 400 m, no check (the cliff) | 285 m | 24% |
+
+When the navigator works, its stated uncertainty holds. When it breaks, it is badly overconfident, and that is exactly the case an integrity check has to catch.
+
+**A limit, found by a test.** We gave the navigator a map whose coordinates are 200 m off, on the generated test flight. The first five fixes were rejected for lying too far from the estimate. After 600 m without a fix the allowed distance had grown to 189 m, and a sixth fix, with a confident score, landed 187 m away and was used. The distance check alone cannot catch a wrong place that lies inside the stated uncertainty. The test stays in the suite to document this.
+
+**Agreement of three frames, the rule of the Tomahawk camera fix** (Irani and Christ 1994, see `docs/reading-notes.md`). Each fix is matched in three frames about 14 m apart; it counts only if at least two land within 10 m of each other after removing the dead-reckoned motion between them. Tomahawk is not a GNSS-denied design: its camera fixes followed GPS or terrain-matching updates, and it checked the frames against an accurate inertial system. Here the motion between frames comes from the camera itself. Tested without the score check, to see whether it could replace the tuned threshold of 0.33:
+
+| Run | Median error, worst | Fixes used, wrong among them |
+|---|---|---|
+| Fix every 300 m, score check 0.33 | 31 m, 73 m | 12, 0 |
+| Fix every 300 m, agreement instead | 31 m, 74 m | 13, 0 |
+| Fix every 300 m, 7 nearest images, agreement instead | 139 m, 522 m | 8, 5 |
+| Fix every 400 m, 7 nearest images, agreement instead | 241 m, 589 m | 3, 2 |
+| Fix every 1,000 m, 7 nearest images, agreement instead | 424 m, 783 m | 3, 3 |
+
+It does not work in this form. Frames 14 m apart share most of their ground, so a wrong place that fits one frame fits the next as well. All wrong fixes that got through had scores between 0.16 and 0.26, so the score check of 0.33 would have stopped them. The agreement check stays in the code as an option, switched off. Frames further apart, 100 m or more, would see different ground; that is untested.
+
+### 3.7 The training section: a first look, without positions
+
+The training section of the same flight was downloaded on Friday night and stopped at 10.25 of about 10.66 GB. The archive stores the three files with the positions at its very end, so they are missing. The images are complete and readable from the partial file:
+
+- 10,436 camera frames and 2,853 reference images on the route: 28.5 km, six times the validation section.
+- Ground: fields with forest edges, long stretches of dark forest, single houses, a large industrial site, villages and a dense town centre.
+- Exposure swings strongly: average brightness per frame from 20 to 183 (on a 0 to 255 scale). About 16 percent of sampled frames have very low contrast, in stretches of up to roughly 760 m, mostly forest.
+- In the town, the streets in the camera frame are rotated against the reference image by much more than the 14 degrees of the validation section. The heading probably changes along the route, which the rotation learned before the jam does not follow.
+
+Dropbox has disabled the dataset link for the day ("downloaded too many times in a day"), and the GitHub pages of the dataset do not carry the position files. The test waits until the link opens again; only the last 0.42 GB are needed.
+
 ## 4. How this compares with existing products
 
 Both product pages describe the same building blocks.
@@ -312,9 +379,9 @@ Neither page shows what happens between fixes or when a fix is wrong. More in [l
 
 | Result | Data | State | Owner |
 |---|---|---|---|
-| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Product code with loader, metrics, plots and tests is on branch `mid-air-baseline-fix`, which is `mid-air-baseline` plus the gyroscope rule from 2.2. Needs merging into `main` | |
-| 2. Camera dead reckoning plus position fixes | ALTO | Experiment done (3.4). Needs a held-out test, turns, and a cleaner filter | |
-| 3. Integrity check and drift budget | ALTO | First version done (3.4). Needs degraded images: blur, darkness, haze | |
+| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Product code on branch `mid-air-baseline-fix`; Alessandro's branch `mid-air-vio` carries the same gyroscope rule and adds visual-inertial odometry (2.6). The team has to pick which reaches `main` | |
+| 2. Camera dead reckoning plus position fixes | ALTO | Shared code on branch `alto-navigator`, reproducing 3.4 (3.6). Held-out test blocked by the download (3.7). Turns still open | |
+| 3. Integrity check and drift budget | ALTO | In the shared code: score check, distance check, stated uncertainty and status (3.6). Agreement of nearby frames tested and dropped. Needs degraded images: blur, darkness, haze | |
 | All sensors in one flight, and the demo view | Simulator | Needs the GNSS cut, recording and export | |
 
 Changes against the current plan:
@@ -352,5 +419,7 @@ Run from the repository root after `uv sync`. The data has to be in `data/raw/` 
 | `experiments/h_alto_end_to_end.py` | The full chain on ALTO, with figure | 3.4 | 90 s |
 | `experiments/l_alto_cost_and_drift.py` | Computing time of one fix at three image sizes, and the sources of camera-only drift | 3.4 | 10 s |
 | `experiments/m_alto_orientation.py` | What the orientation values in ALTO mean: heading, and how far the camera looks away from straight down | 3.1 | 5 s |
+| `baseline/scripts/run_alto_navigator.py` (branch `alto-navigator`) | The navigator as shared code: the runs of 3.4 with stated uncertainty, every fix and why it was used or not, figure | 3.6 | 1 min |
+| `python -m pytest` (branch `alto-navigator`) | 91 tests, including the regression of 3.4 on ALTO and the limit of the distance check | 3.6 | 1 min |
 
 `e` takes the path of another sensor file as its argument, for example the foggy one. `i` fetches a small piece of the Copernicus elevation model on its first run.

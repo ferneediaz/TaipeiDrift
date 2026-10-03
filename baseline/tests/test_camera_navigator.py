@@ -8,7 +8,7 @@ from src.data.camera_flight import CameraFlight, ReferenceMap
 from src.data.synthetic_camera import make_synthetic_camera_flight
 from src.estimation.camera_navigator import NavigatorConfig, calibrate, jam_index, navigate, run_camera_navigator
 from src.estimation.image_motion import shifts_for_flight
-from src.estimation.navigator_core import DISAGREES_WITH_ESTIMATE, LOW_SCORE, OK
+from src.estimation.navigator_core import DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE, LOW_SCORE, OK
 from src.evaluation.navigation_metrics import error_at_distances, fix_errors, navigation_errors, summarize_navigation
 
 CFG = NavigatorConfig(jam_after_m=300.0, fix_every_m=100.0)
@@ -130,6 +130,20 @@ def test_known_limit_the_distance_check_widens_with_the_uncertainty(flight, shif
     assert OK in reasons
     first_believed = result.fixes[reasons.index(OK)]
     assert first_believed.allowed > 180.0 and first_believed.score > 0.9
+
+
+def test_agreement_of_three_frames(flight, shifts, calibration):
+    """With the option on, each fix is matched in three frames; on clean ground they agree."""
+    result = navigate(flight, shifts, calibration, replace(CFG, agreement_frames=3))
+    assert len(result.fixes) >= 5
+    assert all(f.used and f.frames_agreeing >= 2 for f in result.fixes)
+    assert summarize_navigation(result, flight).worst < 12.0
+    # a consistently wrong map fools the frames alike, so agreement alone does not catch it;
+    # every fix is still refused, mostly by the distance check
+    misled = navigate(_misled(flight, 500.0), shifts, calibration, replace(CFG, search="sized", agreement_frames=3))
+    assert misled.fixes and not any(f.used for f in misled.fixes)
+    assert all(f.reason in (DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE) for f in misled.fixes)
+    assert sum(f.reason == DISAGREES_WITH_ESTIMATE and f.frames_agreeing >= 2 for f in misled.fixes) >= 4
 
 
 def test_sized_search_looks_at_more_images_when_less_certain(flight, shifts, calibration):

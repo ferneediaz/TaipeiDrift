@@ -22,6 +22,8 @@ from src.data.camera_flight import CameraFlight, prepare
 from src.estimation.image_motion import shifts_for_flight
 from src.estimation.map_matching import KEEP, match
 from src.estimation.navigator_core import (
+    FRAMES_DISAGREE,
+    agreeing_fixes,
     allowed_distance,
     blend,
     fit_motion_matrix,
@@ -56,6 +58,10 @@ class NavigatorConfig:
     calibration_angles_deg: tuple[float, float, float] = (-10.0, 35.0, 5.0)  # from, to, step
     degraded_above_m: float = 30.0  # status thresholds on sigma
     lost_above_m: float = 100.0
+    agreement_frames: int = 1  # frames matched for one fix; 1 switches the agreement check off
+    agreement_spacing: int = 5  # frames between them, about 14 m on ALTO
+    agreement_radius_m: float = 10.0  # fixes agree if they land this close after removing the motion in between
+    agreement_needed: int = 2  # this many frames have to agree
 
 
 @dataclass
@@ -83,7 +89,8 @@ class FixRecord:
     distance: float  # m between the fix and the estimate before blending
     allowed: float  # largest distance at which the fix would be believed, m
     used: bool
-    reason: str  # OK, LOW_SCORE or DISAGREES_WITH_ESTIMATE
+    reason: str  # OK, LOW_SCORE, DISAGREES_WITH_ESTIMATE or FRAMES_DISAGREE
+    frames_agreeing: int = 1  # with the agreement check: how many of the matched frames agreed
 
 
 @dataclass
@@ -167,12 +174,35 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
                     zooms = np.arange(cfg.wide_zooms[0], cfg.wide_zooms[1] + 0.001, cfg.zoom_step)
             angles = np.array([calibration.angle - cfg.angle_reach_deg, calibration.angle, calibration.angle + cfg.angle_reach_deg])
 
-            found = match(prepare(flight.frame(k)), reference, candidates, zooms, angles, cfg.keep)
-            position = found.position - calibration.fix_offset
+            # match this frame, and with the agreement check also the frames just before it,
+            # each moved to the present by the dead-reckoned motion since then
+            frames = [k - i * cfg.agreement_spacing for i in range(cfg.agreement_frames - 1, -1, -1)]
+            frames = [j for j in frames if j > jam]
+            found_all, moved = [], []
+            for j in frames:
+                found_j = match(prepare(flight.frame(j)), reference, candidates, zooms, angles, cfg.keep)
+                found_all.append(found_j)
+                moved.append(found_j.position - calibration.fix_offset + (estimate - path[j - jam]) if j < k else found_j.position - calibration.fix_offset)
+            found = found_all[-1]
+            position, score, agreeing = moved[-1], found.score, 1
+            frames_agree = True
+            if len(frames) > 1:
+                group = agreeing_fixes(np.array(moved), cfg.agreement_radius_m, min(cfg.agreement_needed, len(frames)))
+                frames_agree = group is not None
+                if frames_agree:
+                    best = max(group, key=lambda i: found_all[i].score)
+                    found = found_all[best]
+                    position = np.mean([moved[i] for i in group], axis=0)
+                    score = float(np.mean([found_all[i].score for i in group]))
+                    agreeing = len(group)
+
             distance = float(np.linalg.norm(position - estimate))
             allowed = allowed_distance(predicted, fix_variance, cfg.gate_sigmas)
-            use, reason = fix_decision(found.score, distance, allowed, cfg.min_score)
-            fixes.append(FixRecord(k, found.score, position, found.zoom, found.angle, found.reference_index, len(candidates), distance, allowed, use, reason))
+            if frames_agree:
+                use, reason = fix_decision(score, distance, allowed, cfg.min_score)
+            else:
+                use, reason = False, FRAMES_DISAGREE
+            fixes.append(FixRecord(k, score, position, found.zoom, found.angle, found.reference_index, len(candidates), distance, allowed, use, reason, agreeing))
             if use:
                 estimate, variance, _ = blend(estimate, predicted, position, fix_variance)
                 zoom = found.zoom

@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import numpy as np
 
-# reasons returned by ``fix_decision``
+# reasons returned by ``fix_decision``, and by the navigator when frames disagree
 OK = "OK"
 LOW_SCORE = "LOW_SCORE"
 DISAGREES_WITH_ESTIMATE = "DISAGREES_WITH_ESTIMATE"
+FRAMES_DISAGREE = "FRAMES_DISAGREE"
 
 # what the navigator reports about itself, see ``status``
 TRACKING = "TRACKING"
@@ -103,6 +104,37 @@ def fix_decision(score: float, distance: float, allowed: float, min_score: float
     if distance > allowed:
         return False, DISAGREES_WITH_ESTIMATE
     return True, OK
+
+
+def agreeing_fixes(positions: np.ndarray, radius: float, needed: int) -> np.ndarray | None:
+    """Find the largest group of fixes that land on the same place.
+
+    Several frames a few metres apart are matched, and each fix is moved to the same moment by
+    the dead-reckoned motion in between. A right place shows up in all of them; a wrong place
+    that only looks alike rarely repeats. This is the rule the Tomahawk missile used (2 of 3
+    frames, Irani and Christ 1994).
+
+    Example: fixes at (0, 0), (3, 4) and (200, 0), radius 10 m, 2 needed. The first two lie 5 m
+    apart and agree; the third is far from both. Returns [0, 1].
+
+    Args:
+        positions: (K, 2) fixes, already moved to the same moment, m.
+        radius: two fixes agree if they are at most this far apart, m.
+        needed: smallest group that counts.
+
+    Returns:
+        indices of the largest group in which every fix lies within ``radius`` of every other,
+        or ``None`` if no group reaches ``needed``.
+    """
+    positions = np.asarray(positions, dtype=float)
+    close = np.linalg.norm(positions[:, None, :] - positions[None, :, :], axis=2) <= radius
+    count = len(positions)
+    best: list[int] = []
+    for mask in range(1, 2**count):  # K is small (3 to 5), so every group can be tried
+        group = [i for i in range(count) if mask >> i & 1]
+        if len(group) > len(best) and all(close[i, j] for i in group for j in group):
+            best = group
+    return np.array(best) if len(best) >= needed else None
 
 
 def status(sigma: float, degraded_above: float = 30.0, lost_above: float = 100.0) -> str:

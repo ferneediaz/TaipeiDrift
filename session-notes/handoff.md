@@ -21,6 +21,8 @@ Last updated: Saturday 3 October 2026, 08:35.
 - A limit, kept as a test: with a map whose coordinates are 200 m off, the first five fixes are rejected, but after 600 m without a fix the allowed distance has grown past 200 m and a confident wrong fix is believed. The distance check alone cannot catch a wrong place inside the stated uncertainty.
 - Right after each fix the error grows again by 10 to 15 percent of the distance flown. That drift is mostly systematic (scale and direction), so two consecutive fixes could re-fit the motion matrix in flight. Not built.
 
+**Saturday morning (09:30):** frame agreement tested as a replacement for the score threshold and dropped: frames 14 m apart see the same ground and agree on the same wrong place (findings 3.6). The option stays in the code, switched off. Tomahawk is not a GNSS-denied design (its camera fixes followed GPS or terrain-matching updates); the reading notes now say so. Findings and plan are updated on this branch: sections 2.6 (Alessandro's visual-inertial odometry), 3.6, 3.7, and the build-order state.
+
 **Reading:** about 15 papers read, notes in `docs/reading-notes.md`.
 
 ## Current objective
