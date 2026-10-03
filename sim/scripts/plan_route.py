@@ -87,7 +87,10 @@ def main() -> int:
     ap.add_argument("--speed", type=float, default=10.0, help="ground speed, m/s")
     ap.add_argument("--north-margin", type=float, default=300.0, help="turn this far before the corridor's north end, m")
     ap.add_argument("--south-margin", type=float, default=100.0, help="stop this far before its south end, m")
+    ap.add_argument("--south-first", action="store_true", help="fly south first, turn near the south end, then north")
+    ap.add_argument("--out", default=str(OUT), help="route file to write (a preview PNG is written next to it)")
     args = ap.parse_args()
+    out = Path(args.out)
 
     origin = image_centre(GROUND_TIF)
     west, north, east, south = 216090.0, 2662690.0, 218240.0, 2659760.0  # a box around both images
@@ -101,11 +104,14 @@ def main() -> int:
     start = int(np.argmin(np.hypot(line[:, 0], line[:, 1])))  # the centreline point nearest the start
     turn = int(np.searchsorted(line[:, 3], args.north_margin))
     stop = int(np.searchsorted(line[:, 3], line[-1, 3] - args.south_margin))
-    route = np.r_[line[start:turn - 1:-1, :2], line[turn:stop + 1, :2]]
+    if args.south_first:  # out to the south end, back north to the turn point of the northern margin
+        route = np.r_[line[start:stop + 1, :2], line[stop - 1:turn - 1:-1, :2]]
+    else:
+        route = np.r_[line[start:turn - 1:-1, :2], line[turn:stop + 1, :2]]
     length = float(np.sum(np.hypot(*np.diff(route, axis=0).T)))
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({
         "about": "Demo route along the Wufeng corridor; written by sim/scripts/plan_route.py",
         "crs": "EPSG:3826", "origin_easting_m": origin[0], "origin_northing_m": origin[1],
         "altitude_m": args.altitude, "speed_mps": args.speed, "length_m": round(length, 1),
@@ -117,11 +123,11 @@ def main() -> int:
     for (x0, y0), (x1, y1) in zip(route[:-1], route[1:]):
         cv2.line(preview, to_px(x0, y0), to_px(x1, y1), (0, 140, 255), 2)
     cv2.circle(preview, to_px(0.0, 0.0), 6, (0, 0, 255), 2)
-    cv2.imwrite(str(OUT.with_suffix(".png")), preview)
+    cv2.imwrite(str(out.with_suffix(".png")), preview)
     narrow = line[start:stop + 1, 2]
     print(f"route: {len(route)} waypoints, {length:.0f} m at {args.altitude:.0f} m and {args.speed:.0f} m/s "
           f"(about {length / args.speed / 60:.1f} min); imagery reaches {np.median(narrow):.0f} m to the side "
-          f"(median), {narrow.min():.0f} m at the narrowest -> {OUT}")
+          f"(median), {narrow.min():.0f} m at the narrowest -> {out}")
     return 0
 
 

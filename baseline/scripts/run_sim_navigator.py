@@ -11,6 +11,7 @@ over the seeds), navigator.png and stanford.png.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import csv
 import json
 import sys
@@ -42,6 +43,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--only", nargs="+", help="names of the runs to do")
     p.add_argument("--output-dir", type=Path)
     p.add_argument("--workers", type=int, default=6)
+    p.add_argument("--recording", help="another recorded flight, e.g. recordings/wufeng_south_80m")
+    p.add_argument("--route", help="its route file, e.g. sim/scenarios/wufeng_south_80m.json")
     return p.parse_args()
 
 
@@ -65,7 +68,14 @@ def compass(cfg: dict, flight, seed: int) -> np.ndarray:
 
 
 def flow_path(cfg: dict, seed: int) -> Path:
-    return Path(_path(cfg, "cache_dir")) / f"sim_flow_{Path(cfg['recording']).name}_compass_seed{seed}.npy"
+    """Where the camera motion of one compass draw is cached.
+
+    The name carries a fingerprint of the recording's image list and of the compass settings, so a
+    flight recorded again under the same name, or another compass, never reuses old camera motion.
+    """
+    recording = Path(_path(cfg, "recording"))
+    content = (recording / "images.csv").read_bytes() + json.dumps(cfg["heading"]["compass"], sort_keys=True).encode()
+    return Path(_path(cfg, "cache_dir")) / f"sim_flow_{recording.name}_{hashlib.sha1(content).hexdigest()[:10]}_compass_seed{seed}.npy"
 
 
 def flow_job(job: tuple) -> str:
@@ -103,6 +113,9 @@ def one_run(job: tuple) -> dict:
 def main() -> int:
     args = parse_args()
     cfg = yaml.safe_load(args.config.read_text())
+    if args.recording:
+        cfg["recording"], cfg["route"] = args.recording, args.route or cfg["route"]
+        cfg["output_dir"] = f"{cfg['output_dir']}_{Path(args.recording).name}"
     seeds = args.seeds or cfg["seeds"]
     runs = {n: s for n, s in cfg["runs"].items() if not args.only or n in args.only}
     out = Path(args.output_dir or REPO_ROOT / cfg["output_dir"])
@@ -143,7 +156,7 @@ def main() -> int:
     from src.visualization.navigator_plot import plot_navigation, plot_stanford
 
     if results:
-        plot_navigation(f, results, out / "navigator.png", title="Simulated flight over Wufeng: GNSS lost after 450 m, camera motion and map fixes")
+        plot_navigation(f, results, out / "navigator.png", title=f"Simulated flight over Wufeng ({Path(cfg['recording']).name}): GNSS lost after 450 m, camera motion and map fixes")
         plot_stanford({k: navigation_errors(v, f) for k, v in results.items()}, cfg["alert_limit_m"], out / "stanford.png",
                       title="Simulated flight: true error against the bound the navigator states")
     print(f"\nresults in {out} ({time.time() - t0:.0f} s)")

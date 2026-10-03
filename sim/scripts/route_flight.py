@@ -6,7 +6,7 @@ plan; the navigator under test never sees that truth, only the recorded sensors.
 
 Steering: the drone looks at a point 40 m ahead on the route and turns its nose towards it (the
 down camera's image top points forward). It slows down while its nose is far off that direction,
-so the turn at the north end is flown on the spot.
+and at a U-turn it stops and turns on the spot.
 
 Run in the container, with the simulator and the recorder already running:
     python3 sim/scripts/route_flight.py [--route sim/scenarios/wufeng_corridor.json]
@@ -29,6 +29,7 @@ from std_msgs.msg import Bool
 LOOKAHEAD_M = 40.0
 WINDOW_M = 80.0  # the nearest route point is searched only this far ahead of the progress so far
 MAX_YAW_RATE = 0.5  # rad/s
+STALL_S = 15.0  # if the progress along the route does not grow for this long, move it on by 5 m
 
 
 class RouteFlight(Node):
@@ -41,6 +42,7 @@ class RouteFlight(Node):
         self.route, self.altitude, self.speed = route, altitude, speed
         self.along = np.r_[0.0, np.cumsum(np.hypot(*np.diff(route, axis=0).T))]
         self.progress = 0.0
+        self.moved_at = 0.0
 
     def now_s(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
@@ -69,13 +71,17 @@ class RouteFlight(Node):
         if ahead.any():
             idx = np.where(ahead)[0]
             near = idx[np.argmin(np.hypot(self.route[idx, 0] - x, self.route[idx, 1] - y))]
-            self.progress = max(self.progress, float(self.along[near]))
+            if float(self.along[near]) > self.progress:
+                self.progress, self.moved_at = float(self.along[near]), self.now_s()
+        if self.now_s() - self.moved_at > STALL_S:  # never stall for good: nudge the progress along the route
+            self.progress, self.moved_at = self.progress + 5.0, self.now_s()
         if self.progress >= self.along[-1] - 5.0:
             return False
         target = self.point_at(self.progress + LOOKAHEAD_M)
         wanted = math.atan2(target[1] - y, target[0] - x)
         error = math.atan2(math.sin(wanted - yaw), math.cos(wanted - yaw))
-        vx = self.speed * max(0.15, math.cos(error))
+        # far off the route's direction (a U-turn): stop and turn on the spot, then fly on
+        vx = 0.0 if abs(error) > math.radians(45.0) else self.speed * math.cos(error)
         self.send(vx, self.hold_height(z), max(-MAX_YAW_RATE, min(MAX_YAW_RATE, 1.2 * error)))
         return True
 

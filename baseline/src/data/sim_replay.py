@@ -45,7 +45,7 @@ class SimReplayConfig:
     map_tif: str = "data/raw/aerial/wufeng_2018-05-03_x4.tif"  # the 2020 image gives a map as fresh as the ground
     route: str = "sim/scenarios/wufeng_corridor.json"  # holds the world origin in EPSG:3826
     map_metres_per_pixel: float = 0.5
-    start_height_m: float = 95.0  # the flight starts at the first image at least this high
+    start_height_m: float | None = None  # the flight starts at the first image this high; None: 95 % of the route's height
     stop_speed_mps: float = 2.0  # and ends before the drone slows below this at the end of the route
     cache_dir: str | None = "data/processed"
 
@@ -90,10 +90,12 @@ def load_sim_flight(cfg: SimReplayConfig, heading_deg: np.ndarray | None = None)
     q = truth[["qw", "qx", "qy", "qz"]].to_numpy()[nearest]
     true_heading = heading_from_quaternion(*q.T)
 
+    route = json.loads(Path(cfg.route).read_text())
+    start_height = cfg.start_height_m if cfg.start_height_m is not None else 0.95 * route["altitude_m"]
     speed = np.r_[0.0, np.hypot(np.diff(east), np.diff(north)) / np.maximum(np.diff(t), 1e-6)]
-    high = np.nonzero(up >= cfg.start_height_m)[0]
+    high = np.nonzero(up >= start_height)[0]
     if len(high) == 0:
-        raise ValueError(f"the drone never reaches {cfg.start_height_m} m in {rec}")
+        raise ValueError(f"the drone never reaches {start_height:.0f} m in {rec}")
     first = int(high[0])
     moving = np.nonzero(speed[first:] >= cfg.stop_speed_mps)[0]
     last = first + int(moving[-1]) if len(moving) else len(t) - 1
@@ -101,7 +103,6 @@ def load_sim_flight(cfg: SimReplayConfig, heading_deg: np.ndarray | None = None)
 
     origin = np.array([north[first], east[first]])
     position = np.column_stack([north[keep], east[keep]]) - origin
-    route = json.loads(Path(cfg.route).read_text())
     ground = _ground_map(Path(cfg.map_tif), (route["origin_easting_m"], route["origin_northing_m"]), origin,
                          cfg.map_metres_per_pixel, Path(cfg.cache_dir).expanduser() if cfg.cache_dir else None)
 

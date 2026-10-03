@@ -186,6 +186,12 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
             match(prepare(flight.frame(k)), flight.reference, flight.reference.nearest(truth[k], cfg.nearest_images), zooms, angles, cfg.keep)
             for k in frames
         ]
+    zoom = float(np.median([f.zoom for f in fixes]))
+    if zoom <= zooms[0] + 1e-9 or zoom >= zooms[-1] - 1e-9:
+        # the best of the zooms tried may not be the right one: the camera's scale (its height) lies
+        # outside what calibration_zooms covers, and every fix after the jam would be searched at the wrong scale
+        raise ValueError(f"the camera's scale lies at the edge of the zooms tried ({zoom:.2f} of {zooms[0]:.2f} to "
+                         f"{zooms[-1]:.2f}): the flight height is outside what calibration_zooms covers; widen it")
     offsets = np.array([f.position - truth[k] for f, k in zip(fixes, frames)])
     if cfg.offset_frame == "body":
         heading = _heading(flight)
@@ -199,7 +205,7 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
     return Calibration(
         jam_index=jam,
         motion_matrix=matrix,
-        zoom=float(np.median([f.zoom for f in fixes])),
+        zoom=zoom,
         angle=float(np.median([f.angle for f in fixes])),
         fix_offset=np.median(offsets, axis=0),
         offset_frame=cfg.offset_frame,
