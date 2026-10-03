@@ -1,0 +1,18 @@
+# Mid-Air IMU noise model (Fonder and Van Droogenbroeck, CVPRW 2019, eq. 1), per axis:
+#   m = m_true + N(0, n) + b_t,   b_t = b_{t-1} + N(0, b0 * sqrt(dt / t_a)),   b_0 ~ N(0, b0)
+# Mid-Air draws n, b0 and t_a at random for each flight. It does not publish the bounds,
+# so the bounds below are OUR ASSUMPTION for consumer MEMS IMUs. Check them against the Mid-Air
+# sensor records (imu minus ground truth) once the data is downloaded.
+sensor_noise:
+  ros__parameters:
+    seed: -1                      # -1: new draw every run; >= 0: repeatable run
+    scale: 1.0                    # multiplies every noise term, for the noise sweep
+    gyro_n:   [0.0005, 0.005]     # white noise std per sample, rad/s
+    gyro_b0:  [0.001, 0.01]       # bias scale, rad/s (0.06 to 0.6 deg/s)
+    gyro_ta:  [100.0, 1000.0]     # bias time constant, s
+    accel_n:  [0.005, 0.05]       # white noise std per sample, m/s^2
+    accel_b0: [0.01, 0.1]         # bias scale, m/s^2
+    accel_ta: [100.0, 1000.0]     # bias time constant, s
+    # Barometer (Gazebo Air Pressure sensor): Gazebo adds 10 Pa white noise; this adds
+    # a random-walk drift standing in for weather and temperature (1 Pa is about 0.08 m).
+    baro_drift_pa_per_sqrt_s: 0.65   # about 5 Pa (0.4 m) after one minute
