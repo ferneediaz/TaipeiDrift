@@ -12,8 +12,9 @@ Last updated: Saturday 3 October 2026, 08:35.
 
 1. **Held-out test on the training section** (build step 2). Blocked: the download of `Train.zip` stopped at 01:44 at 10.25 of about 10.66 GB (`data/raw/alto/Unconfirmed 150932.crdownload`, downloaded with Brave). Dustin has to press Resume in Brave's download list. The missing tail holds the three position files (query, reference, matches), which the archive stores last; all camera frames and the main reference images are already in the file. When the download is complete it is called `Train.zip`, and `python baseline/scripts/run_alto_navigator.py --section Train` runs the test with the settings untouched.
 2. **What to expect on the training section,** from a look at the images: 28.5 km and 10,436 frames, six times the validation section; fields, long dark forest, villages, a town; about 16 percent of frames with very low contrast, in stretches of up to roughly 760 m; and probably heading changes, which the fixed angle learned before the jam does not follow.
-3. **Wrong-fix numbers and a stronger check** (build step 4). The reading suggests checks that need no tuned threshold: agreement of consecutive frames (Tomahawk) or of crops of one frame (UASTHN). See `docs/reading-notes.md`. Build only after the held-out test shows whether the 0.33 threshold holds.
-4. Then the rest of the build order in `docs/PLAN.md`: limits with darkened and blurred frames, the demo view, turns, the phone walk.
+3. **Next build step: limits with darkened, blurred and hazy frames** (build step 3). It needs only the validation data: degrade the camera frames after the jam in steps, run the navigator, and chart where fixes stop and what the status reports.
+4. **Done on Saturday morning, do not redo:** wrong-fix numbers are in every run's summary (build step 4). Agreement of three frames 14 m apart was tested and dropped (findings 3.6). Untested ideas: frames 100 m or more apart, crops of one frame (UASTHN), and learning the score threshold from the GNSS stretch before the jam.
+5. Then the rest of the build order in `docs/PLAN.md`: the demo view, turns, the phone walk. For the team meeting: the four lines of work and a proposal for one story are in `docs/PLAN.md`, after the build order.
 
 **Found last night:**
 
