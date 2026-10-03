@@ -30,3 +30,11 @@ node_modules/
 
 # generated results (baseline/scripts/run_midair_baseline.py)
 outputs/
+
+# simulator: generated ground model and recorded bags
+sim/models/ground/
+sim/models/trees/
+sim/models/islands/
+sim/bags/
+*.mcap
+*.db3
