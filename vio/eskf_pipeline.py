@@ -190,6 +190,8 @@ def run_ablation(traj: Trajectory, k0: int, vis: VisualInputs, cfg: dict, name: 
     bc = cfg["barometer"]
     baro_cfg = BaroUpdateConfig(enabled=use_baro, white_std_m=bc["white_std_m"],
                                 bias_walk_m_per_sqrt_s=bc["bias_walk_m_per_sqrt_s"],
+                                drift_sigma_m_per_s=bc.get("drift_sigma_m_per_s", 0.0024),
+                                scale_error_rms=bc.get("scale_error_rms", 0.052),
                                 every_n_samples=int(bc.get("every_n_samples", 20)))
     rot_cfg = RotationUpdateConfig(enabled=use_rot, sigma_deg=fc["sigma_deg"], gate_prob=fc["gate_prob"])
     flow_cfg = FlowUpdateConfig(enabled=use_flow, rel_height_std=dc["rel_height_std"], min_sigma_mps=dc["min_sigma_mps"],

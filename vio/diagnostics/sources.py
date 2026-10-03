@@ -57,8 +57,14 @@ def intervals_from_tracks(tracks, times: np.ndarray, K: np.ndarray, pose_cfg: Po
         if not pose.valid:
             continue
         spread = float(np.sqrt(np.trace(np.cov(b.T)))) if len(b) > 2 else float("nan")
+        # translational parallax: flow left after removing the estimated rotation (pixels)
+        Kinv = np.linalg.inv(K)
+        na, nb = (np.c_[a, np.ones(len(a))] @ Kinv.T)[:, :2], (np.c_[b, np.ones(len(b))] @ Kinv.T)[:, :2]
+        rays = np.c_[na, np.ones(len(na))] @ pose.rotation  # rotate rays of frame i into frame j: R_ab^T x
+        par = float(np.median(np.linalg.norm(nb - rays[:, :2] / rays[:, 2:3], axis=1)) * K[0, 0])
         out.append(VisualInterval(float(times[tr.keyframe_index]), float(times[tr.frame_index]), pose.rotation,
-                                  pose.n_correspondences, pose.n_inliers, pose.inlier_ratio, pose.median_flow_px, spread))
+                                  pose.n_correspondences, pose.n_inliers, pose.inlier_ratio, pose.median_flow_px, spread,
+                                  pose.translation_dir, par))
     return out
 
 

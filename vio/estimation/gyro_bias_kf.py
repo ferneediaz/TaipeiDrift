@@ -84,6 +84,9 @@ class BiasKFConfig:
     gravity_std_tol: float = 0.3  # m/s^2
     gravity_window_s: float = 0.2
     gravity_rate_hz: float = 5.0
+    sun_update: bool = False  # absolute sun-direction update (needs sun_world and observations)
+    sun_sigma_deg: float = 5.0
+    sun_min_confidence: float = 0.5
 
 
 def soft_threshold_bias(b_hat: np.ndarray, floor_rad_s: float) -> np.ndarray:
@@ -129,6 +132,24 @@ class GravityLog:
 
 
 @dataclass
+class SunObservation:
+    """Detected sun direction in body axes at an IMU sample (absolute flight index)."""
+
+    imu_index: int
+    s_body: np.ndarray  # unit vector towards the sun, body axes
+    confidence: float
+
+
+@dataclass
+class SunLog:
+    imu_index: int
+    accepted: bool
+    residual_deg: float  # angle between observed and predicted sun direction
+    nis: float
+    reason: str = ""
+
+
+@dataclass
 class BiasKFOutput:
     result: DeadReckoningResult
     bias: np.ndarray  # (n, 3) rad/s, gyro axes
@@ -136,11 +157,13 @@ class BiasKFOutput:
     updates: list[BiasUpdateLog] = field(default_factory=list)
     bias_applied: np.ndarray | None = None  # (n, 3) bias actually subtracted from the gyro (after shrinkage)
     gravity: list[GravityLog] = field(default_factory=list)
+    sun: list[SunLog] = field(default_factory=list)
 
 
 def run_bias_kf(timestamp: np.ndarray, accelerometer: np.ndarray, gyroscope: np.ndarray, gyroscope_frame: str,
                 gravity_world: np.ndarray, initial: NavState, start_index: int, intervals: list[BiasInterval],
-                cfg: BiasKFConfig | None = None) -> BiasKFOutput:
+                cfg: BiasKFConfig | None = None, sun_observations: list[SunObservation] | None = None,
+                sun_world: np.ndarray | None = None) -> BiasKFOutput:
     """Dead reckoning with the gyro bias estimated from relative visual rotations and, optionally,
     roll/pitch corrected by gravity.
 
@@ -183,15 +206,25 @@ def run_bias_kf(timestamp: np.ndarray, accelerometer: np.ndarray, gyroscope: np.
     open_iv: dict[int, dict] = {}
     logs: list[BiasUpdateLog] = []
     glogs: list[GravityLog] = []
+    slogs: list[SunLog] = []
+    use_sun = cfg.sun_update and sun_observations and sun_world is not None
+    sun_w = np.asarray(sun_world, float) / np.linalg.norm(sun_world) if use_sun else None
+    sun_at: dict[int, list[SunObservation]] = {}
+    for o in (sun_observations or []) if use_sun else []:
+        if 0 < o.imu_index - k0 < n:
+            sun_at.setdefault(o.imu_index - k0, []).append(o)
+    sig_sun = np.deg2rad(cfg.sun_sigma_deg)
 
-    def kalman(H, r, Rm, attitude_gain: bool):
+    def kalman(H, r, Rm, attitude_gain: bool, full_attitude: bool = False):
         P = state["P"]
         S = H @ P @ H.T + Rm
         nis = float(r @ np.linalg.solve(S, r))
         if nis > gate:
             return False, nis
         K = P @ H.T @ np.linalg.inv(S)
-        if attitude_gain:
+        if full_attitude:
+            pass  # sun: an absolute direction; rotation about the sun ray is unobservable through H itself
+        elif attitude_gain:
             K[:3] = proj_tilt @ K[:3]  # gravity never corrects heading, not even through correlations
         else:
             K[:3] = 0.0  # vision is bias-only
@@ -220,9 +253,24 @@ def run_bias_kf(timestamp: np.ndarray, accelerometer: np.ndarray, gyroscope: np.
         ok, _ = kalman(H, u_meas - u_pred, I3 * sig_g**2, attitude_gain=True)
         glogs.append(GravityLog(k0 + k, ok, dev, sd, ang, "" if ok else "chi-square gate"))
 
+    def sun(o: SunObservation, k: int) -> None:
+        s_meas = np.asarray(o.s_body, float) / np.linalg.norm(o.s_body)
+        Rinv = state["R"].inv()
+        s_pred = Rinv.apply(sun_w)
+        ang = float(np.degrees(np.arccos(np.clip(s_meas @ s_pred, -1.0, 1.0))))
+        if o.confidence < cfg.sun_min_confidence:
+            slogs.append(SunLog(k0 + k, False, ang, np.nan, "low confidence"))
+            return
+        # R_true = Exp(dtheta) R_hat -> R_true^T s_w = s_pred + R_hat^T [s_w]x dtheta  (no position/velocity term)
+        H = np.hstack([Rinv.as_matrix() @ skew(sun_w), np.zeros((3, 3))])
+        ok, nis = kalman(H, s_meas - s_pred, np.eye(3) * sig_sun**2, attitude_gain=True, full_attitude=True)
+        slogs.append(SunLog(k0 + k, ok, ang, nis, "" if ok else "chi-square gate"))
+
     def process(k: int) -> None:
         if cfg.gravity_update and k > 0 and k % g_every == 0:
             gravity(k)
+        for o in sun_at.get(k, []):
+            sun(o, k)
         for iv in ends.get(k, []):
             i = iv.imu_i - k0
             acc = open_iv.pop(i, None)
@@ -284,4 +332,4 @@ def run_bias_kf(timestamp: np.ndarray, accelerometer: np.ndarray, gyroscope: np.
     att = Rotation.from_quat(quats)
     position, velocity = integrate_translation(timestamp, accelerometer, att, initial, gravity_world)
     res = DeadReckoningResult(timestamp, position, velocity, rotation_to_quat_wxyz(att), start_index=k0, t0=float(timestamp[0]))
-    return BiasKFOutput(res, bias_hist, std_hist, logs, app_hist, glogs)
+    return BiasKFOutput(res, bias_hist, std_hist, logs, app_hist, glogs, slogs)

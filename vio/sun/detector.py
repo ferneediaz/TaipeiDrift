@@ -19,9 +19,9 @@ import cv2
 import numpy as np
 
 SAT = 250
-MIN_AREA, MAX_AREA = 8, 4000
-MIN_CIRCULARITY = 0.5
-MIN_RING = 200.0
+MIN_AREA, MAX_AREA = 150, 30000  # the sun shows as a large clipped bloom; small clipped blobs are clouds
+MIN_CIRCULARITY = 0.3  # bloom merges with nearby bright sky
+MIN_RING = 215.0
 MIN_SKY_ADJ = 0.5
 
 

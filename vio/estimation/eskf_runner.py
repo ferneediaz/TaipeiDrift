@@ -44,9 +44,15 @@ class FlowUpdateConfig:
 
 @dataclass
 class BaroUpdateConfig:
+    """Relative-altitude update (vertical position only). Noise follows the measured barometer:
+    sigma^2 = white^2 + rw^2 t + (drift t)^2 + (scale |dz|)^2, with t since the cut and dz the
+    barometric altitude change since the cut. No bias state: drift and scale are folded into the noise."""
+
     enabled: bool = True
-    white_std_m: float = 0.3  # matches the simulated sensor's white noise
-    bias_walk_m_per_sqrt_s: float = 0.05  # offset drift, folded into the noise as it grows: sqrt(w^2 + q t)
+    white_std_m: float = 0.30
+    bias_walk_m_per_sqrt_s: float = 0.112
+    drift_sigma_m_per_s: float = 0.0024
+    scale_error_rms: float = 0.052  # rms of +/- U(0.03, 0.07)
     every_n_samples: int = 20  # 5 Hz
     gate_prob: float = 0.99
 
@@ -152,8 +158,10 @@ def run_eskf(inp: EskfInputs, noise: ImuNoiseModel | None = None, rot_cfg: Rotat
             logs.append(_flow_update(f, pair, k, k0, quats, inp, flow_cfg))
         if use_baro and k > 0 and k % max(1, baro_cfg.every_n_samples) == 0:
             t = float(inp.timestamp[k] - inp.timestamp[0])
-            sigma = np.sqrt(baro_cfg.white_std_m**2 + baro_cfg.bias_walk_m_per_sqrt_s**2 * t)
-            u = f.update_altitude(alt0 + float(inp.baro_altitude_change[k]), up, sigma, baro_cfg.gate_prob)
+            dz = float(inp.baro_altitude_change[k])
+            sigma = np.sqrt(baro_cfg.white_std_m**2 + baro_cfg.bias_walk_m_per_sqrt_s**2 * t
+                            + (baro_cfg.drift_sigma_m_per_s * t) ** 2 + (baro_cfg.scale_error_rms * dz) ** 2)
+            u = f.update_altitude(alt0 + dz, up, sigma, baro_cfg.gate_prob)
             logs.append(UpdateLog("baro", k0 + k, u.accepted, u.nis, u.dof, u.reason))
         if k in keyframes:
             f.clone_attitude()

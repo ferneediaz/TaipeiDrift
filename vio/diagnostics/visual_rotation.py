@@ -53,6 +53,8 @@ class VisualInterval:
     inlier_ratio: float
     median_flow_px: float
     track_spread_px: float
+    t_dir_cam: np.ndarray | None = None  # unit translation direction (camera i axes, cheirality-resolved sign); no scale
+    parallax_px: float = float("nan")  # median flow left after removing the estimated rotation (translation signal)
 
 
 def interval_row(dataset: str, condition: str, sequence: str, iv: VisualInterval, R_i: Rotation, R_j: Rotation,

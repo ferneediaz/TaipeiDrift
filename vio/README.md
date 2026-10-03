@@ -199,3 +199,40 @@ Question: can the forward camera's relative rotations estimate the Mid-Air gyro 
 | cloudy 3001 (low) | 0.92 / 1.66 / 3.83 | 0.004 / 0.001 | 338 / 1,333 |
 
 **Why the low-drift flights get worse.** Measured against the true attitude (evaluation only), the camera's relative rotations have a mean error equivalent to 0.02–0.14 deg/s. A mounting or scale map explains almost none of it. The filter cannot separate this camera bias from gyro bias, so it helps only where the gyro bias is clearly larger (0000, 3000) and imposes the camera's error where the gyro is already good.
+
+## Experiment: sun as an absolute orientation cue
+
+Code: [sun/detector.py](sun/detector.py), sun update in [estimation/gyro_bias_kf.py](estimation/gyro_bias_kf.py), [scripts/run_sun_feasibility.py](scripts/run_sun_feasibility.py), [scripts/run_sun_orientation.py](scripts/run_sun_orientation.py). Results: `outputs/sun_orientation/`.
+
+**Model.** The detector finds a clipped, compact bloom adjacent to sky. Its pixel becomes a ray: `s_cam = K⁻¹[u, v, 1] / ‖·‖`, then `s_body = R_bc s_cam`. The residual is `r = s_meas − R̂ᵀ s_world`, with `H = [R̂ᵀ [s_world]×, 0]`; it updates attitude only, never position or velocity. Rotation about the sun ray is unobservable. Gravity plus the sun gives full attitude when the two directions are not parallel.
+
+**Synthetic results**, level flight, final tilt / heading error in deg after 55 s:
+
+| Drift | None | Gravity | Sun | Gravity + sun |
+|---|---|---|---|---|
+| Heading | 0 / 5.5 | 0 / 5.5 | 1.8 / 0.6 | 0.0 / 0.002 |
+| Tilt | 5.5 / 0 | 0.001 / 0 | 2.4 / 0.9 | 0.001 / 0.007 |
+| Combined | 5.5 / 5.5 | 0.001 / 5.5 | 2.3 / 0.9 | 0.001 / 0.003 |
+
+With the sun at the zenith, parallel to gravity, heading stays unobserved (5.5 deg) and the filter stays stable.
+
+**Mid-Air.** There is no date, time, location or sun metadata, so no ephemeris can be computed.
+
+- **Visibility.** The detector fires on 6–77 % of sunny and sunset frames, and on none of the cloudy or foggy frames.
+- **Most detections are not the sun.** Static lighting means real detections must share one world direction. Within a flight only 4–41 % of frames fall in the densest 3-degree cluster, and the clusters of different flights disagree by 5–15 deg at best and 90–140 deg at worst.
+- **Real flights.** The world sun direction was calibrated leave-one-out from the other flights of the same condition.
+  - It does not reduce heading drift: on sunset 1013 heading goes from 3.4 deg (vision) to 4.8 deg (vision + sun).
+  - Sunny 0000 accepts 4 of 132 updates, with a median residual of 37 deg.
+  - Low-drift sunset 1010 gets worse with sun and gravity.
+  - Cloudy flights and sunny 0001 have no sun at all.
+
+**NTU VIRAL.**
+
+- It has absolute UNIX time and a public location (NTU, Singapore).
+- The grayscale, auto-exposed camera saturates bright sky, so detections are inconsistent (sbs_01: 32 % of frames, 24 % of them in one direction).
+- rtp_01 is at noon in June, with the sun near the zenith and out of view.
+- The VN100's world heading reference is undocumented.
+
+No transfer test was run.
+
+**Conclusion.** The mechanism works: gravity plus the sun observes full attitude in simulation. A forward camera with this simple detector does not deliver a reliable sun observation on these datasets. It needs either a sky-pointing or wide-angle camera, or a detector validated against a known sun direction.

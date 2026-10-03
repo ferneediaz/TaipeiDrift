@@ -39,9 +39,13 @@ down_camera:
   max_residual_px: 1.0
   height_learning_window_s: 2.0     # learn height above ground in the last 2 s before the cutoff (GNSS velocity)
 
-barometer:                          # SIMULATED from ground-truth altitude; fused as altitude in all but imu_only
-  white_std_m: 0.3
-  bias_walk_m_per_sqrt_s: 0.05
+barometer:                          # SIMULATED, measured real-sensor model (research/offline-nav-evidence); fused in all but imu_only
+  white_std_m: 0.30
+  bias_walk_m_per_sqrt_s: 0.112
+  drift_sigma_m_per_s: 0.0024       # per-flight drift slope ~ N(0, 0.0024)
+  scale_error_min: 0.03             # per-flight scale error +/- U(0.03, 0.07)
+  scale_error_max: 0.07
+  scale_error_rms: 0.052            # used by the update noise
   seed: 0
   every_n_samples: 20               # altitude update at 5 Hz
 
