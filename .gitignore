@@ -30,8 +30,18 @@ node_modules/
 .vscode/
 .idea/
 
-# generated results (baseline/scripts/run_midair_baseline.py)
-outputs/
+# Generated outputs: keep bulk research artifacts local. The compact, curated
+# ROS/Gazebo A/B/C/D diagnostics below are committed; raw bags are not.
+outputs/*
+!outputs/sim_runs/
+outputs/sim_runs/*
+!outputs/sim_runs/city_20261003_085928/
+!outputs/sim_runs/city_20261003_091945/
+!outputs/sim_runs/city_20261003_092854/
+!outputs/sim_runs/city_20261003_093825/
+!outputs/sim_runs/velocity_phase/
+!outputs/sim_runs/velocity_phase/*/
+outputs/sim_runs/**/rosbag2/
 
 # simulator: generated ground model and recorded bags
 sim/models/ground/

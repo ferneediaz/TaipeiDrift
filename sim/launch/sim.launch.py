@@ -2,13 +2,13 @@
 
     ros2 launch sim/launch/sim.launch.py [cam_res:=1024] [gps:=true] [gui:=true] [world:=terrain] [demo:=false]
         [stereo:=false] [stereo_baseline_m:=0.30] [wind:=none] [ships:=auto] [gnss_cutoff_s:=20.0]
-        [record_mode:=light] [vision_rotation:=true] [vision_direction:=true]
+        [record_mode:=light] [vision_rotation:=true] [vision_direction:=true] [run_label:=]
 
 cam_res  down camera width and height in pixels; 1024 matches Mid-Air, 512 renders faster on a CPU
 gps      false removes the GNSS receiver from the drone
 gui      false runs Gazebo without its window (server only)
-world    a file name in sim/worlds/ without .sdf: terrain (fields and woods), islands (two islands and open sea)
-         or strait (the islands with warships that transmit AIS)
+world    a file name in sim/worlds/ without .sdf: terrain (fields and woods), islands (two islands and open sea),
+         strait (the islands with warships that transmit AIS) or city (roads and buildings)
 stereo              true adds a right down-camera by generating a temporary model variant
 stereo_baseline_m   right camera offset along body -Y, in metres
 wind                SPEED_MPS,FROM_DEG, for example 6,20: 6 m/s from the north-north-east, with gusts
@@ -27,6 +27,7 @@ record_mode       light records sensor and pose topics to outputs/sim_runs/<run>
                   off records no bag (the CSV logs are still written)
 vision_rotation   the estimator (nodes/eskf_ros_adapter.py) fuses the forward camera's relative rotation
 vision_direction  ... and its direction of travel
+run_label         a name (letters, digits, _ and -): the run is written to outputs/sim_runs/velocity_phase/<name>
 
 Every launch runs the ESKF estimator (GNSS + IMU + barometer + forward camera) on /nav/odom. With the ships, a
 second instance also fuses the position from the ships' bearings (rf_fix:=true) on /nav_rf/odom, so the two can be
@@ -37,6 +38,7 @@ import datetime as dt
 import json
 import math
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -59,6 +61,7 @@ WORLD_ASSETS = {
     "terrain": ["make_ground.py", "make_trees.py"],  # replace the ground with the orthophoto via make_ground.py --aerial
     "islands": ["make_islands.py"],
     "strait": ["make_islands.py"],  # the islands scenery, with ships
+    "city": ["make_city.py"],
 }
 
 
@@ -296,6 +299,9 @@ def setup(context):
     record_mode = LaunchConfiguration("record_mode").perform(context).lower()
     vision_rotation = LaunchConfiguration("vision_rotation").perform(context).lower()
     vision_direction = LaunchConfiguration("vision_direction").perform(context).lower()
+    run_label = LaunchConfiguration("run_label").perform(context).strip()
+    if run_label and not re.fullmatch(r"[A-Za-z0-9_-]+", run_label):
+        sys.exit("run_label may contain only letters, numbers, underscores, and hyphens")
     if not world.exists():
         sys.exit(f"No world {world}. Choose one of: {', '.join(sorted(w.stem for w in world.parent.glob('*.sdf')))}")
     if record_mode not in ("off", "light", "full"):
@@ -319,21 +325,28 @@ def setup(context):
     sim_time = {"use_sim_time": True}
 
     run_id = dt.datetime.now().strftime(f"{world.stem}_%Y%m%d_%H%M%S")
-    run_dir = SIM.parent / "outputs" / "sim_runs" / run_id
+    run_dir = (SIM.parent / "outputs" / "sim_runs" / "velocity_phase" / run_label
+               if run_label else SIM.parent / "outputs" / "sim_runs" / run_id)
     run_dir.mkdir(parents=True, exist_ok=False)
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=SIM.parent,
                                 capture_output=True, text=True, check=True).stdout.strip()
+        working_tree_dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=SIM.parent,
+                                                 capture_output=True, text=True, check=True).stdout.strip())
     except Exception:
         commit = "unknown"
+        working_tree_dirty = None
+    velocity_fit_config = {"window_s": 8.0, "min_samples": 6, "min_span_s": 6.0,
+                           "method": "robust generalized least squares; non-overlapping windows"}
     # the vision thresholds the estimator runs with: its tracker re-anchors at the pose estimator's minimum
     eskf_cfg = yaml.safe_load((SIM.parent / "vio/configs/midair_eskf.yaml").read_text())
     pose_cfg = yaml.safe_load((SIM.parent / eskf_cfg["vio_config"]).read_text())["pose"]
     metadata = {
-        "run_id": run_id, "world": world.stem, "gnss_cutoff_s_since_first_fix": gnss_cut_s,
-        "camera_resolution": cam_res, "demo_trajectory": "default_world_route",
+        "run_id": run_label or run_id, "world": world.stem, "gnss_cutoff_s_since_first_fix": gnss_cut_s,
+        "camera_resolution": cam_res, "demo_trajectory": "city_loop" if world.stem == "city" else "default_world_route",
         "estimator_config": "vio/configs/midair_eskf.yaml; simulated GNSS + IMU + barometer; vision flags recorded below",
-        "git_commit": commit, "ros_distro": os.environ.get("ROS_DISTRO", "unknown"),
+        "git_commit": commit, "working_tree_dirty": working_tree_dirty,
+        "ros_distro": os.environ.get("ROS_DISTRO", "unknown"),
         "run_created_local": dt.datetime.now().astimezone().isoformat(), "record_mode": record_mode,
         "topics": {"gt": "/ground_truth/odom", "raw_gps": "/sim/gps_raw", "gated_gps": "/gps/fix",
                    "gnss_status": "/nav/gnss_available", "imu": "/imu/data", "barometer": "/air_pressure",
@@ -346,6 +359,7 @@ def setup(context):
         "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true",
         "sim_tracker_min_tracks": pose_cfg["min_correspondences"],
         "pose_min_correspondences": pose_cfg["min_correspondences"], "pose_min_inliers": pose_cfg["min_inliers"],
+        "gnss_velocity_fit": velocity_fit_config,
         "gnss_local_enu_origin": {"latitude_deg": gps_origin[0], "longitude_deg": gps_origin[1],
                                    "elevation_m": gps_origin[2]},
     }
@@ -358,7 +372,8 @@ def setup(context):
     (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     (run_dir / "config.json").write_text(json.dumps({"world": world.stem, "demo": demo, "cam_res": cam_res,
         "gnss_cutoff_s_since_first_fix": gnss_cut_s, "record_mode": record_mode, "ships": ships,
-        "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true"}, indent=2), encoding="utf-8")
+        "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true",
+        "gnss_velocity_fit": velocity_fit_config}, indent=2), encoding="utf-8")
     (run_dir / "sim.log").write_text(f"Run {run_id}; launch logs are emitted by ros2 launch.\n", encoding="utf-8")
     bag_topics = ["/ground_truth/odom", "/sim/gps_raw", "/gps/fix", "/nav/gnss_available",
                   "/sim/imu_raw", "/imu/data", "/sim/air_pressure_raw", "/air_pressure", "/tf", "/tf_static",
@@ -432,7 +447,8 @@ def setup(context):
         actions += [
             # Give the Gazebo window time to open before asking it to follow the drone
             TimerAction(period=15.0, actions=[
-                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem],
+                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem,
+                                    *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else [])],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
             # down camera is a panel in the Gazebo window and this slot shows the RSSI map.
@@ -464,6 +480,7 @@ def generate_launch_description():
         DeclareLaunchArgument("record_mode", default_value="light"),
         DeclareLaunchArgument("vision_rotation", default_value="true"),
         DeclareLaunchArgument("vision_direction", default_value="true"),
+        DeclareLaunchArgument("run_label", default_value=""),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])

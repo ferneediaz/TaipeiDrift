@@ -3,7 +3,6 @@ import argparse
 import csv
 import json
 import math
-import json
 from pathlib import Path
 import numpy as np
 
@@ -15,6 +14,7 @@ from sensor_msgs.msg import CameraInfo, FluidPressure, Imu, NavSatFix
 from std_msgs.msg import Bool, String
 from scipy.spatial.transform import Rotation, Slerp
 from run_policy import gps_csv_values
+from frame_conversions import body_velocity_to_world
 
 
 def stamp(msg):
@@ -29,11 +29,28 @@ def pose_values(msg):
     return [p.x, p.y, p.z, v.x, v.y, v.z, *rpy]
 
 
+def gt_velocity_world(msg):
+    q = msg.pose.pose.orientation
+    v = msg.twist.twist.linear
+    return body_velocity_to_world([v.x, v.y, v.z], [q.x, q.y, q.z, q.w])
+
+
+def direction_error_deg(a, b, min_speed=0.1):
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    na, nb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
+    if na < min_speed or nb < min_speed:
+        return math.nan
+    cosine = float(np.clip(np.dot(a, b) / (na * nb), -1.0, 1.0))
+    return math.degrees(math.acos(cosine))
+
+
 class RunLogger(Node):
     def __init__(self, out):
         super().__init__("sim_run_logger", parameter_overrides=[rclpy.parameter.Parameter("use_sim_time", value=True)])
         self.file = (Path(out) / "trajectory.csv").open("w", newline="", encoding="utf-8")
         self.run_dir = Path(out)
+        run_metadata = json.loads((self.run_dir / "metadata.json").read_text(encoding="utf-8"))
+        self.velocity_fit_window_s = float(run_metadata.get("gnss_velocity_fit", {}).get("window_s", 8.0))
         self.log_file = (self.run_dir / "sim.log").open("a", encoding="utf-8")
         self.debug_file = (self.run_dir / "estimator_debug.csv").open("w", newline="", encoding="utf-8")
         self.debug_writer = csv.writer(self.debug_file)
@@ -46,7 +63,19 @@ class RunLogger(Node):
         self.gnss_debug_writer = csv.writer(self.gnss_debug_file)
         self.gnss_debug_writer.writerow(["stamp_s", "estimator_state_stamp_s", "position_accepted", "position_nis",
             "position_rejection_reason", "velocity_observation_enu_mps", "velocity_covariance_enu",
-            "velocity_accepted", "velocity_nis", "velocity_rejection_reason"])
+            "velocity_accepted", "velocity_nis", "velocity_rejection_reason", "velocity_sample_count",
+            "velocity_span_s", "velocity_residual_rms_m", "velocity_rejected_stamps"])
+        self.velocity_debug_file = (self.run_dir / "velocity_debug.csv").open("w", newline="", encoding="utf-8")
+        self.velocity_debug_writer = csv.writer(self.velocity_debug_file)
+        self.velocity_debug_writer.writerow([
+            "timestamp_sim_s", "fit_event", "gt_vx_enu", "gt_vy_enu", "gt_vz_enu",
+            "est_vx_enu", "est_vy_enu", "est_vz_enu", "gnss_fit_stamp_s",
+            "gnss_fit_vx_enu", "gnss_fit_vy_enu", "gnss_fit_vz_enu", "speed_gt",
+            "speed_est", "speed_gnss_fit", "speed_error_est", "direction_error_est_deg",
+            "vector_error_est", "horizontal_velocity_error_est", "fit_vector_error",
+            "fit_speed_error", "fit_direction_error_deg", "fit_sample_count", "fit_span_s",
+            "fit_residual_rms_m", "fit_accepted", "fit_nis", "fit_rejection_reason", "gnss_available"])
+        self.latest_velocity_fit = None
         self.gt_history = []
         self.started = False
         self.rows = 0
@@ -100,6 +129,23 @@ class RunLogger(Node):
             pos, rot = pos0, r0
         return pos, rot
 
+    def truth_velocity_at(self, t):
+        before = [item for item in self.gt_history if item[0] <= t]
+        after = [item for item in self.gt_history if item[0] >= t]
+        if before and after:
+            t0, m0 = before[-1]
+            t1, m1 = after[0]
+            v0, v1 = gt_velocity_world(m0), gt_velocity_world(m1)
+            if t1 > t0:
+                u = (t - t0) / (t1 - t0)
+                return (1.0 - u) * v0 + u * v1
+            return v0
+        if self.gt_history:
+            nearest = min(self.gt_history, key=lambda item: abs(item[0] - t))
+            if abs(nearest[0] - t) <= 0.05:
+                return gt_velocity_world(nearest[1])
+        return None
+
     def estimator_status(self, msg):
         try:
             d = json.loads(msg.data)
@@ -109,8 +155,26 @@ class RunLogger(Node):
             self.gnss_debug_writer.writerow([d.get("stamp"), d.get("estimator_state_stamp"), d.get("accepted"),
                 d.get("nis"), d.get("reason"), json.dumps(d.get("velocity_observation")),
                 json.dumps(d.get("velocity_covariance")), d.get("velocity_accepted"), d.get("velocity_nis"),
-                d.get("velocity_reason")])
+                d.get("velocity_reason"), d.get("velocity_sample_count"), d.get("velocity_span_s"),
+                d.get("velocity_residual_rms_m"), json.dumps(d.get("velocity_rejected_stamps"))])
             self.gnss_debug_file.flush()
+            return
+        if d.get("event") == "gnss_velocity_fit":
+            fit_v = np.asarray(d["velocity_observation"], dtype=float)
+            gt_v = self.truth_velocity_at(float(d["stamp"]))
+            fit_vector_error = fit_speed_error = fit_direction_error = math.nan
+            if gt_v is not None:
+                fit_vector_error = float(np.linalg.norm(fit_v - gt_v))
+                fit_speed_error = abs(float(np.linalg.norm(fit_v)) - float(np.linalg.norm(gt_v)))
+                fit_direction_error = direction_error_deg(fit_v, gt_v)
+            self.latest_velocity_fit = {
+                "stamp": float(d["stamp"]), "velocity": fit_v,
+                "sample_count": d.get("sample_count"), "span_s": d.get("span_s"),
+                "residual_rms_m": d.get("residual_rms_m"), "accepted": d.get("accepted"),
+                "nis": d.get("nis"), "reason": d.get("reason"),
+                "vector_error": fit_vector_error, "speed_error": fit_speed_error,
+                "direction_error": fit_direction_error, "logged": False,
+            }
             return
         if d.get("event") != "visual_span":
             return
@@ -161,6 +225,29 @@ class RunLogger(Node):
         est = pose_values(self.est) if self.est else [math.nan] * 9
         self.writer.writerow([now, *gt, *est, *gps, int(gps_ok),
                               self.baro.fluid_pressure if self.baro else math.nan, *imu_v])
+        gt_v = gt_velocity_world(self.gt)
+        est_v = np.asarray(est[3:6], dtype=float)
+        fit = self.latest_velocity_fit
+        fit_valid = bool(fit and self.gnss_available and
+                         0.0 <= now - fit["stamp"] <= self.velocity_fit_window_s + 1.0)
+        fit_v = fit["velocity"] if fit_valid else np.full(3, math.nan)
+        fit_event = bool(fit_valid and not fit["logged"])
+        if fit_event:
+            fit["logged"] = True
+        speed_gt, speed_est = float(np.linalg.norm(gt_v)), float(np.linalg.norm(est_v))
+        speed_fit = float(np.linalg.norm(fit_v)) if fit_valid else math.nan
+        v_error = est_v - gt_v
+        self.velocity_debug_writer.writerow([
+            now, int(fit_event), *gt_v.tolist(), *est_v.tolist(), fit["stamp"] if fit_valid else math.nan,
+            *fit_v.tolist(), speed_gt, speed_est, speed_fit, abs(speed_est - speed_gt),
+            direction_error_deg(est_v, gt_v), float(np.linalg.norm(v_error)),
+            float(np.linalg.norm(v_error[:2])), fit["vector_error"] if fit_valid else math.nan,
+            fit["speed_error"] if fit_valid else math.nan,
+            fit["direction_error"] if fit_valid else math.nan,
+            fit["sample_count"] if fit_valid else math.nan, fit["span_s"] if fit_valid else math.nan,
+            fit["residual_rms_m"] if fit_valid else math.nan, fit["accepted"] if fit_valid else "",
+            fit["nis"] if fit_valid else math.nan, fit["reason"] if fit_valid else "", int(self.gnss_available)])
+        self.velocity_debug_file.flush()
         self.file.flush()
         self.rows += 1
         if self.rows == 1 or self.rows % 100 == 0:
@@ -173,6 +260,7 @@ class RunLogger(Node):
         self.log_file.close()
         self.debug_file.close()
         self.gnss_debug_file.close()
+        self.velocity_debug_file.close()
 
 
 def main():
