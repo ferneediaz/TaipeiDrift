@@ -1,0 +1,39 @@
+# Camera navigator on ALTO: GNSS for the first stretch, then the camera alone.
+# Relative paths are resolved from the repository root. Command-line flags override these values.
+
+output_dir: outputs/alto_navigator   # one subfolder per run, not committed
+shift_cache_dir: data/processed      # image shifts are stored here, one file per flight
+error_distances_m: [300, 500, 1000, 2000]   # report the error this far after the jam
+plot: [camera_only, every_1000_sized, every_300]   # runs drawn in the figure; fixes are shown for the last
+
+alto:
+  data_root: data/raw/alto
+  section: Val                       # Val or Train
+
+synthetic:                           # used with --synthetic, no download needed
+  length_m: 900.0
+  zoom: 0.85
+  rotation_deg: 15.0
+  seed: 0
+
+# Settings shared by all runs. Values measured in experiments/h_alto_end_to_end.py and
+# experiments/i_alto_zoom_check.py on the validation section; see docs/findings.md, section 3.
+navigator:
+  jam_after_m: 300.0       # GNSS is lost after this distance
+  fix_sigma_m: 15.0        # accuracy of one fix
+  drift_rate: 0.10         # dead reckoning error as a share of the distance since the last fix
+  gate_sigmas: 3.0         # a fix further from the estimate than this many sigmas is not used
+  nearest_images: 7
+  min_search_radius_m: 60.0
+
+# Each run overrides the shared settings.
+#   fix_every_m: estimated distance between fixes; null means no fixes
+#   search: nearest (7 reference images) or sized (all within 3 sigma of the estimate)
+#   min_score: a fix with a lower matching score is not used; 0 switches the score check off
+runs:
+  camera_only:        {fix_every_m: null}
+  every_100:          {fix_every_m: 100.0,  search: nearest, min_score: 0.0}
+  every_300:          {fix_every_m: 300.0,  search: sized,   min_score: 0.33}
+  every_400_no_check: {fix_every_m: 400.0,  search: nearest, min_score: 0.0}   # shows the failure: wrong fixes get used
+  every_1000_nearest: {fix_every_m: 1000.0, search: nearest, min_score: 0.33}  # the check refuses every fix
+  every_1000_sized:   {fix_every_m: 1000.0, search: sized,   min_score: 0.33}  # the larger search finds the place again
