@@ -32,6 +32,7 @@ research = [
     "shapely>=2.1.2",
     "torch>=2.14.1",
     "tqdm>=4.70.1",
+    "vismatch>=1.2.1",
 ]
 
 [tool.uv]
