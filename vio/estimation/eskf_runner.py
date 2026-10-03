@@ -58,8 +58,23 @@ class BaroUpdateConfig:
 
 
 @dataclass
+class DirectionUpdateConfig:
+    """Visual translation DIRECTION as a velocity-direction measurement (no speed information).
+
+    sigma_deg: per-axis direction noise; the Mid-Air diagnostic gives a median angular error of
+    1.0 deg (p90 2.7 deg) over 0.5 s spans, i.e. ~0.85 deg per axis; 1.5 deg is used to cover the
+    heavier tail and the mean-velocity approximation. Updates need ||v_hat|| >= min_speed_mps.
+    """
+
+    enabled: bool = True
+    sigma_deg: float = 1.5
+    min_speed_mps: float = 0.5
+    gate_prob: float = 0.99
+
+
+@dataclass
 class UpdateLog:
-    kind: str  # "rotation", "flow" or "baro"
+    kind: str  # "rotation", "flow", "baro" or "direction"
     imu_index: int  # absolute flight index
     accepted: bool
     nis: float
@@ -100,12 +115,14 @@ class EskfOutput:
 
 def run_eskf(inp: EskfInputs, noise: ImuNoiseModel | None = None, rot_cfg: RotationUpdateConfig | None = None,
              flow_cfg: FlowUpdateConfig | None = None, cov_every: int = 25,
-             baro_cfg: BaroUpdateConfig | None = None) -> EskfOutput:
+             baro_cfg: BaroUpdateConfig | None = None, dir_cfg: DirectionUpdateConfig | None = None) -> EskfOutput:
     """Filter from the cutoff to the end of the flight."""
     rot_cfg = rot_cfg or RotationUpdateConfig(enabled=False)
     flow_cfg = flow_cfg or FlowUpdateConfig(enabled=False)
     baro_cfg = baro_cfg or BaroUpdateConfig(enabled=False)
+    dir_cfg = dir_cfg or DirectionUpdateConfig(enabled=False)
     use_baro = baro_cfg.enabled and inp.baro_altitude_change is not None
+    use_dir = dir_cfg.enabled and inp.rotation_measurements is not None and inp.R_bc_forward is not None
     up = -inp.gravity_world / np.linalg.norm(inp.gravity_world)  # world 'up'
     alt0 = float(up @ np.asarray(inp.initial.position))
     n, k0 = len(inp.timestamp), inp.start_index
@@ -122,6 +139,11 @@ def run_eskf(inp: EskfInputs, noise: ImuNoiseModel | None = None, rot_cfg: Rotat
             keyframes.add(m.keyframe_imu_index - k0)
             if m.end_of_span:
                 rot_at.setdefault(m.imu_index - k0, []).append(m)
+    dir_at: dict[int, list[VisualMeasurement]] = {}
+    if use_dir:
+        for m in inp.rotation_measurements:
+            if m.end_of_span:
+                dir_at.setdefault(m.imu_index - k0, []).append(m)
     flow_at = {p.imu_index - k0: p for i, p in enumerate(inp.flow_pairs or []) if i % max(1, flow_cfg.every_n_frames) == 0}         if use_flow else {}
     clone_index = None
     sigma_rot = np.deg2rad(rot_cfg.sigma_deg)
@@ -153,6 +175,8 @@ def run_eskf(inp: EskfInputs, noise: ImuNoiseModel | None = None, rot_cfg: Rotat
                         key=lambda c: (C_hat.inv() * Rotation.from_matrix(c)).magnitude())
                 u = f.update_relative_rotation(C, sigma_rot, rot_cfg.gate_prob)
                 logs.append(UpdateLog("rotation", m.imu_index, u.accepted, u.nis, u.dof, u.reason))
+        for m in dir_at.get(k, []):
+            logs.append(_direction_update(f, m, k, k0, quats, vel, inp, dir_cfg))
         pair = flow_at.get(k)
         if pair is not None:
             logs.append(_flow_update(f, pair, k, k0, quats, inp, flow_cfg))
@@ -178,6 +202,48 @@ def run_eskf(inp: EskfInputs, noise: ImuNoiseModel | None = None, rot_cfg: Rotat
     att = rotation_to_quat_wxyz(Rotation.from_quat(quats))
     result = DeadReckoningResult(inp.timestamp, pos, vel, att, start_index=k0, t0=float(inp.timestamp[0]))
     return EskfOutput(result, bg, ba, std, np.array(cov_idx), np.array(covs), logs)
+
+
+def direction_jacobian(v_hat: np.ndarray, d_vis_world: np.ndarray, n: int):
+    """Residual and Jacobian of the velocity-direction measurement.
+
+    d_pred = v_hat / ||v_hat||; B = [e1 e2] spans the plane orthogonal to d_pred.
+    Residual r = B^T d_vis (predicted value B^T d_pred = 0).  With R_true = Exp(dtheta) R_hat and
+    d_vis computed with R_hat:  d_vis ~ d_true - dtheta x d_true, d_true ~ d_pred + (I - d d^T) dv / ||v||, so
+        r = B^T dv / ||v||  +  B^T [d_pred]x dtheta  + noise.
+    B^T v_hat = 0: no sensitivity along the velocity, the speed magnitude stays unobserved.
+    """
+    from vio.estimation.eskf import BA, BG, P_, TH, V_, skew  # noqa: F401
+    speed = float(np.linalg.norm(v_hat))
+    d = v_hat / speed
+    a = np.array([1.0, 0.0, 0.0]) if abs(d[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    e1 = np.cross(d, a)
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(d, e1)
+    B = np.column_stack([e1, e2])
+    r = B.T @ (d_vis_world / np.linalg.norm(d_vis_world))
+    H = np.zeros((2, n))
+    H[:, V_] = B.T / speed
+    H[:, TH] = B.T @ skew(d)
+    return r, H, B
+
+
+def _direction_update(f: ESKF, m: VisualMeasurement, k: int, k0: int, quats: np.ndarray, vel: np.ndarray,
+                      inp: EskfInputs, cfg: DirectionUpdateConfig) -> UpdateLog:
+    if not m.valid or m.translation_dir_cam is None:
+        return UpdateLog("direction", m.imu_index, False, np.nan, 2, m.reason or "no translation direction")
+    kf = m.keyframe_imu_index - k0
+    if kf < 0 or kf >= k:
+        return UpdateLog("direction", m.imu_index, False, np.nan, 2, "keyframe before cutoff")
+    # mean predicted velocity over the span (the camera measures the displacement direction)
+    v_mean = np.vstack([vel[kf:k], f.v[None]]).mean(0)
+    if np.linalg.norm(v_mean) < cfg.min_speed_mps:
+        return UpdateLog("direction", m.imu_index, False, np.nan, 2, "speed below threshold")
+    R_kf = Rotation.from_quat(quats[kf])  # estimator attitude at the keyframe (camera i axes)
+    d_vis = R_kf.apply(inp.R_bc_forward @ m.translation_dir_cam)
+    r, H, _ = direction_jacobian(v_mean, d_vis, f.n)
+    u = f.update(r, H, np.eye(2) * np.deg2rad(cfg.sigma_deg) ** 2, cfg.gate_prob)
+    return UpdateLog("direction", m.imu_index, u.accepted, u.nis, u.dof, u.reason)
 
 
 def _flow_update(f: ESKF, pair: FlowPair, k: int, k0: int, quats: np.ndarray, inp: EskfInputs,
