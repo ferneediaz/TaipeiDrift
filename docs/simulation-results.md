@@ -239,4 +239,26 @@ python scripts/fused_replay.py --all [--camera-model realistic] [--heading-sourc
 - Reported: median, 90 percent and worst error after the GNSS loss, and how often the true error is within the
   filter's 3 sigma, next to the navigator's. Whatever comes out is reported here.
 
-Result: not run yet.
+**The result.** Run once on Saturday 3 October 2026, 20:07 to 20:09, at tag `frozen-fused-replay` (log:
+`outputs/fused_sealed_run.log`). Median / 90 percent / worst error after the GNSS loss, in metres, medians over the
+three draws:
+
+| Sealed flight | Camera | The camera's steps alone | Filter with sun and camera speed | Frozen navigator | Filter with its map fixes | True error within the filter's 3 sigma (lowest draw) |
+|---|---|---|---|---|---|---|
+| North first, 90 m | ideal | 76 / 128 / 169 | 69 / 113 / 145 | 36.3 / 70 / 90 | **32.2 / 64 / 78** | 98.2% |
+| South first, 110 m | ideal | 59 / 101 / 121 | 26 / 78 / 121 | 16.2 / 38 / 58 | **11.5 / 27 / 42** | 99.7% |
+| North first, 90 m | realistic | 75 / 131 / 184 | 76 / 112 / 147 | 21.8 / 60 / 85 | **18.3 / 70 / 80** | 98.4% |
+| South first, 110 m | realistic | 55 / 104 / 128 | 25 / 93 / 140 | 15.3 / 33 / 48 | **11.2 / 25 / 47** | 99.6% |
+
+How to read it:
+
+- **The fused filter is more accurate than the navigator alone on both sealed flights, with both cameras:** 4 to 5 m
+  better in the median, and a smaller worst error. Per draw on the 90 m flight: 14.5, 32.2 and 38.2 m, against the
+  navigator's 20.4, 36.3 and 42.2 m.
+- **It fused every fix the navigator handed over** (12, 7 and 7 on the 90 m flight; 14, 15 and 15 on the 110 m flight);
+  none was rejected and no reset was needed.
+- **Its stated error is a little less reliable than the navigator's.** On the 90 m flight the true error was outside
+  the filter's 3 sigma 1.6 to 1.8 percent of the time; the navigator's bound held all the time. By the rule we set
+  for the navigator (at least 99 percent), the fused filter passes on the 110 m flight and misses on the 90 m flight.
+- **Without map fixes** the filter with the sun heading and the camera's speed drifts less than the camera alone on
+  the 110 m flight (26 against 59 m) and about the same on the 90 m flight.
