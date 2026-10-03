@@ -47,6 +47,46 @@ def fit_motion_matrix(shifts: np.ndarray, steps: np.ndarray) -> np.ndarray:
     return matrix
 
 
+def fit_rotation_scale(shifts: np.ndarray, steps: np.ndarray, moving_share: float = 0.5) -> np.ndarray:
+    """Learn image shift to ground motion as one turn and one scale, from medians.
+
+    A camera looking straight down sees the ground slide by the drone's own motion, turned by how
+    the camera sits against north and scaled by the height: two numbers. Two reasons to prefer this
+    to ``fit_motion_matrix`` on a turning drone:
+
+    - Before the jam the drone may fly in one direction only. A general 2 x 2 matrix is then not
+      determined across that direction; a turn and a scale are.
+    - A quadcopter tilts into every turn and every change of speed, and a camera fixed to it sees
+      the ground jump without the drone moving. Least squares lets these jumps shrink the scale;
+      the median of the frame-by-frame ratios ignores them.
+
+    Each frame gives a ratio of ground step to image shift, written as complex numbers
+    (north + i east over x + i y). Its size is metres per pixel, its angle the turn.
+
+    Example: the image slides 5 px down, (0, 5), while the drone flies 2 m north, (2, 0). The ratio is
+    2 / 5i = -0.4i: 0.4 m per pixel, turned by -90 degrees, and the matrix is [[0, -0.4], [0.4, 0]],
+    so a shift of (0, 10) px is read as 4 m north.
+
+    Args:
+        shifts: (K, 2) image shift per frame, pixels.
+        steps: (K, 2) true ground step over the same frames, (north, east) in metres.
+        moving_share: only frames whose step is at least this share of the median step are used,
+            so that hovering frames do not count.
+
+    Returns:
+        (2, 2) matrix; ``shift @ matrix`` is the ground step in metres.
+    """
+    z = np.asarray(shifts, dtype=float) @ np.array([1.0, 1j])
+    w = np.asarray(steps, dtype=float) @ np.array([1.0, 1j])
+    moving = (np.abs(w) >= moving_share * np.median(np.abs(w))) & (np.abs(z) > 1e-6)
+    if moving.sum() < 3:
+        raise ValueError("fewer than three moving frames before the jam to learn the camera's scale from")
+    ratio = w[moving] / z[moving]
+    unit = ratio / np.abs(ratio)
+    c = np.median(np.abs(ratio)) * np.exp(1j * np.arctan2(np.median(unit.imag), np.median(unit.real)))
+    return np.array([[c.real, c.imag], [-c.imag, c.real]])
+
+
 def predicted_variance(variance: float, distance_since_fix: float, drift_rate: float) -> float:
     """Uncertainty of the estimate after flying on without a fix.
 
