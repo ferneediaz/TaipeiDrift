@@ -6,8 +6,10 @@ common:
   decorrelation_length_m: 100.0 # tuned (results/tune): 100 m beats 50 m # map errors are correlated along track: likelihood exponent = v*dt/L (<=1)
   resample_neff_frac: 0.5
   roughening_K: 0.2
-  pseudo_meas_inflation: 50.0   # tuned (results/tune2); inflate the particle-increment pseudo-measurement noise in the KF (>1 keeps P realistic)
-  linear_roughening_h: 0.3       # after resampling jitter linear-state means by h*chol(P) (keeps diversity)
+  pseudo_meas_inflation: 1.0    # tuned (results/tune5): 1 = textbook MPF; inflate the particle-increment pseudo-measurement noise in the KF (>1 keeps P realistic)
+  linear_roughening:            # after resampling: keep diversity of the per-particle linear-state means
+    mode: liu_west              # tuned (results/tune5). chol_p: x += h*chol(P)*n (random walk!) | liu_west: shrink to ensemble mean + jitter
+    h: 0.3
   tempering:                    # progressive correction: never let one update collapse N_eff
     enabled: true
     min_neff_frac: 0.2
@@ -21,6 +23,8 @@ common:
     nis_threshold: 9.0          # mean normalized innovation squared above this -> reinit
     reinit_sigma_m: 800.0
     cooldown_s: 60.0
+    proposed_statistic: near_last_echo     # ground_posterior | near_last_echo (tuned: results/tune4)
+    near_window_m: 150.0
 tercom:
   profile_length_m: 2000.0      # 2 km: longer profiles are distorted by tactical-grade velocity drift
   min_valid_frac: 0.7
@@ -41,6 +45,7 @@ mpf_proposed:
   map_sigma_m: 3.0              # bare-earth map error only: canopy is modelled explicitly (M1 report)
   adapt: true                   # online adaptation of P_visible and short-echo rate
   adapt_alpha: 0.01
+  relax_alpha: 0.01             # when not converged, relax p_visible / short_rate towards the prior
   adapt_max_spread_m: 150.0     # adapt only when converged (avoids a lose-lock feedback loop)
   p_visible: 0.8                # initial / fixed P(ground echo not obscured)
   p_visible_bounds: [0.2, 0.99]

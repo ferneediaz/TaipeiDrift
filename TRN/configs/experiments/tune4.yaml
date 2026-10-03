@@ -1,0 +1,12 @@
+name: tune4
+description: Robustness of the proposed filter - adaptation on/off x divergence statistic (separate seeds).
+routes: [A_mountain_crossing, C_foothills]
+filters: [mpf_proposed]
+runs: 8
+overrides:
+  montecarlo.base_seed: 780
+  atmosphere.enabled: true
+sweep:
+  filters.mpf_proposed.adapt: [true, false]
+  filters.common.divergence.proposed_statistic: [ground_posterior, near_last_echo]
+  atmosphere.cloud_fraction: [0.0, 0.1, 0.3]

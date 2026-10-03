@@ -1,12 +1,12 @@
 name: m6_map
-description: M6 - onboard map resolution and added correlated map error (sigma, 1 km correlation), 30 % cloud.
+description: M6 - onboard map resolution and added correlated map error (sigma, 1 km correlation), 10 % cloud.
 routes: [A_mountain_crossing, C_foothills]
 filters: [mpf_baseline, mpf_proposed]
 runs: 20
 quick_runs: 4
 overrides:
   atmosphere.enabled: true
-  atmosphere.cloud_fraction: 0.3
+  atmosphere.cloud_fraction: 0.1
 sweep:
   onboard_map.resolution_m: [30.0, 40.0]
   onboard_map.error_field.sigma_m: [0.0, 5.0, 10.0]

@@ -1,0 +1,11 @@
+name: tune3
+description: Validate p_visible relaxation (0 = old freeze behaviour) on separate seeds.
+routes: [A_mountain_crossing, C_foothills]
+filters: [mpf_proposed]
+runs: 8
+overrides:
+  montecarlo.base_seed: 779
+  atmosphere.enabled: true
+sweep:
+  filters.mpf_proposed.relax_alpha: [0.0, 0.01]
+  atmosphere.cloud_fraction: [0.0, 0.1, 0.3]
