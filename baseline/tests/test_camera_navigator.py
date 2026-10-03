@@ -8,7 +8,7 @@ from src.data.camera_flight import CameraFlight, ReferenceMap
 from src.data.synthetic_camera import make_synthetic_camera_flight
 from src.estimation.camera_navigator import NavigatorConfig, calibrate, jam_index, navigate, run_camera_navigator
 from src.estimation.image_motion import shifts_for_flight
-from src.estimation.navigator_core import DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE, LOW_SCORE, OK
+from src.estimation.navigator_core import DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE, LOW_SCORE, OFF_MAP, OK
 from src.evaluation.navigation_metrics import error_at_distances, fix_errors, navigation_errors, summarize_navigation
 
 CFG = NavigatorConfig(jam_after_m=300.0, fix_every_m=100.0)
@@ -159,3 +159,49 @@ def test_bad_settings_are_refused(flight, shifts, calibration):
         navigate(flight, shifts, calibration, replace(CFG, search="everywhere"))
     with pytest.raises(ValueError):
         calibrate(flight, shifts, replace(CFG, jam_after_m=1e6))
+    without_map = replace(flight, ground_map=None)
+    with pytest.raises(ValueError):
+        navigate(without_map, shifts, calibration, replace(CFG, search="area"))
+
+
+AREA = replace(CFG, search="area", min_score=0.33)
+
+
+@pytest.fixture(scope="module")
+def area_calibration(flight, shifts):
+    return calibrate(flight, shifts, AREA)
+
+
+def test_area_search_calibrates_and_holds_the_position(flight, shifts, area_calibration):
+    assert area_calibration.zoom == pytest.approx(flight.metadata["zoom"], abs=0.01)
+    assert area_calibration.angle == pytest.approx(flight.metadata["rotation_deg"], abs=0.01)
+    result = navigate(flight, shifts, area_calibration, AREA)
+    summary = summarize_navigation(result, flight)
+    assert summary.fixes_used >= 5 and summary.fixes_rejected == 0 and summary.used_but_wrong == 0
+    assert summary.worst < 12.0
+    assert all(f.search_radius_m >= AREA.min_search_radius_m for f in result.fixes)
+
+
+def test_area_search_reads_no_truth_after_the_jam(flight, shifts):
+    blind = np.array(flight.position_gt)
+    blind[jam_index(flight, AREA.jam_after_m) + 1 :] = np.nan
+    a = run_camera_navigator(flight, AREA, shifts=shifts)
+    b = run_camera_navigator(replace(flight, position_gt=blind), AREA, shifts=shifts)
+    np.testing.assert_array_equal(a.position, b.position)
+
+
+def test_area_search_refuses_a_map_with_wrong_coordinates(flight, shifts, area_calibration):
+    ground = flight.ground_map
+    wrong = replace(flight, ground_map=replace(ground, origin=ground.origin + np.array([500.0, 0.0]), _prepared=None))
+    result = navigate(wrong, shifts, area_calibration, AREA)
+    assert result.fixes and not any(f.used for f in result.fixes)
+    assert {f.reason for f in result.fixes} <= {DISAGREES_WITH_ESTIMATE, LOW_SCORE, OFF_MAP}
+
+
+def test_area_search_off_the_map_is_reported(flight, shifts, area_calibration):
+    ground = flight.ground_map
+    empty = replace(flight, ground_map=replace(ground, covered=np.zeros(ground.shape, bool), _prepared=None, _covered_float=None))
+    result = navigate(empty, shifts, area_calibration, AREA)
+    assert result.fixes and all(f.reason == OFF_MAP and not f.used for f in result.fixes)
+    alone = navigate(flight, shifts, area_calibration, replace(AREA, fix_every_m=None))
+    np.testing.assert_array_equal(result.position, alone.position)

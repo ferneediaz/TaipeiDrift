@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from src.data.alto import AltoConfig, load_alto_flight
+from src.data.camera_flight import prepare
 from src.estimation.camera_navigator import NavigatorConfig, calibrate, navigate
 from src.estimation.image_motion import image_shift, shifts_for_flight
 from src.evaluation.navigation_metrics import summarize_navigation
@@ -68,5 +69,49 @@ def test_calibration(calibration):
 def test_errors_match_the_experiment(flight, shifts, calibration, settings, expected, used, rejected):
     result = navigate(flight, shifts, calibration, replace(NavigatorConfig(), **settings))
     summary = summarize_navigation(result, flight)
+    assert (summary.median, summary.worst, summary.end) == pytest.approx(expected, abs=0.06)
+    assert (summary.fixes_used, summary.fixes_rejected) == (used, rejected)
+
+
+# The search that knows nothing about the true path: one map from all five reference folders,
+# searched in a circle around the estimate (findings, section 3.8).
+AREA = NavigatorConfig(search="area")
+EXPECTED_AREA = [
+    (dict(fix_every_m=100.0), (25.22, 49.87, 27.68), 39, 0),
+    (dict(fix_every_m=300.0, min_score=0.33), (31.14, 72.87, 37.76), 12, 1),
+    (dict(fix_every_m=400.0), (35.96, 279.88, 279.88), 9, 0),  # no check: one wrong fix is used
+    (dict(fix_every_m=1000.0, min_score=0.33), (56.12, 278.07, 10.32), 4, 0),
+]
+
+
+@pytest.fixture(scope="module")
+def area_flight():
+    return load_alto_flight(AltoConfig(data_root=str(DATA_ROOT), ground_map=True, map_cache_dir=str(REPO_ROOT / "data" / "processed")))
+
+
+@pytest.fixture(scope="module")
+def area_calibration(area_flight, shifts):
+    return calibrate(area_flight, shifts, AREA)
+
+
+def test_map_shows_each_reference_image_at_its_coordinates(area_flight):
+    ground = area_flight.ground_map
+    for i in (0, 200, 458):
+        reference = prepare(area_flight.reference.load(i))
+        x, y = np.round(ground.to_pixel(area_flight.reference.position[i])).astype(int)
+        crop = prepare(ground.image[y - 250 : y + 250, x - 250 : x + 250])
+        assert np.corrcoef(reference.ravel(), crop.ravel())[0, 1] > 0.9
+
+
+def test_area_calibration(area_calibration):
+    assert area_calibration.jam_index == 118
+    assert area_calibration.zoom == pytest.approx(0.85)
+    assert area_calibration.angle == pytest.approx(10.0)
+    np.testing.assert_allclose(area_calibration.fix_offset, [-6.36, 3.32], atol=0.05)
+
+
+@pytest.mark.parametrize("settings, expected, used, rejected", EXPECTED_AREA)
+def test_area_search_errors(area_flight, shifts, area_calibration, settings, expected, used, rejected):
+    summary = summarize_navigation(navigate(area_flight, shifts, area_calibration, replace(AREA, **settings)), area_flight)
     assert (summary.median, summary.worst, summary.end) == pytest.approx(expected, abs=0.06)
     assert (summary.fixes_used, summary.fixes_rejected) == (used, rejected)

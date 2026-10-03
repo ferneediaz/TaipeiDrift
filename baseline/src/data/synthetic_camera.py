@@ -2,7 +2,8 @@
 
 It has the same shape as the ALTO data, so the navigator can be tested without the 1.7 GB
 download: reference images with north at the top, one every 10 m along the route, and camera
-frames that are rotated, show less ground and have a different brightness.
+frames that are rotated, show less ground and have a different brightness. The whole texture is
+also given as one map (``ground_map``), for the search around the estimate.
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import cv2
 import numpy as np
 
 from src.data.camera_flight import CameraFlight, ReferenceMap
+from src.data.ground_map import GroundMap
 
 MAP_METRES_PER_PIXEL = 0.6
 IMAGE_PX = 160  # side of reference images and camera frames
@@ -87,6 +89,8 @@ def make_synthetic_camera_flight(
         frame = np.clip(frame.astype(np.float32) * 1.15 + 12.0, 0, 255)  # brighter, as if overexposed
         return frame.astype(np.uint8)
 
+    # the whole texture as one map; to_pixel counts from pixel centres, the map from the corner
+    corner = np.array([(height / 2 + 0.5) * mpp, -0.5 * mpp - margin])
     return CameraFlight(
         name="synthetic_camera",
         timestamp=np.arange(len(position)) / 20.0,
@@ -94,4 +98,5 @@ def make_synthetic_camera_flight(
         load_frame=load_frame,
         reference=ReferenceMap(position=reference_position - position[0], metres_per_pixel=mpp, load=load_reference),
         metadata={"source": "synthetic", "zoom": zoom, "rotation_deg": rotation_deg, "seed": seed},
+        ground_map=GroundMap(ground, mpp, corner - position[0], zoom_unit_px=IMAGE_PX),
     )

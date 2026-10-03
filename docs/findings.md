@@ -1,6 +1,6 @@
 # Findings
 
-What we measured on Friday 2 October between 21:00 and 22:40, and on Saturday 3 October (sections 2.6, 3.6 and 3.7), on the data we have on disk. Every number on this page comes from a script in `experiments/` or from the shared code in `baseline/`; the list is at the end. Read this before the team decides how to go on.
+What we measured on Friday 2 October between 21:00 and 22:40, and on Saturday 3 October (sections 2.6 and 3.6 to 3.8), on the data we have on disk. Every number on this page comes from a script in `experiments/` or from the shared code in `baseline/`; the list is at the end. Read this before the team decides how to go on.
 
 The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 says what they change.
 
@@ -21,6 +21,7 @@ Added on Saturday:
 10. **Agreement of nearby frames does not catch wrong fixes here.** Frames 14 m apart see almost the same ground and land on the same wrong place. The score check stays (section 3.6).
 11. **Visual-inertial odometry on Mid-Air works** (Alessandro, branch `mid-air-vio`): 13 to 33 m after 83 s without GNSS on three flights it was not tuned on, against 338 to 912 m for the IMU alone (section 2.6). It is the missing layer between our fixes.
 12. **The test on the ALTO training section is blocked.** Dropbox has disabled the dataset link for the day. The images are on disk, but the files with the positions are in the part that did not arrive (section 3.7).
+13. **A mistake found and repaired: our search knew the true path.** ALTO's reference images are centred on the true path, so every fix landed near it. The navigator now searches one map of the area in a circle around its own estimate. The results stay within half a metre of the earlier ones, so they hold; the cliff at 400 m disappears (section 3.8).
 
 ## What the team has to decide
 
@@ -341,6 +342,26 @@ The training section of the same flight was downloaded on Friday night and stopp
 
 Dropbox has disabled the dataset link for the day ("downloaded too many times in a day"), and the GitHub pages of the dataset do not carry the position files. The test waits until the link opens again; only the last 0.42 GB are needed.
 
+### 3.8 The search no longer knows the true path (Saturday morning)
+
+**The mistake.** The reference images we searched (folder `offset_0_None`) are centred on the true flight path: image 0 has the same coordinates as camera frame 0, and all 459 lie within 2.8 m of the path. Inside one reference image a template can slide only about 48 m from its centre (a 340-pixel template in a 500-pixel image, at 0.6 m per pixel). So every fix landed within about 48 m of the true path, wherever the estimate was. The search used knowledge that a drone does not have.
+
+**The repair.** One map, built from all five reference folders: the route itself and 20 and 40 m north and south of it, 2,295 images. They are crops of the same aerial photos and agree with their coordinates to within 0.9 pixels (0.5 m), measured by phase correlation of overlapping images. The map is 8,024 by 1,969 pixels; 36 percent of it holds imagery, a strip about 380 m wide along the route. The navigator now searches a circle around its own estimate, with a radius of 60 m or 3 sigma, whichever is larger, and only at places where the whole frame lies on imagery. One search takes about 0.13 s on one laptop core.
+
+| Fixes | Score check | Reference images on the true path | One map, circle around the estimate |
+|---|---|---|---|
+| Every 100 m | no | 25.5 m median, 50.3 m worst | 25.2 m, 49.9 m |
+| Every 300 m | yes | 30.9 m, 72.8 m | 31.1 m, 72.9 m |
+| Every 400 m | no | 285.1 m, 897.9 m (7 nearest images, 5 wrong fixes used) | 36.0 m, 279.9 m (1 wrong fix used) |
+| Every 1,000 m | yes | 56.3 m, 278.1 m (sized search) | 56.1 m, 278.1 m |
+
+What this means:
+
+- **The results of sections 3.4 and 3.6 hold.** They did not depend on knowing the path: between fixes the estimate stayed close enough for the true place to lie inside the search.
+- **The cliff at 400 m belonged to the small search of 7 images.** With a circle sized by the uncertainty and no score check, fixes every 400 m give a median of 36 m, with one wrong fix used.
+- **What is still easier than reality:** the map is a strip 380 m wide around the flown route, so a wide search meets fewer look-alike places than it would on a full map. The next test, on UAV-VisLoc with full satellite maps, removes that.
+- The runs on the reference images stay in `baseline/configs/alto_navigator.yaml` for comparison. The map runs are the ones to report.
+
 ## 4. How this compares with existing products
 
 Both product pages describe the same building blocks.
@@ -398,8 +419,8 @@ Changes against the current plan:
 
 - ALTO: one section of 4.6 km of one flight, in daylight, in summer, over rural land, on a nearly straight course.
 - The settings for ALTO were chosen while looking at this same section: the zoom and rotation ranges, the score threshold of 0.33, the assumed drift of 10 percent and the fix accuracy of 15 m. Nothing has been tested on data we did not tune on.
-- The reference images exist only along the flown route. Places that look alike elsewhere cannot confuse the match, so this is easier than a map of an area.
-- The rotation is learned once before the jam and kept. That works on a straight course. Turns need a heading from a gyroscope, or a search over rotation at every fix.
+- The map covers only a strip about 380 m wide around the flown route (section 3.8). Places that look alike further away cannot confuse the match, so a wide search is easier than on a map of a whole area.
+- The rotation is learned once before the jam and kept. That works on a straight course, and the validation section is one: its course stays between 77 and 84 degrees. Turns need a heading from the drone's own attitude, or a search over rotation at every fix.
 - Mid-Air: the IMU baseline uses the 30 sunny flights. The scale test uses two flights.
 - Computing time was measured only as a whole on a laptop. Nothing has run on drone hardware.
 - Night, fog, rain and water are untested.

@@ -17,6 +17,8 @@ from typing import Any, Callable
 import cv2
 import numpy as np
 
+from src.data.ground_map import GroundMap
+
 _CLAHE = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 
@@ -63,6 +65,7 @@ class CameraFlight:
     load_frame: Callable[[int], np.ndarray]  # index -> grayscale uint8 camera frame
     reference: ReferenceMap
     metadata: dict[str, Any] = field(default_factory=dict)
+    ground_map: GroundMap | None = None  # one map of the whole area, for the search around the estimate
 
     def __post_init__(self) -> None:
         self.timestamp = np.asarray(self.timestamp, dtype=float)

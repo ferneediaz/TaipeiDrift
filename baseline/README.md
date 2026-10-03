@@ -61,7 +61,7 @@ The ALTO zip files go into `data/raw/alto/` (see `data/README.md`). The runs and
 1. **While GNSS works,** the navigator learns everything it needs: a 2 by 2 matrix that turns image shift in pixels into ground steps in metres, and the zoom, rotation and offset of the camera against the reference images. It reads no altitude, no orientation and no camera calibration.
 2. **After the jam,** the image shift alone carries the position forward. The navigator states its uncertainty, which grows by 10 percent of the distance flown since the last fix.
 3. **Every so many metres** it matches the frame against the reference images near its estimate, with normalised correlation of brightness patterns. A fix is used only if its score is high enough and it lies within 3 sigma of the estimate. A used fix is blended in according to the two uncertainties.
-4. **The search** is either the 7 nearest reference images or all images within 3 sigma of the estimate, so it grows when the navigator is less certain.
+4. **The search** covers one map of the whole area, in a circle around the estimate of 60 m or 3 sigma, whichever is larger, so it grows when the navigator is less certain (`search: area`). On ALTO the map is built from all five reference folders, a strip about 380 m wide, and kept in `data/processed/alto_val_map/`. The older searches over the dataset's own reference images (`nearest`, `sized`) stay for comparison: those images are centred on the true path, so that search knows where the path runs (`docs/findings.md`, section 3.8).
 
 The logic is in [src/estimation/navigator_core.py](src/estimation/navigator_core.py), with a worked example for each function. The true position after the jam is read only by [src/evaluation/navigation_metrics.py](src/evaluation/navigation_metrics.py); a test checks that the navigator gives the same result when it is hidden.
 
@@ -69,16 +69,27 @@ The logic is in [src/estimation/navigator_core.py](src/estimation/navigator_core
 
 GNSS lost after 300 m, then 4.3 km with the camera alone. Errors in metres.
 
+Searching the map around the estimate (the runs to report):
+
 | Run | Median | Worst | End | Fixes used / rejected |
 |---|---|---|---|---|
 | Camera alone | 472.4 | 657.0 | 608.2 | |
-| Fix every 100 m | 25.5 | 50.3 | 26.3 | 39 / 0 |
+| Fix every 100 m, no check | 25.2 | 49.9 | 27.7 | 39 / 0 |
+| Fix every 300 m, score check | 31.1 | 72.9 | 37.8 | 12 / 1 |
+| Fix every 400 m, no check | 36.0 | 279.9 | 279.9 | 9 / 0, of which 1 wrong |
+| Fix every 1,000 m, score check | 56.1 | 278.1 | 10.3 | 4 / 0 |
+
+Searching the dataset's reference images, which are centred on the true path (for comparison):
+
+| Run | Median | Worst | End | Fixes used / rejected |
+|---|---|---|---|---|
+| Fix every 100 m, 7 nearest images | 25.5 | 50.3 | 26.3 | 39 / 0 |
 | Fix every 300 m, larger search, score check | 30.9 | 72.8 | 37.7 | 12 / 1 |
-| Fix every 400 m, no check | 285.1 | 897.9 | 897.9 | 7 / 0, of which 5 wrong |
+| Fix every 400 m, 7 nearest images, no check | 285.1 | 897.9 | 897.9 | 7 / 0, of which 5 wrong |
 | Fix every 1,000 m, 7 nearest images, score check | 472.4 | 657.0 | 608.2 | 0 / 3 |
 | Fix every 1,000 m, larger search, score check | 56.3 | 278.1 | 10.0 | 4 / 0 |
 
-These are the numbers of `experiments/h_alto_end_to_end.py`, reproduced exactly; [tests/test_alto_navigator.py](tests/test_alto_navigator.py) checks them whenever the data is present. The settings were chosen on this same section, so they still need the test on the training section.
+The second table is `experiments/h_alto_end_to_end.py`, reproduced exactly; [tests/test_alto_navigator.py](tests/test_alto_navigator.py) checks both tables whenever the data is present. The settings were chosen on this same section, so they still need a test on data they were not tuned on.
 
 **A known limit, shown by a test:** if the map's coordinates are 200 m off, the first fixes are rejected, but after 600 m without a fix the allowed distance has grown past 200 m and a confident wrong fix is believed. The distance check alone cannot catch a wrong place that lies inside the stated uncertainty.
 
@@ -88,6 +99,7 @@ These are the numbers of `experiments/h_alto_end_to_end.py`, reproduced exactly;
 - `src/data/synthetic.py`: four exact flights (stationary, constant velocity, banked climbing circle, spinning hover) with optional IMU noise
 - `src/data/midair.py`: the Mid-Air adapter. Every assumption about the file format is listed at its top
 - `src/data/camera_flight.py`, `alto.py`, `synthetic_camera.py`: camera flights with reference images, the ALTO adapter and a generated flight for tests
+- `src/data/ground_map.py`: one north-up map of the area with coordinates, and a mosaic of reference images into it
 - `src/estimation/inertial_dead_reckoning.py`: the IMU estimator
 - `src/estimation/image_motion.py`, `map_matching.py`, `navigator_core.py`, `camera_navigator.py`: the camera navigator
 - `src/evaluation/`, `src/visualization/`: metrics and plots for both

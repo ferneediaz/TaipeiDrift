@@ -6,10 +6,17 @@
 3. Every so many metres: match the camera frame against reference images near the estimate.
    The fix is blended into the estimate only if it passes the check (``navigate``).
 
-What it reads: the camera frames, the reference images with their coordinates, and the true
-position up to the jam. It reads no altitude, no orientation and no camera calibration. The true
-position after the jam is never read here; ``src.evaluation.navigation_metrics`` uses it to
-measure the error.
+What it reads: the camera frames, the map (reference images with coordinates, or one map of the
+whole area) and the true position up to the jam. It reads no altitude, no orientation and no
+camera calibration. The true position after the jam is never read here;
+``src.evaluation.navigation_metrics`` uses it to measure the error.
+
+Three ways to search for a fix:
+
+- ``nearest`` and ``sized``: the reference images of the dataset closest to the estimate. On ALTO
+  these images are centred on the true path, so this search knows where the path runs.
+- ``area``: one map of the whole area, searched in a circle around the estimate. This search knows
+  nothing about the true path; it is the one to report.
 """
 from __future__ import annotations
 
@@ -20,9 +27,11 @@ import numpy as np
 
 from src.data.camera_flight import CameraFlight, prepare
 from src.estimation.image_motion import shifts_for_flight
-from src.estimation.map_matching import KEEP, match
+from src.data.ground_map import GroundMap
+from src.estimation.map_matching import KEEP, Match, match, search_area
 from src.estimation.navigator_core import (
     FRAMES_DISAGREE,
+    OFF_MAP,
     agreeing_fixes,
     allowed_distance,
     blend,
@@ -39,9 +48,11 @@ class NavigatorConfig:
 
     jam_after_m: float = 300.0  # GNSS is lost after this distance
     fix_every_m: float | None = 300.0  # estimated distance between position fixes; None: no fixes
-    search: str = "nearest"  # "nearest": a fixed number of reference images; "sized": grows with the uncertainty
+    search: str = "nearest"  # "nearest": a fixed number of reference images; "sized": grows with the uncertainty;
+    # "area": one map of the whole area, in a circle around the estimate that grows with the uncertainty
     nearest_images: int = 7
-    min_search_radius_m: float = 60.0  # sized search: all reference images within max(this, 3 sigma)
+    min_search_radius_m: float = 60.0  # sized and area search: within max(this, 3 sigma)
+    calibration_radius_m: float = 60.0  # area search before the jam: around the GNSS position
     min_score: float = 0.0  # a fix with a lower matching score is not used
     fix_sigma_m: float = 15.0  # accuracy of one fix
     drift_rate: float = 0.10  # dead reckoning error as a share of the distance since the last fix
@@ -89,8 +100,9 @@ class FixRecord:
     distance: float  # m between the fix and the estimate before blending
     allowed: float  # largest distance at which the fix would be believed, m
     used: bool
-    reason: str  # OK, LOW_SCORE, DISAGREES_WITH_ESTIMATE or FRAMES_DISAGREE
+    reason: str  # OK, LOW_SCORE, DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE or OFF_MAP
     frames_agreeing: int = 1  # with the agreement check: how many of the matched frames agreed
+    search_radius_m: float = 0.0  # sized and area search: radius of the search around the estimate
 
 
 @dataclass
@@ -123,10 +135,17 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
     start, stop, step = cfg.calibration_angles_deg
     angles = np.arange(start, stop + 1.0, step)
     frames = (jam // 3, 2 * jam // 3, jam)
-    fixes = [
-        match(prepare(flight.frame(k)), flight.reference, flight.reference.nearest(truth[k], cfg.nearest_images), zooms, angles, cfg.keep)
-        for k in frames
-    ]
+    if cfg.search == "area":
+        ground = _ground_map(flight)
+        found = [search_area(prepare(flight.frame(k)), ground, truth[k], cfg.calibration_radius_m, zooms, angles, cfg.keep) for k in frames]
+        if any(f is None for f in found):
+            raise ValueError("the map holds no imagery around a frame before the jam")
+        fixes: list[Match] = found  # type: ignore[assignment]
+    else:
+        fixes = [
+            match(prepare(flight.frame(k)), flight.reference, flight.reference.nearest(truth[k], cfg.nearest_images), zooms, angles, cfg.keep)
+            for k in frames
+        ]
     return Calibration(
         jam_index=jam,
         motion_matrix=matrix,
@@ -136,12 +155,19 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
     )
 
 
+def _ground_map(flight: CameraFlight) -> GroundMap:
+    if flight.ground_map is None:
+        raise ValueError(f"search 'area' needs a map of the whole area; flight {flight.name} has none")
+    return flight.ground_map
+
+
 def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration, cfg: NavigatorConfig) -> NavigatorResult:
     """Estimate the path after the jam from image shift and position fixes."""
-    if cfg.search not in ("nearest", "sized"):
+    if cfg.search not in ("nearest", "sized", "area"):
         raise ValueError(f"unknown search {cfg.search!r}")
     jam = calibration.jam_index
     reference = flight.reference
+    ground = _ground_map(flight) if cfg.search == "area" else None
     fix_variance = cfg.fix_sigma_m**2
 
     estimate = flight.position_gt[jam].copy()  # the last position GNSS gave
@@ -164,25 +190,44 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
             since_try = 0.0
             predicted = predicted_variance(variance, since_fix, cfg.drift_rate)
             zooms = np.clip(zoom + np.arange(-cfg.zoom_reach, cfg.zoom_reach + 0.01, cfg.zoom_step), *cfg.zoom_limits)
-            candidates = reference.nearest(estimate, cfg.nearest_images)
+            radius = max(cfg.min_search_radius_m, cfg.gate_sigmas * float(np.sqrt(predicted)))
+            candidates = np.array([], dtype=int)
+            if cfg.search in ("nearest", "sized"):
+                candidates = reference.nearest(estimate, cfg.nearest_images)
             if cfg.search == "sized":
-                radius = max(cfg.min_search_radius_m, cfg.gate_sigmas * float(np.sqrt(predicted)))
                 inside = reference.within(estimate, radius)
                 if len(inside) >= cfg.nearest_images:
                     candidates = inside
-                if since_fix > cfg.wide_zoom_after_m:
-                    zooms = np.arange(cfg.wide_zooms[0], cfg.wide_zooms[1] + 0.001, cfg.zoom_step)
+            if cfg.search in ("sized", "area") and since_fix > cfg.wide_zoom_after_m:
+                zooms = np.arange(cfg.wide_zooms[0], cfg.wide_zooms[1] + 0.001, cfg.zoom_step)
             angles = np.array([calibration.angle - cfg.angle_reach_deg, calibration.angle, calibration.angle + cfg.angle_reach_deg])
+
+            def find(j: int) -> Match | None:
+                image = prepare(flight.frame(j))
+                if ground is not None:
+                    return search_area(image, ground, estimate, radius, zooms, angles, cfg.keep)
+                return match(image, reference, candidates, zooms, angles, cfg.keep)
 
             # match this frame, and with the agreement check also the frames just before it,
             # each moved to the present by the dead-reckoned motion since then
             frames = [k - i * cfg.agreement_spacing for i in range(cfg.agreement_frames - 1, -1, -1)]
             frames = [j for j in frames if j > jam]
-            found_all, moved = [], []
+            found_all, moved, matched = [], [], []
             for j in frames:
-                found_j = match(prepare(flight.frame(j)), reference, candidates, zooms, angles, cfg.keep)
+                found_j = find(j)
+                if found_j is None:
+                    continue
                 found_all.append(found_j)
+                matched.append(j)
                 moved.append(found_j.position - calibration.fix_offset + (estimate - path[j - jam]) if j < k else found_j.position - calibration.fix_offset)
+            allowed = allowed_distance(predicted, fix_variance, cfg.gate_sigmas)
+            searched = radius if cfg.search != "nearest" else 0.0
+            if not matched or matched[-1] != k:
+                nothing = np.full(2, np.nan)
+                fixes.append(FixRecord(k, float("nan"), nothing, float("nan"), float("nan"), -1, 0, float("nan"), allowed, False, OFF_MAP, 0, searched))
+                path.append(estimate.copy())
+                sigma.append(float(np.sqrt(predicted_variance(variance, since_fix, cfg.drift_rate))))
+                continue
             found = found_all[-1]
             position, score, agreeing = moved[-1], found.score, 1
             frames_agree = True
@@ -197,12 +242,13 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
                     agreeing = len(group)
 
             distance = float(np.linalg.norm(position - estimate))
-            allowed = allowed_distance(predicted, fix_variance, cfg.gate_sigmas)
             if frames_agree:
                 use, reason = fix_decision(score, distance, allowed, cfg.min_score)
             else:
                 use, reason = False, FRAMES_DISAGREE
-            fixes.append(FixRecord(k, score, position, found.zoom, found.angle, found.reference_index, len(candidates), distance, allowed, use, reason, agreeing))
+            fixes.append(
+                FixRecord(k, score, position, found.zoom, found.angle, found.reference_index, len(candidates), distance, allowed, use, reason, agreeing, searched)
+            )
             if use:
                 estimate, variance, _ = blend(estimate, predicted, position, fix_variance)
                 zoom = found.zoom

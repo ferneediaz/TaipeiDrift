@@ -16,6 +16,7 @@ OK = "OK"
 LOW_SCORE = "LOW_SCORE"
 DISAGREES_WITH_ESTIMATE = "DISAGREES_WITH_ESTIMATE"
 FRAMES_DISAGREE = "FRAMES_DISAGREE"
+OFF_MAP = "OFF_MAP"  # the search circle holds no place where the frame lies fully on the map
 
 # what the navigator reports about itself, see ``status``
 TRACKING = "TRACKING"
