@@ -7,6 +7,7 @@ We are working on Challenge 2, navigation without GNSS. The plan is proposed and
 ## Contents
 
 - [docs/TaipeiDrift_Pitch.pdf](docs/TaipeiDrift_Pitch.pdf): the pitch deck for Demo Day, 18 slides: nine for the three-minute pitch, then the backup slides with costs, market, competition and limits
+- [docs/pitch-offline/](docs/pitch-offline/): the same deck as a web page that runs without internet, with the demo video; open `index.html` in a browser, the keys are in its `README.txt`
 - [docs/findings.md](docs/findings.md): **read first**, what we measured on Friday night and what it changes
 - [docs/PLAN.md](docs/PLAN.md): the plan: what we build, roles, timeline, demo
 - [docs/brief.md](docs/brief.md): what the challenge asks for
