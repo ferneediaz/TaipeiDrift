@@ -1,30 +1,35 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 13:05. Code freeze Sunday 10:00, demo 13:00.
+Last updated: Saturday 3 October 2026, 14:20. Code freeze Sunday 10:00, demo 13:00.
 
 ## Resume here
 
-**Where the work lives (moved today, read this first).**
+**Where the work lives (read this first).**
 
-- Working copy: **`~/Projects/DefenseHackathon`**, branch `alto-navigator`, a fresh clone outside iCloud. The old `~/Desktop/DefenseHackathon` syncs to iCloud; with the disk 98 percent full macOS moved its files to iCloud (Python and git stalled). It is stale; do not work there.
-- Simulator work: **`~/Projects/DefenseHackathon-sim`**, a git worktree of the same repository on branch **`sim-demo`** (Dan's `simulations` plus Ilhan's patch, commit 3e9458a).
-- Python: `~/.venvs/defensehackathon/bin/python` (`.venv` in the working copy links to it). Run from outside the iCloud folder; imports from inside it hang.
-- Data: stays in `~/Desktop/DefenseHackathon/data/raw.nosync` and `processed.nosync` (iCloud skips `.nosync`); `data/raw` and `data/processed` in the working copy link there. The worktree needs the same two links.
-- **The one working doc for the team: `docs/status-saturday.md`** (what we did, results, done and left with owners). Measurements: `docs/findings.md` sections 3.8 to 3.10.
+- **Work on branch `integration`** in **`~/Projects/DefenseHackathon-sim`** (a git worktree outside iCloud). It holds every team branch (ours, Alessandro's `mid-air-vio`, `main` with Felix's TRN and Dan's simulator, Ilhan's patch and research, the DenseUAV review); 297 tests pass. It is up for merging into `main` as pull request 2 (https://github.com/dwn97/TaipeiDrift/pull/2); the team merges it, never us. `alto-navigator` was fast-forwarded to the same commit (90b863a) so old links still show the current docs; keep pushing both, or only `integration`.
+- `~/Projects/DefenseHackathon` (branch `alto-navigator`) is the older checkout; `~/Desktop/DefenseHackathon` is stale (iCloud).
+- Python: `~/.venvs/defensehackathon/bin/python` (`.venv` links to it). Run from outside the iCloud folder.
+- Data: `~/Desktop/DefenseHackathon/data/raw.nosync` and `processed.nosync`, linked as `data/raw` and `data/processed` in both checkouts. Simulator recordings in `recordings/` (ignored by git), outputs in `outputs/`.
+- **The working doc: `docs/status-saturday.md`** (link for the team: https://github.com/dwn97/TaipeiDrift/blob/integration/docs/status-saturday.md). Phone test plan: `docs/phone-sun-test.md`. Competitors: `docs/landscape.md`.
 
-**Rules from Dustin.** Never push to `main`; work on a branch and push it by name. Pull, then commit, then push, and say what the pull brought in. No assistant attribution in commits. Plain language, no middle dot, no "not X but Y". Explain math from small numbers. Communicate clearly: say where we stand, what changed and why, before diving into work; stop at checkpoints when asked.
+**Rules from Dustin.** Never push to `main`; work on a branch and push it by name. Pull, then commit, then push, and say what the pull brought in. No assistant attribution in commits or pull requests. Plain language, no middle dot, no "not X but Y". Explain math from small numbers. Communicate clearly: say where we stand, what changed and why; stop at checkpoints when asked. Check the clock with `date` before writing times.
 
-**Next: the simulator demo** (Dustin's priority after the compaction). Goal: one simulated flight with IMU, camera, barometer and a real map, where our navigator runs (and later Alessandro's filter with our fixes).
+**Simulator demo: done so far.**
 
-1. Docker image `taipeidrift-sim` is **built** (4.79 GB) and the container `taipeidrift-sim` was started from `~/Projects/DefenseHackathon-sim/sim` (`docker compose up -d`). It mounts the worktree at `/ws/TaipeiDrift`.
-2. Ground = the real Wufeng 2020 aerial image: in the worktree, link `data/raw` to the `.nosync` folder, then `~/.venvs/defensehackathon/bin/python sim/scripts/make_ground.py --aerial` (needs rasterio; the image is `data/raw/aerial/wufeng_2020-03-23_x4.tif`). The plane is centred on the world origin, north up, at the image's true size. Consider fewer 3D trees (`make_trees.py --count`), since the photo already shows trees.
-3. Coordinates. Both images are EPSG:3826 (TWD97, true metres).
-   - 2020: 14,891 x 19,896 px at 0.143 m, bounds W 216099.2, E 218228.1, S 2659835.4, N 2662679.7. Its centre (E 217163.65, N 2661257.55) is the simulator's origin (x east, y north).
-   - 2018 (our on-board map): 10,851 x 14,820 px at 0.195 m, bounds W 216121.2, E 218233.8, S 2659765.7, N 2662651.0. In simulator metres its top-left corner is north +1393.45, east -1042.45. Load it as a `GroundMap`, resampled to about 0.5 m per pixel.
-   - Only 33 percent of the rectangle holds imagery: a motorway corridor 300 to 600 m wide. The flight must follow it; get the centreline from the coverage mask.
-4. Flight: Ilhan's `sim/scripts/t_scenario.py` (velocity commands, altitude and heading hold from the simulator's truth) adapted: climb to about 120 m (90-degree camera: 240 m footprint, 0.47 m per pixel at 512 px), about 10 m/s along the corridor with its turns, GNSS cut after about 300 m (`gnss_cut_s`), `cam_res:=512 gui:=false` (real-time factor about 0.94). Record with `sim/nodes/recorder.py` (format `taipeidrift-replay/1`: CSVs imu, baro, gnss, images, truth). Known bug from Ilhan: the GNSS cut is written in simulation time, not in the recording's `t_s`.
-5. A loader from the replay format to `CameraFlight` (frames, truth north/east, timestamps, heading from the truth quaternion plus compass noise as the sensor), the 2018 image as `ground_map`, then the navigator (`search: area`, `camera_motion_floor: 0.3`, `confirm_jumps`), then `make_replay.py` for the video. Run the navigator twice: with the 2018 image (two years old) and with the 2020 image (the ground itself, a fresh map as Ukraine's Eagle Eyes has). The difference is the price of an old map (`docs/landscape.md`, Eagle Eyes section).
-6. Later, if time allows: Alessandro's ESKF on the same recording, with our fixes as position updates (his `ESKF.update(r, H, R, gate_prob)`; a fix is a north/east measurement with 15 m accuracy). His filter's uncertainty is 2 to 5 times too small and he flagged a missing propagation term; both matter before fusing (status doc 5a).
+1. The container `taipeidrift-sim` runs from `~/Projects/DefenseHackathon-sim/sim` (`docker compose up -d`), mounting the worktree at `/ws/TaipeiDrift`. Start: `docker compose exec -d sim bash -ic "cd /ws/TaipeiDrift && ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=terrain > /tmp/sim.log 2>&1"`.
+2. Ground: `python sim/scripts/make_ground.py --aerial --fill-empty` (the 2020 photo, empty parts filled with the procedural landscape); trees off (`make_trees.py --count 0`).
+3. Route: `python sim/scripts/plan_route.py` writes `sim/scenarios/wufeng_corridor.json` (4.8 km along the corridor both images cover, 100 m, 10 m/s, out north, 180-degree turn, back south).
+4. Recorded: `recordings/wufeng_corridor_100m` (recorder `sim/nodes/recorder.py --image-rate-hz 5 --cam-res 512 --duration-s 660`, then `python3 sim/scripts/route_flight.py` in the container). GNSS stays on in the recording; the jam is applied by distance (450 m).
+5. Loader `baseline/src/data/sim_replay.py`; runs `baseline/scripts/run_sim_navigator.py` (config `baseline/configs/sim_navigator.yaml`, `motion_fit: rotation_scale`): camera alone 76 m median, 2018 map 26.5 m, fresh 2020 map 17.3 m, no wrong fix, bound held 100 percent. Video: `python baseline/scripts/make_replay.py sim --seed 3`.
+6. Findings: the drone pitches 9.5 degrees in cruise, up to 16 in turns; the fixed down camera then looks 16 to 22 m behind; corrected with the true attitude the fix error is 2 to 5 m. Image of the down camera: top = forward, right = body right; frames are turned north up by the heading (`north_up`), zoom = height / 128 for the 0.5 m map.
+
+**Next: the fused navigator** (Alessandro's ESKF plus our fixes, on the same recording). Plan:
+
+- Reuse `vio/estimation/eskf.py` (`ESKF`, ENU world: gravity (0, 0, -9.81), `gyroscope_frame="body"`, IMU body FLU from `imu.csv`), start state from the truth at the jam (as his runner does at the cutoff).
+- Updates: barometer height (his `update_altitude`, noise from his `BaroUpdateConfig`); a compass heading (truth yaw plus 4-degree offset and 1-degree noise, a new yaw update, H on the attitude error's world-up axis); down-camera velocity with his `camera_velocity_from_flow` (needs feature tracks and `R_bc` for the sim camera; derive it from `meta.json` `T_body_cam`, and note his `_flow_update` assumes NED down = (0, 0, 1), so pass world down = (0, 0, -1) for ENU).
+- Map fix every 300 m: search centre = ESKF position plus where the camera looks (ray through the image centre, from the ESKF attitude and the barometer height); radius 3 sigma from the ESKF covariance, 60 to 600 m; zoom from the height; the fix minus that look offset is the drone's position, 15 m, through `ESKF.update` with the 99 percent gate and our confirmation of large jumps.
+- Compare four runs on the same flight: camera alone, ESKF without fixes, fused, fused with the 2020 map. Alessandro's caveat: his filter's stated uncertainty was 2 to 5 times too small on Mid-Air; check NEES on the simulated flight before trusting its gate.
+- Dan's new recorder (`sim/nodes/record_midair.py`) writes Mid-Air format; an alternative path to run Alessandro's own pipeline unchanged (down camera only; the simulated drone has no forward camera).
 
 **Also left** (status doc section 7): computing time per fix and per frame and map storage per square kilometre; the README for the submission; slides with Dustin; team decisions on `main`.
 
