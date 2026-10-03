@@ -7,12 +7,12 @@ Every number below is in a file of this folder (paths in brackets). Both cameras
 On the same simulated flight, adding our map fixes to Alessandro's ESKF changes the error after the GNSS cut as
 follows (median over 5 seeds):
 
-| Camera | ESKF alone, median / max | ESKF + our fixes, median / max |
-|---|---|---|
-| Ideal | 56 m / 587 m | 1.7 m / 6.6 m |
-| Realistic (Dustin's camera model) | 169 m / 1,946 m | 1.9 m / 11.0 m |
+| Camera | ESKF alone, median / max | ESKF + our fixes (B), median / max | Same, no truth at all after the cut (C), median / max |
+|---|---|---|---|
+| Ideal | 56 m / 587 m | 1.7 m / 6.6 m | 2.4 m / 17.4 m |
+| Realistic (Dustin's camera model) | 169 m / 1,946 m | 1.9 m / 11.0 m | 2.6 m / 13.9 m |
 
-No wrong fix was accepted. His 99 % gate rejected 0–2 correct fixes per run.
+No wrong fix was accepted in any run. His 99 % gate rejected 0–2 correct fixes per run in B, and 0–21 in C.
 
 ## What was run
 
@@ -22,7 +22,8 @@ No wrong fix was accepted. His 99 % gate rejected 0–2 correct fixes per run.
   Scored from the cut to the end of the route: 4,540 m flown.
 - **Caveat, pre-cut GNSS is SIMULATED.** The recorded `gnss.csv` stops at t = 6.8 s, so before the cut GNSS is
   truth + N(0, 1.5 m) per horizontal axis at 1 Hz. Seed 0 uses exactly S1's series; seeds 1–4 draw new noise.
-  Truth is never used after the cut. The one exception is roll/pitch inside the map matcher (AHRS stand-in, same as S1).
+  Truth is never used after the cut. The one exception is in A and B: roll/pitch inside the map matcher (AHRS
+  stand-in, same as S1). Config C removes that exception.
 - Estimator: `vio/estimation/eskf.py`, unchanged; it is identical to the ale-simulation copy. The offline driver
   `experiments/s2_sim_eskf_fusion.py` reproduces his live sim adapter:
   - start from a settled 0.5 s IMU window (yaw 0; the drone spawns facing east);
@@ -42,6 +43,12 @@ No wrong fix was accepted. His 99 % gate rejected 0–2 correct fixes per run.
       to x/y, following Dan's `on_rf` pattern.
     - Fix covariance = S1's pre-cut calibration: 1.24 m per axis (ideal camera), 1.29 m (realistic camera).
     - Gate: his 99 % chi-square gate (2 dof: 9.21).
+  - **C**: B, but the matcher's full attitude (roll, pitch, heading) comes from the ESKF state, as does its
+    height (B already used the ESKF height). Nothing from truth is used after the cut.
+    - This uses a new optional argument, `R_body_to_enu`, of `s1_sim_map_fix.fix_at`. Its default (`None`) is the
+      old path.
+    - Check: rerunning B seed 0 gives a byte-identical track, flow and GNSS file. Every non-timing fix column is
+      identical too; the only new column is `tilt_err_deg`.
 - Randomness: the filter and the matcher are deterministic. The only random input is the pre-cut GNSS noise, so
   there are 5 seeds of it.
 
@@ -154,6 +161,7 @@ Dustin's per-frame files), read through `s1_sim_report.series`.
 |---|---|---|---|---|---|---|
 | A: Alessandro's ESKF alone | 55.9 | 429 | 587 | 587 | – | – |
 | B: Alessandro's ESKF + our fixes | 1.7 | 3.1 | 6.6 | 4.0 | 506 | 106 |
+| C: as B, no truth after the cut | 2.4 | 5.1 | 17.4 | 5.5 | 488 | 114 |
 | S1, ours: odometry + fixes, EKF with scale state | 1.7 | 2.9 | 5.2 | 4.5 | 511 | 121 |
 | S1, ours, 3-state EKF (no scale state) | 1.7 | 3.0 | 6.0 | 4.4 | 504 | 114 |
 | S1, dead reckoning (same odometry, no fixes) | 28.1 | 80.7 | 84.0 | 84.0 | – | – |
@@ -166,6 +174,7 @@ Dustin's per-frame files), read through `s1_sim_report.series`.
 |---|---|---|---|---|---|---|
 | A: Alessandro's ESKF alone | 168.6 | 1,475 | 1,946 | 1,946 | – | – |
 | B: Alessandro's ESKF + our fixes | 1.9 | 3.9 | 11.0 | 4.1 | 451 | 143 |
+| C: as B, no truth after the cut | 2.6 | 5.2 | 13.9 | 5.5 | 446 | 156 |
 | S1, ours: odometry + fixes, EKF with scale state | 1.8 | 3.2 | 6.4 | 3.9 | 459 | 151 |
 | S1, ours, 3-state EKF (no scale state) | 1.9 | 3.3 | 6.3 | 4.3 | 457 | 148 |
 | S1, dead reckoning (same odometry, no fixes) | 26.9 | 84.9 | 88.3 | 88.3 | – | – |
@@ -175,12 +184,41 @@ Dustin's per-frame files), read through `s1_sim_report.series`.
 Figures: `fig_error_vs_distance_ideal_s0.png` and `fig_error_vs_distance_realistic_s0.png` show error vs
 distance flown since the cut for every estimator, seed 0.
 
+### C vs B: the matcher without truth roll/pitch
+[`summary_eskf_per_run_<camera>.csv` rows C, `runs/<camera>/C_s*_fixes.csv`, log `run_C.log`]
+
+Median over 5 seeds (per-seed range in brackets):
+
+| Camera | Config | Median (m) | p90 (m) | Max (m) | Final (m) | Accepted / rejected fixes | Fix error, median | NEES mean / % above 99 % bound |
+|---|---|---|---|---|---|---|---|---|
+| Ideal | B | 1.7 | 3.1 | 6.6 (6.1–6.9) | 4.0 | 503–507 / 1–2 | 1.6 m | 6.7 / 24 % |
+| Ideal | C | 2.4 | 5.1 | 17.4 (11.8–26.9) | 5.5 | 484–501 / 3–21 | 2.2 m | 13.4 / 48 % |
+| Realistic | B | 1.9 | 3.9 | 11.0 (10.6–15.8) | 4.1 | 444–461 / 0–1 | 1.7 m | 6.5 / 23 % |
+| Realistic | C | 2.6 | 5.2 | 13.9 (11.6–23.3) | 5.5 | 443–454 / 0–1 | 2.3 m | 11.4 / 41 % |
+
+- **Wrong fixes in C:** 0 accepted. There was one wrong fix in total (realistic camera, seed 2: 94 m off). The
+  gate rejected it with NIS 311.
+- **The ESKF's tilt error** (angle between its body z axis and truth's, at fix attempts) is 0.6–0.7° median,
+  1.2–1.5° p90 and 3.2° max. At 80 m, 0.7° moves the ground point under the camera by about 1 m. That matches the
+  fix error growing from 1.6 to 2.2 m.
+- **Why C rejects more correct fixes:** the fix covariance is still S1's pre-cut calibration (1.24–1.29 m sd).
+  It was measured with truth roll/pitch, so it is too tight for C. Correct fixes then fail the gate (seed 0,
+  ideal camera: 21 rejected, NIS 9.3–15.7), and the ESKF becomes more overconfident (NEES 13 vs 7).
+- **C's largest errors** come after runs of 15–20 attempts without an accepted fix: rejected fixes (ideal seed 0,
+  26.9 m at 4.2 km) or no consensus (realistic seed 4, 23.3 m at 2.7 km).
+- **Not done:** recalibrating the fix covariance for C before the cut, using the ESKF's attitude instead of truth.
+  This is the obvious next step. We did not tune on post-cut data.
+- **Comparability:** among our own rows, C is the only one that uses no truth after the cut. B and the S1 rows
+  still take roll/pitch from truth, and S1 also takes heading as truth plus simulated drift. We did not audit
+  Dustin's replay for this.
+
 ## What this does and does not show
 
 - **Shown, same data:**
   - Our fixes fused into Alessandro's ESKF bring it from hundreds of metres to under 7 m (ideal camera) and under
     16 m (realistic camera) everywhere.
-  - His gate accepts them; no wrong fix entered.
+  - With no truth at all after the cut (C), they still keep it under 27 m everywhere: median 2.4–2.6 m.
+  - His gate accepts them; no wrong fix entered in any configuration.
   - With the same fixes, his ESKF and our EKF have the same median error (1.7 m ideal, 1.8–1.9 m realistic). The
     fixes dominate.
   - His ESKF has a higher worst case: max 6.6 vs 5.2 m on the ideal camera, 11.0 vs 6.4 m on the realistic one.
@@ -203,8 +241,10 @@ PY=/Users/ilhan.neuville/dev/hackathon/TaipeiDrift/.venv/bin/python
 $PY experiments/s2_sim_eskf_fusion.py run --config A B --seeds 0 1 2 3 4 --workers 3 --camera ideal       # ~2.5 min per B run
 $PY experiments/s2_sim_eskf_fusion.py run --config A --seeds 0 --camera realistic                         # builds the flow cache first
 $PY experiments/s2_sim_eskf_fusion.py run --config B A --seeds 0 1 2 3 4 --workers 3 --camera realistic
+$PY experiments/s2_sim_eskf_fusion.py run --config C --seeds 0 1 2 3 4 --workers 3 --camera ideal
+$PY experiments/s2_sim_eskf_fusion.py run --config C --seeds 0 1 2 3 4 --workers 3 --camera realistic
 $PY experiments/s2_sim_report.py --camera ideal --seed 0
 $PY experiments/s2_sim_report.py --camera realistic --seed 0
 ```
 
-Logs: `run_ideal.log`, `run_realistic.log`. Flow pairs cache: `cache/flow_pairs_<recording>_<camera>.pkl`.
+Logs: `run_ideal.log`, `run_realistic.log`, `run_C.log`. Flow pairs cache: `cache/flow_pairs_<recording>_<camera>.pkl`.

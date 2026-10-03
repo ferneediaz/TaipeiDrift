@@ -24,7 +24,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments"))
 OUT = ROOT / "outputs/s2_sim"
-COLORS = {"A": "#111111", "B": "#17becf"}
+COLORS = {"A": "#111111", "B": "#17becf", "C": "#e377c2"}
 
 
 def metrics(err: np.ndarray) -> dict:

@@ -38,6 +38,38 @@ reckoning) and [s2-results.md](s2-results.md) (Alessandro's ESKF).
 ![Error vs distance, ideal camera](fig_error_vs_distance_ideal.png)
 ![Error vs distance, realistic camera](fig_error_vs_distance_realistic.png)
 
+## No truth at all after the cut (config C, Alessandro's ESKF)
+
+In config C the matcher receives roll, pitch, heading **and** height from the ESKF state instead of the truth, so
+nothing from the truth is used after the GNSS cut. Median over 5 seeds (median / p90 / max / final):
+
+| Camera | B (roll/pitch from truth) | **C (nothing from truth)** | Wrong fixes accepted (C) |
+|---|---|---|---|
+| Ideal | 1.7 / 3.1 / 6.6 / 4.0 m | **2.4 / 5.1 / 17.4 / 5.5 m** (max 11.8–26.9 m across seeds) | 0 (one 94 m wrong fix was rejected by the gate) |
+| Realistic | 1.9 / 3.9 / 11.0 / 4.1 m | **2.6 / 5.2 / 13.9 / 5.5 m** (max 11.6–23.3 m) | 0 |
+
+Why C is worse: the ESKF tilt error (0.6–0.7° median, 3.2° max) moves the matched ground point by about 1 m at
+80 m, and the fix covariance was calibrated with truth roll/pitch, so it is too tight for C (correct fixes get
+gated, NEES rises from about 7 to 13). Next step: recalibrate it before the cut with the ESKF attitude.
+Command: `experiments/s2_sim_eskf_fusion.py run --config C ...`; details in [s2-results.md](s2-results.md).
+
+## Blind dry run: a route the code had never seen (frozen code, nothing tuned)
+
+Before handing this over I recorded a new route, `wufeng_north_120m` (120 m high, 12 m/s, 4.8 km; the
+development flight was 80 m and 8 m/s), and ran the code exactly as pushed in commit `629af5c`, in a separate
+checkout, 5 seeds, ideal camera, our filter. Scored by our code and by Dustin's scorer (same medians):
+
+| Seed | Median | Max | Final | Fixes used | Wrong fixes used | Within 3 sigma (Dustin's scorer) | Dead reckoning median / final |
+|---|---|---|---|---|---|---|---|
+| 0 | 2.8 m | 12.1 m | 3.5 m | 303 | 0 | 70 % | 22.7 / 82.6 m |
+| 1 | 1.6 m | 4.9 m | 3.3 m | 351 | 0 | 80 % | 7.0 / 25.2 m |
+| 2 | 1.8 m | 5.2 m | 2.4 m | 346 | 0 | 80 % | 29.8 / 159.3 m |
+| 3 | 2.1 m | 4.9 m | 2.4 m | 352 | 0 | 80 % | 14.6 / 62.4 m |
+| 4 | 2.1 m | 5.5 m | 4.0 m | 360 | 0 | 70 % | 42.1 / 146.5 m |
+
+It holds on the new route (median 1.6–2.8 m, no wrong fix, 0 % hazardous), **but the stated uncertainty is
+clearly too small here: the error is inside 3 sigma only 70–80 % of the time.** That is the main thing to fix.
+
 ## Three checks that a cheating system would fail (seed 0, our filter, ideal camera)
 
 | Check | Median / max error | Fixes accepted | What it shows |
@@ -104,12 +136,15 @@ What to check:
 ## Limits you should hold me to
 
 1. **Only one recording so far, and two changes were made after looking at it** (odometry template in turns, and a
-   barometer-scale state in the filter). So this is **not** a held-out test yet: that is what your secret flight is for.
-2. **Roll and pitch come from the truth** inside the matcher (an AHRS would give them from gravity, with small
-   errors). Heading uses truth + simulated drift (constant N(0, 2°) + random walk 0.1°/√s).
+   barometer-scale state in the filter). The blind dry run on `wufeng_north_120m` (above) is a first held-out
+   check by me; your secret flight is the real one.
+2. **In our filter (and in ESKF config B) roll and pitch come from the truth** inside the matcher (stand-in for an
+   AHRS) and the heading is truth + simulated drift (constant N(0, 2°) + random walk 0.1°/√s). **Config C removes
+   this**: everything comes from Alessandro's ESKF, and the median goes from 1.7 to 2.4 m.
 3. **Pre-cut GNSS is simulated** (truth + 1.5 m noise): the recorder wrote only 7 GNSS rows (`gnss.csv` stops at
-   t = 6.8 s). Dan, this looks like a recorder bug.
-4. **The stated uncertainty is too small**: the true error is inside our 3-sigma only 91–97.5 % of the time.
+   t = 6.8 s; 2 rows on the second flight). Dan, this looks like a recorder bug.
+4. **The stated uncertainty is too small**: the true error is inside our 3-sigma only 91–97.5 % of the time on the
+   development flight and **70–80 %** on the blind route. Do not use our sigma as an integrity bound yet.
 5. **Fixes are much easier here than on real photos**: 83 % of attempts succeed in simulation versus about 30 % on
    real DJI photos (Tuniu, `docs/research/tuniu-step1-results.md` on `research/offline-nav-evidence`).
 6. **The comparison with Dustin's navigator is not fully like-for-like**: even at his 300 m spacing ours stays

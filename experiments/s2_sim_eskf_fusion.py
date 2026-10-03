@@ -21,6 +21,8 @@ Configurations:
       (outputs/s1_sim/calibration.json fix_sd_m), his 99 % Mahalanobis gate. Fixes are computed LIVE with the
       ESKF's own prior (window centre), sigma (window size), heading and altitude via s1_sim_map_fix.fix_at.
   (No exploratory variant: the brief allowed one only if B rejected most correct fixes; B accepted 506 of 507.)
+  C   B, but the matcher gets the ESKF's FULL attitude (roll, pitch, heading) and height: nothing from truth is used
+      after the cut (in B roll/pitch come from the truth quaternion, S1's AHRS stand-in).
 Randomness: the ESKF and the fixes are deterministic given the inputs; the only random input is the SIMULATED pre-cut
 GNSS noise. Seed 0 = S1's series exactly (load_recording); seeds 1-4 redraw N(0, 1.5 m) per axis at the same times.
 
@@ -88,8 +90,9 @@ FIX_GATE = 0.99          # his gate for camera updates
 FIX_EVERY = 5            # recorded images (5 Hz) -> 1 Hz, as S1
 HEIGHT_LEARN_S = 10.0    # his 2 s at 25 Hz (50 pairs) -> 10 s at 5 Hz (50 pairs)
 WRONG_M = 10.0           # a fix farther than this from truth is "wrong" (S1 convention)
-CONFIGS = {"A": dict(fixes=False), "B": dict(fixes=True)}
-LABELS = {"A": "A: Alessandro ESKF alone", "B": "B: ESKF + our map fixes (his 99 % gate)"}
+CONFIGS = {"A": dict(fixes=False), "B": dict(fixes=True, eskf_tilt=False), "C": dict(fixes=True, eskf_tilt=True)}
+LABELS = {"A": "A: Alessandro ESKF alone", "B": "B: ESKF + our map fixes (his 99 % gate)",
+          "C": "C: as B, matcher attitude + height from the ESKF (no truth after the cut)"}
 
 
 def s1():
@@ -284,10 +287,12 @@ def run(config: str, seed: int = 0, camera: str = "ideal") -> dict:
                 prior = f.p[:2].copy()
                 c0 = time.perf_counter()
                 fx = S1.fix_at(j, prior, sig, compass(f.R), float(f.p[2]), recording=str(REC), route=str(ROUTE),
-                               cam_kind=camera)
+                               cam_kind=camera, R_body_to_enu=f.R.as_matrix() if spec["eskf_tilt"] else None)
                 fix_calls_s += time.perf_counter() - c0
                 row = dict(image=j, t_s=tj, dist_since_cut_m=float(rec.travelled[j] - rec.travelled[rec.cut]),
                            prior_err_m=float(np.hypot(*(prior - tr[:2]))), prior_sigma_m=sig,
+                           tilt_err_deg=float(np.degrees(np.arccos(np.clip(
+                               f.R.as_matrix()[:, 2] @ S1.r_enu_body(rec.q[j])[:, 2], -1.0, 1.0)))),
                            heading_err_deg=float(S1.wrap180(compass(f.R) - S1.heading_of(S1.r_enu_body(rec.q[j])))))
                 if fx is None:
                     row.update(status="nofix")

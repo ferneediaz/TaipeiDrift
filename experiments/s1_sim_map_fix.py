@@ -245,15 +245,19 @@ def load_image(rec: Recording, i: int, cam_kind: str) -> np.ndarray:
     return img
 
 
-def attitude(rec: Recording, i: int, heading_deg: float) -> np.ndarray:
-    """Camera(OpenCV) -> ENU: truth roll/pitch (AHRS stand-in) with the estimator's heading."""
+def attitude(rec: Recording, i: int, heading_deg: float, R_body_to_enu=None) -> np.ndarray:
+    """Camera(OpenCV) -> ENU: truth roll/pitch (AHRS stand-in) with the estimator's heading.
+    R_body_to_enu (optional, 3x3 body FLU -> ENU): an estimator's full attitude, used as is (no truth)."""
+    if R_body_to_enu is not None:
+        return np.asarray(R_body_to_enu, float) @ R_BODY_CV
     R_true = r_enu_body(rec.q[i])
     R_used = rz_up(-float(wrap180(heading_deg - heading_of(R_true)))) @ R_true
     return R_used @ R_BODY_CV
 
 
-def make_query(rec: Recording, i: int, heading_deg: float, height_m: float, cam_kind: str) -> dict:
-    R = attitude(rec, i, heading_deg)
+def make_query(rec: Recording, i: int, heading_deg: float, height_m: float, cam_kind: str,
+               R_body_to_enu=None) -> dict:
+    R = attitude(rec, i, heading_deg, R_body_to_enu)
     q = G.rectify(load_image(rec, i, cam_kind), 1, camera(rec), R, height_m, RES, far_m=1e3)
     q["height_used"] = height_m
     q["fwd"] = np.array([math.sin(math.radians(heading_deg)), math.cos(math.radians(heading_deg))])
@@ -436,7 +440,8 @@ def calibration(cam_kind: str = "ideal") -> dict:
 
 
 def fix_at(image_index: int, prior_en, sigma_m: float, heading_deg: float, height_m: float,
-           recording: str = str(REC_DEFAULT), route: str = str(ROUTE_DEFAULT), cam_kind: str = "ideal"):
+           recording: str = str(REC_DEFAULT), route: str = str(ROUTE_DEFAULT), cam_kind: str = "ideal",
+           R_body_to_enu=None):
     """Camera-to-map fix for one recorded image (cam0 row of images.csv), for an external filter.
 
     prior_en: filter estimate, ENU metres from the route origin (= the recording's truth frame).
@@ -452,7 +457,7 @@ def fix_at(image_index: int, prior_en, sigma_m: float, heading_deg: float, heigh
     off = np.array(cal.get("map_offset_m", (0.0, 0.0)))
     sd = float(cal.get("fix_sd_m", 3.0))
     half = min(WIN_MAX_M, max(WIN_MIN_M, WIN_SIGMA * float(sigma_m)))
-    q = make_query(rec, int(image_index), float(heading_deg), float(height_m), cam_kind)
+    q = make_query(rec, int(image_index), float(heading_deg), float(height_m), cam_kind, R_body_to_enu)
     centre = np.asarray(prior_en, float) + np.array(rec.origin) + off
     t0 = time.perf_counter()
     fx = consensus_fix(load_map(), q, centre, half)
