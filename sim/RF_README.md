@@ -1,6 +1,6 @@
 # Finding the drone's position from ships' radio (AIS), without GPS
 
-In the `strait` world, three warships transmit AIS radio. The drone has no GPS. It listens to the ships and works out where it is in two ways:
+In the `strait` world, three warships transmit AIS radio. The drone's GPS is cut 20 s into the flight. It listens to the ships and works out where it is in two ways:
 
 1. **From bearings:** the direction each signal comes from. This is the navigator, `nodes/rf_nav.py`, good to tens of metres.
 2. **From signal strength (RSSI):** how strong each signal is. This is the live map, `nodes/rssi_map.py`, good to a few hundred metres. It is for watching only.
@@ -11,18 +11,18 @@ This document explains the radio, what the drone measures, the math of both meth
 
 ```bash
 sim/run.sh                                                        # on the host: start, open the browser
-docker compose exec sim bash -ic "python3 sim/scripts/check_rf_nav.py 300"   # score the bearing navigator
+docker compose exec sim bash -ic "python3 sim/scripts/check_rf_nav.py 300"   # score the navigators
 docker compose exec sim bash -ic "python3 sim/scripts/check_rf.py"           # check the radio model, no sim needed
 ```
 
-`sim/run.sh` starts the container, launches the `strait` world without GPS (`gps:=false`) with a demo flight, and opens http://localhost:6080. The browser desktop shows:
+`sim/run.sh` starts the container, launches the `strait` world with a demo flight (GPS first, cut after 20 s; `sim/run.sh strait gps:=false` for no GPS at all), and opens http://localhost:6080. The bearing fix is also fused into the ESKF estimator (`/nav_rf/odom`); see the sim README, "The ESKF with the ships' fix". The browser desktop shows:
 
 | Where | What |
 |---|---|
 | Gazebo window, main view | the drone from behind (3rd person) |
 | Gazebo window, right-hand panels | overview of the ships (red ball = drone), the drone's down camera |
 | Top right | the RSSI map: where the drone could be from signal strength alone |
-| Bottom right | the sensor monitor: GPS "no fix", the bearing estimate and its error, each ship's RSSI and bearing |
+| Bottom right | the sensor monitor: the NAVIGATION table (RF only, ESKF, ESKF + RF, each against the truth), the sensors, each ship's RSSI and bearing |
 
 ## 1. The radio: AIS
 
@@ -190,5 +190,5 @@ One snapshot from the current triangle of ships, simulated 400 times:
 | `nodes/rf_nav.py` | position from bearings: `/rf_nav/odom` |
 | `nodes/rssi_map.py` | the live RSSI map |
 | `scripts/check_rf.py` | checks the radio model and prints the link budget against range |
-| `scripts/check_rf_nav.py` | scores `rf_nav` against ground truth and saves a plot to `data/sim/rf_nav/` |
+| `scripts/check_rf_nav.py` | scores `rf_nav` and both ESKFs against ground truth and saves a plot to `data/sim/rf_nav/` |
 | `run.sh` | starts everything and opens the browser |

@@ -3,9 +3,11 @@
 #
 #   sim/run.sh [WORLD] [LAUNCH_ARG ...]
 #
-#   sim/run.sh                          the strait world (warships, AIS), no GPS, demo flight: the default
+#   sim/run.sh                          the strait world (warships, AIS), demo flight: the default. GNSS is cut
+#                                       after its first fix (gnss_cutoff_s, default in sim.launch.py), then the
+#                                       estimators navigate on the ships
 #   sim/run.sh islands                  the islands world, demo flight, with GPS
-#   sim/run.sh strait gps:=true         any extra arguments go to sim.launch.py
+#   sim/run.sh strait gps:=false        any extra arguments go to sim.launch.py (here: no GNSS at all)
 #   PORT=6081 sim/run.sh                the browser desktop on another port, if 6080 is taken
 #
 # Builds the container the first time (about 10 minutes; after changing sim/docker/, rebuild with
@@ -20,8 +22,7 @@ WORLD=${1:-strait}
 [ $# -gt 0 ] && shift
 export PORT=${PORT:-6080}
 ARGS=("world:=$WORLD" "demo:=true" "cam_res:=512")
-[ "$WORLD" = strait ] && ARGS+=("gps:=false")   # the strait run navigates on the ships, without GNSS
-ARGS+=("$@")                                    # later arguments win: sim/run.sh strait gps:=true
+ARGS+=("$@")                                    # later arguments win: sim/run.sh strait gps:=false
 URL="http://localhost:$PORT"
 
 say() { echo "$(date '+%H:%M:%S') $*"; }
