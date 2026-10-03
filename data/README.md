@@ -41,3 +41,11 @@ Datasets live in `data/raw/` and `data/processed/` and are not committed. Keep d
 - A strip at 23.90 to 24.20 N, 120 to 121 E: from the Taiwan Strait across the coast into the mountains
 - Fetched automatically on the first run of `python experiments/c_terrain_matching.py`
 - Used only by the earlier experiments in `docs/experiments.md`.
+
+## Tuniu River flights (`data/raw/tuniu_tw_1`, `data/raw/tuniu_tw_2`)
+
+- Source: OpenDroneMap's example datasets ([ODMdata](https://github.com/OpenDroneMap/ODMdata)), `tuniu_tw_1` and `tuniu_tw_2`, Google Drive links in that list; photos by Yu-Huang Wang ([forum post](https://community.opendronemap.org/t/2019-04-11-tuniu-river-toufeng-miaoli-county-taiwan/3292)). **No licence stated**: use for testing, do not redistribute the photos or images made from them.
+- `tuniu_tw_1`: DJI Phantom 4 RTK, 2019-04-11, 271 photos (2.1 GB) and the RTK `.MRK` log. Unzip so that the photos are in `data/raw/tuniu_tw_1/20190411_Miaoli_Toufeng_Tuniu-River_5.75K/100_0005/`, or set `TUNIU_TW1` to the folder. Export: `python experiments/x1_tuniu_export.py`.
+- `tuniu_tw_2`: same river, 2019-09-16, 297 photos (2.4 GB) with RTK. Input of the OpenDroneMap 3D model (digital twin, 3D clip).
+- The map (OpenAerialMap 2019-12-12, CC BY 4.0) and the terrain (Copernicus GLO-30) are fetched by `python experiments/x2_tuniu_map.py fetch`.
+- How they are used: [README.md](../README.md#the-data-what-is-real-what-is-simulated).
