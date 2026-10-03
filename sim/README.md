@@ -192,11 +192,53 @@ Hills from the Copernicus DEM are a later step.
 - **Location:** open water in the Taiwan Strait between Penghu and Taiwan (23.65 N, 119.85 E), so GPS reports real coordinates there. GPS altitude is above the sea.
 - **Heights:** z = 0 is the helipad top, 4 m above the sea. The demo's 40 m is above the helipad, so 44 m above the water.
 
-The water does not move, so it gives a camera slightly more to hold on to than real waves would. Waves, wind and the GNSS cut belong to the scenario step. `make_islands.py --seed` gives different islands; `layout.json` in the generated model lists the helipads for scripts.
+The water does not move, so it gives a camera slightly more to hold on to than real waves would. Waves, wind and the GNSS cut belong to the scenario step. `make_islands.py --seed` gives different islands; `layout.json` in the generated model lists the helipads, houses, lighthouse and trees for scripts.
+
+**Topographic map.** `maps/` holds a map of this world and its elevation grid:
+
+- `islands_topo.png` and `islands_topo.pdf`: contours every 1 m on land and every 2 m under water, the coastline, helipads, houses, trees, the lighthouse, the demo route, a 100 m grid in world metres, and latitude and longitude on the edges.
+- `islands_dem.tif`: elevation in metres above the sea (negative is depth), float32, 1 m per pixel, top is north. `islands_dem.json` says where it lies in world metres and in latitude and longitude. This is the map a GNSS-denied navigator can match against.
+
+Heights on the map are above the sea; world z is that minus 4 m. After changing the islands, redraw it in the container with `python3 sim/scripts/make_topo_map.py`.
+
+## Record data in the Mid-Air format
+
+`nodes/record_midair.py` saves a flight in the files and layout of the [Mid-Air dataset](https://midair.ulg.ac.be/data_organization.html), so code written for Mid-Air reads our world's flights unchanged:
+
+```
+data/sim/<world>/sunny/
+  color_down/trajectory_0000/000000.JPEG ...   down camera, 1024 x 1024, 25 Hz
+  sensor_records.hdf5                         per trajectory: camera_data, groundtruth, imu, gps (as Mid-Air)
+```
+
+- **Camera:** JPEG, as Mid-Air's colour images; Mid-Air uses PNG only for depth, disparity, segmentation and normals, which we do not record.
+- **Rates and rows:** frame j goes with row 4j of the 100 Hz ground truth and IMU, and row j // 25 of the 1 Hz GPS. Quaternions are w, x, y, z; axes are north, east, down.
+- **Turn rates follow the Mid-Air files, not their documentation:** the gyroscope and the true angular velocity are around the world axes, the accelerometer is in the drone's axes (forward, right, down). See `docs/findings.md`, section 2.2. Code written for Mid-Air therefore works on these recordings unchanged.
+- **Look up one picture:** `python3 sim/scripts/frame_info.py data/sim/islands/sunny/color_down/trajectory_0000/000123.JPEG` prints every sensor value recorded with it.
+- **Differences from Mid-Air:** every trajectory uses the world origin (helipad A), not its own start point, so all flights share one map frame. GPS DOP values are fixed, since no satellites are simulated. Barometer readings are added under `barometer/pressure`.
+- **Every frame is kept:** the recorder pauses the simulation and steps it 40 ms at a time, waiting for each frame. A CPU renders the camera slower than real time, so without this most frames would be skipped. It takes the pictures and steps the simulation through Gazebo's own transport, not ROS: over ROS a 3 MB picture could wait about 3 s whenever a piece of it was lost. Recording runs at about half real time.
+- **Check a recording:** `python3 sim/scripts/check_recording.py data/sim/islands/sunny` compares every sensor with the ground truth and the pictures with the map, and prints PASS or FAIL for each.
+
+To record a set of flights in one go, run on the host (each flight restarts the simulator, takes off from helipad A, and records one pass of its route):
+
+```bash
+sim/scripts/record_islands_set.sh "pads 40 0"                  # one round trip, pad A to B and back at 40 m, about 10 minutes
+sim/scripts/record_islands_set.sh                              # survey at 40 and 80 m, round trips at 40, 60, 80 and 100 m, about 2 hours
+```
+
+Or by hand: start the world without the window, start a flight, then record:
+
+```bash
+docker compose exec -d sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=islands gui:=false > /tmp/sim.log 2>&1"
+docker compose exec -d sim bash -ic "python3 sim/nodes/demo_flight.py --world islands --route survey > /tmp/demo.log 2>&1"
+docker compose exec sim bash -ic "python3 sim/nodes/record_midair.py --world islands --duration 600"
+```
+
+`--route pads` flies between the helipads, and `--route survey` flies lines over both islands. Each run of the recorder adds the next `trajectory_XXXX`. Wait until the drone has climbed (about 20 s) before recording. Sizes: about 45 kB per frame over open sea and about 150 kB over land, so roughly 0.5 GB for a flight from pad to pad and back and 3 GB for a full survey. `data/sim/` is not committed.
 
 ## Frames
 
-Gazebo and ROS use ENU (x east, y north, z up) and a body frame that is forward, left, up. Mid-Air and `docs/PLAN.md` use NED. Convert when exporting recordings to the shared format.
+Gazebo and ROS use ENU (x east, y north, z up) and a body frame that is forward, left, up. Mid-Air and `docs/PLAN.md` use NED. The live ROS topics are in ENU; `record_midair.py` converts to NED when it writes a recording.
 
 ## Files
 
@@ -215,10 +257,16 @@ nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift and attitud
 nodes/gnss_gate.py          simulation-time GNSS cutoff
 nodes/recorder.py           common replay-format recorder
 nodes/sensor_monitor.py     live sensor values in the terminal
-nodes/demo_flight.py        demo flights (circles, or island to island) and the chase camera
+nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
+nodes/record_midair.py      records a flight in the Mid-Air dataset format
+scripts/record_islands_set.sh  records a set of flights over the islands world
+scripts/frame_info.py       prints the sensor values recorded with one picture
+scripts/check_recording.py  checks a recording: shapes, files, sensors against the truth, pictures against the map
 scripts/make_ground.py      ground texture
 scripts/make_trees.py       3D trees
 scripts/make_islands.py     islands world scenery
+scripts/make_topo_map.py    topographic map and elevation grid of the islands world
+maps/                       the islands map (PNG, PDF) and elevation grid (TIFF + JSON)
 scripts/check_sensors.py    checks rates, frames and camera intrinsics
 scripts/smoke_flight.py     short test flight, saves one down-camera frame
 scripts/t_scenario.py       60 m GNSS-cut flight scenario
