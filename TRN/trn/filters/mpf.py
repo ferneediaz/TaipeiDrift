@@ -170,12 +170,24 @@ class MarginalizedPF(NavFilter):
             wp = self._w()
             beta = wp @ pg                                   # posterior P(ground echo present) per beam
             kcount = np.isfinite(ranges).sum(axis=1)
-            for b in range(B):
-                if beta[b] > 0.5 and kcount[b] > 0:
-                    rr = ranges[b][np.isfinite(ranges[b])]
-                    rsel = rr[np.argmin(np.abs(rr - rbar[b]))]
-                    nis_val = (rsel - rbar[b]) ** 2 / (sbar2[b] + rvar[b])
-                    break
+            dc_ = self.fc["divergence"]
+            if dc_.get("proposed_statistic", "ground_posterior") == "near_last_echo":
+                # filter-independent check: last echo near the predicted ground, canopy-inclusive sigma,
+                # so a confidently wrong filter cannot explain the mismatch away; far cloud echoes excluded
+                s2 = self.lc["range_sigma_m"] ** 2 + self.fc["map_sigma_m"] ** 2
+                for b in range(B):
+                    if kcount[b] > 0:
+                        rl = ranges[b][np.isfinite(ranges[b])][-1]
+                        if abs(rl - rbar[b]) < dc_["near_window_m"]:
+                            nis_val = (rl - rbar[b]) ** 2 / (s2 + rvar[b])
+                            break
+            else:
+                for b in range(B):
+                    if beta[b] > 0.5 and kcount[b] > 0:
+                        rr = ranges[b][np.isfinite(ranges[b])]
+                        rsel = rr[np.argmin(np.abs(rr - rbar[b]))]
+                        nis_val = (rsel - rbar[b]) ** 2 / (sbar2[b] + rvar[b])
+                        break
             spread = float(np.sqrt(np.sum(wp @ (self.xi[:, :2] - wp @ self.xi[:, :2]) ** 2)))
             if vc["adapt"] and spread < vc["adapt_max_spread_m"]:
                 a = vc["adapt_alpha"]
@@ -187,6 +199,12 @@ class MarginalizedPF(NavFilter):
                 self.pvis = float(np.clip((1 - a) * self.pvis + a * pv_obs, lo, hi))
                 lo, hi = vc["short_rate_bounds"]
                 self.lam_s = float(np.clip((1 - a) * self.lam_s + a * ls_obs, lo, hi))
+            elif vc["adapt"]:
+                # not converged: relax towards the prior so a past cloud blackout cannot keep the
+                # ground hypothesis switched off (prevents re-acquisition failure)
+                r = vc["relax_alpha"]
+                self.pvis = (1 - r) * self.pvis + r * float(vc["p_visible"])
+                self.lam_s = (1 - r) * self.lam_s + r * float(vc["short_rate"])
         # barometer (linear measurement in xi_U and baro bias)
         bc = self.fc["baro_rate_hz"]
         if self.baro_enabled and np.isfinite(m.baro) and m.t - self.last_baro >= 1.0 / bc - 1e-9:
@@ -221,10 +239,17 @@ class MarginalizedPF(NavFilter):
             self.xl = self.xl[idx]
             self.logw = np.zeros(self.N)
             roughen(self.xi, self.fc["roughening_K"], self.rng)
-            h = float(self.fc["linear_roughening_h"])
-            if h > 0:
+            lr = self.fc["linear_roughening"]
+            h = float(lr["h"])
+            if h > 0 and lr["mode"] == "chol_p":
                 Lp = np.linalg.cholesky(self.P + 1e-12 * np.eye(self.P.shape[0]))
                 self.xl += h * self.rng.standard_normal(self.xl.shape) @ Lp.T
+            elif h > 0 and lr["mode"] == "liu_west":
+                # Liu & West (2001) kernel shrinkage: preserves the ensemble mean and covariance (no random walk)
+                mu = self.xl.mean(axis=0)
+                C = np.cov(self.xl.T) + 1e-12 * np.eye(self.xl.shape[1])
+                a = np.sqrt(1.0 - h * h)
+                self.xl = a * self.xl + (1 - a) * mu + h * self.rng.standard_normal(self.xl.shape) @ np.linalg.cholesky(C).T
         return self._estimate(m, neff, reinit)
 
     def _temper(self, ll: np.ndarray) -> float:

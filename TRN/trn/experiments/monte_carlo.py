@@ -11,12 +11,17 @@ progress.log.
 """
 from __future__ import annotations
 
+import os
+
+# one BLAS/OpenMP thread per worker process (set before numpy is imported; inherited by spawned workers)
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "MKL_NUM_THREADS", "NUMBA_NUM_THREADS"):
+    os.environ.setdefault(_v, "1")
+
 import argparse
 import csv
 import itertools
 import json
 import multiprocessing as mp
-import os
 import time
 from pathlib import Path
 
