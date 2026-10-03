@@ -1,7 +1,12 @@
 """Navigation dashboard: the terminal monitor's information in a window, with tabs.
 
-Started by `sim.launch.py` with demo:=true (in the desktop's lower-right corner), or by hand while the simulator runs:
+Started by `sim.launch.py` with demo:=true, or by hand while the simulator runs:
     python3 sim/nodes/nav_dashboard.py --world strait [--headline eskf_rf|rf|eskf]
+
+Until the first ship is heard there is no RF navigation display, and the window fills the whole right side of the
+desktop, its Overview with the live sensor readings and the AIS receiver's state below the rows. When a ship's
+bearing arrives (the ships start transmitting at ais.start_after_s, config/rf.yaml) the RF navigation display opens
+in the top right (nodes/aoa_map.py) and this window shrinks to the lower-right corner under it.
 
 Tabs
     Overview      GNSS state; each estimator's position error against the truth, its own 2σ and whether the error is
@@ -23,7 +28,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from sensor_monitor import ESTIMATORS, FAIR_M, GOOD_M, M_PER_DEG_LAT, Monitor, quat_yaw, stamp
 
-WINDOW = (720, 545)       # width and height, in the browser desktop's lower-right corner
+WIDTH = 720               # the RF display's width (aoa_map.WINDOW), in the browser desktop's lower-right corner
+RF_HEIGHT = 470           # the RF display's height above it: the dashboard takes the rest of the desktop's height
+                          # (before the RF display opens: all of it)
 REFRESH_MS = 250          # screen refresh, wall clock
 ROW_COLUMNS = (118, 82, 100, 76, 92, 120)  # Overview rows: name, error, bar, 2σ, bound, heading and height (px)
 PLACE_AFTER_MS = (300, 1500, 4000)  # place the window again after it appears: the window manager may move it
@@ -129,16 +136,41 @@ class Dashboard(QtWidgets.QWidget):
         self.feed, self.headline = feed, headline
         self.setWindowTitle("Navigation dashboard")
         self.setStyleSheet(STYLE)
-        tabs = QtWidgets.QTabWidget()
+        self.tabs = tabs = QtWidgets.QTabWidget()
         tabs.addTab(self.overview_tab(), "Overview")
         tabs.addTab(self.table_tab(), "Navigation")
-        tabs.addTab(self.sensors_tab(), "Sensors")
-        tabs.addTab(self.ais_tab(), "AIS")
+        self.repeated = [tabs.addTab(self.sensors_tab(), "Sensors"),  # on the Overview too while the window is tall
+                         tabs.addTab(self.ais_tab(), "AIS")]
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
         lay.addWidget(tabs)
+        self.tall = None          # True while the window fills the right side (no ship heard yet)
+        self.set_tall(True)
         self.timer = QtCore.QTimer(self, timeout=self.tick)
         self.timer.start(REFRESH_MS)
+
+    # --- size -----------------------------------------------------------------------------------------------
+    def set_tall(self, tall):
+        """The whole right side before the RF display opens; the lower-right corner, under it, after."""
+        if tall == self.tall:
+            return
+        self.tall = tall
+        self.extra.setVisible(tall)
+        for i in self.repeated:  # a tab only for what the Overview does not show
+            self.tabs.setTabVisible(i, not tall)
+        if tall and self.tabs.currentIndex() in self.repeated:
+            self.tabs.setCurrentIndex(0)
+        screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        self.setMaximumSize(screen.width(), screen.height())  # a maximise must not ask Qt for an enormous canvas
+        for ms in (0,) + PLACE_AFTER_MS:  # again later: the window manager may move it after a resize
+            QtCore.QTimer.singleShot(ms, lambda: self.place(screen))
+
+    def place(self, screen):
+        frame_h = self.frameGeometry().height() - self.height()   # the title bar the window manager adds
+        height = screen.height() - frame_h - (0 if self.tall else RF_HEIGHT + frame_h)
+        self.resize(WIDTH, height)
+        frame = self.frameGeometry()
+        self.move(screen.right() - frame.width() + 1, screen.bottom() - frame.height() + 1)
 
     # --- tabs -----------------------------------------------------------------------------------------------
     def overview_tab(self):
@@ -182,6 +214,15 @@ class Dashboard(QtWidgets.QWidget):
         hl.addWidget(label("SENSORS", "caption"))
         hl.addLayout(chips)
         lay.addWidget(holder)
+        # shown only while the window is tall, before the RF navigation display opens
+        self.ais_state = label("", "mid")
+        self.live = QtWidgets.QLabel()
+        self.live.setTextFormat(QtCore.Qt.RichText)
+        self.live.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+        self.live.setStyleSheet("font-size: 13px;")
+        self.extra = card(label("AIS RECEIVER", "caption"), self.ais_state, label("", "caption"),
+                          label("LIVE SENSORS", "caption"), self.live, stretch=True)
+        lay.addWidget(self.extra, 4)
         return page
 
     def table_tab(self):
@@ -227,6 +268,7 @@ class Dashboard(QtWidgets.QWidget):
         for _ in range(400):  # drain the ROS queue: the IMU alone is 100 messages per simulated second
             rclpy.spin_once(self.feed, timeout_sec=0.0)
         f = self.feed
+        self.set_tall(not any(r["det"] for r in f.rf.values()))
         self.update_banner()
         rows = self.navigation_rows()
         self.update_overview(rows)
@@ -355,12 +397,19 @@ class Dashboard(QtWidgets.QWidget):
             out.append(f"<b>GPS</b> <span style='color:{MUTED}'>({hz['gps']:.1f} Hz)</span><br>lat "
                        f"{f.gps.latitude:.6f} · lon {f.gps.longitude:.6f}{err}")
         else:
-            out.append(f"<b>GPS</b><br><span style='color:{RED}'>no fix (denied)</span>")
+            out.append(f"<b>GPS</b><br><span style='color:{RED}'>no fix (denied)</span>" if f.gnss_on is False else
+                       f"<b>GPS</b><br><span style='color:{MUTED}'>waiting for a fix</span>")
         if f.info:
             fp = f" · ground footprint {2 * tz:.0f} m" if tz and tz > 0 else ""  # 90° field of view
             out.append(f"<b>Down camera</b> <span style='color:{MUTED}'>({hz['cam']:.0f} fps)</span><br>"
                        f"{f.info.width}×{f.info.height} px{fp}")
-        self.sensors.setText("<br><br>".join(out) or "Waiting for the sensors…")
+        html = "<br><br>".join(out) or "Waiting for the sensors…"
+        self.sensors.setText(html)
+        if self.tall:
+            self.live.setText(html)
+            sent = sum(r["sent"] for r in f.rf.values())
+            self.ais_state.setText("Listening on 161.975 and 162.025 MHz · no ship heard yet" +
+                                   (f" ({sent} packets too weak to decode)" if sent else ""))
 
     def update_ais(self):
         f = self.feed
@@ -391,16 +440,7 @@ def main():
     rclpy.init(args=ros_args)
     app = QtWidgets.QApplication([])
     window = Dashboard(Feed(args.world), args.headline)
-    screen = app.primaryScreen().availableGeometry()
-    window.setMaximumSize(screen.width(), screen.height())  # a maximise must not ask Qt for an enormous canvas
-    window.resize(*WINDOW)
     window.show()
-
-    def place():  # the lower-right corner, once the window manager has added its frame
-        frame = window.frameGeometry()
-        window.move(screen.right() - frame.width() + 1, screen.bottom() - frame.height() + 1)
-    for ms in PLACE_AFTER_MS:
-        QtCore.QTimer.singleShot(ms, place)
     try:
         app.exec_()
     except KeyboardInterrupt:

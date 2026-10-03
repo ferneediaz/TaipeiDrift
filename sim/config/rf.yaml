@@ -18,6 +18,7 @@ ais:
   report_jitter: 0.1                    # +-10 % on the nominal reporting interval
   class_power_dbm: {A: 41.0, B: 33.0}   # 12.5 W and 2 W
   position_sigma_m: 3.0                 # error of the position a ship reports (its own GNSS), per axis
+  start_after_s: 20.0                   # sim time when the ships start transmitting (0: from the start)
 
 propagation:
   sea_reflection: -0.9         # calm sea, VHF, grazing angle

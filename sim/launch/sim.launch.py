@@ -14,12 +14,11 @@ stereo_baseline_m   right camera offset along body -Y, in metres
 wind                SPEED_MPS,FROM_DEG, for example 6,20: 6 m/s from the north-north-east, with gusts
 ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_traffic.py), runs the drone's
          AIS receiver and direction finder (nodes/rf_sensor.py) and the triangulation navigator (nodes/rf_nav.py),
-         adds a fixed overview camera, shown as a panel beside the chase view in the Gazebo window, and a red
-         beacon over the drone so the overview shows where it is;
+         and shows the drone's down camera floating over the top left of the chase view;
          default (auto): in the strait world only
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
-         the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera is then a panel
-         in the Gazebo window)
+         the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera then floats
+         over the Gazebo window)
          and the navigation dashboard (nodes/nav_dashboard.py) on the desktop
 monitor  with demo: window (default) opens the navigation dashboard; terminal opens the same information in a
          terminal (nodes/sensor_monitor.py)
@@ -102,10 +101,8 @@ def windy_world(world: Path, speed_mps: float, from_deg: float) -> Path:
     return out
 
 
-# The strait world's overview camera, shown as a panel in the Gazebo window (a gz topic, not bridged to ROS)
-OVERVIEW_TOPIC = "/views/overview"
-# Fixed camera high in the south, looking north over the triangle of ships and the drone's route
-OVERVIEW_POSE = (425.0, -1700.0, 1100.0, 0.0, 0.53, 1.5708)
+# Where the down camera floats over the Gazebo 3D view (x, y, width, height in pixels, from its top-left corner)
+INSET_DOWN = (10, 10, 230, 230)
 
 
 def df_antenna_sdf(rf_cfg: dict) -> list:
@@ -145,7 +142,7 @@ def df_antenna_sdf(rf_cfg: dict) -> list:
     return [ET.fromstring(v) for v in parts]
 
 
-def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: float = 0.30, views: bool = False,
+def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: float = 0.30,
               wind: bool = False, rf_cfg: dict = None) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
     if wind:
@@ -166,13 +163,6 @@ def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: 
         right.find("topic").text = "camera/down_right/image_raw"
         right.find("gz_frame_id").text = "camera_down_right"
         link.append(right)
-    if views:
-        # A red ball high above the drone, visual only, so the drone can be found in the overview, which is
-        # kilometres wide. The down camera looks the other way and never sees it.
-        link.append(ET.fromstring(
-            '<visual name="beacon"><pose>0 0 30 0 0 0</pose><geometry><sphere><radius>15</radius></sphere>'
-            '</geometry><material><ambient>1 0.1 0.1 1</ambient><diffuse>1 0.1 0.1 1</diffuse>'
-            '<emissive>0.6 0 0 1</emissive></material></visual>'))
     if rf_cfg:
         base = tree.find(".//link[@name='base_link']")
         for element in df_antenna_sdf(rf_cfg):
@@ -189,53 +179,34 @@ def geodetic_origin(world_path: Path):
                  ("latitude_deg", "longitude_deg", "elevation"))
 
 
-def overview_camera_sdf() -> Path:
-    """A fixed camera over the strait world, for the overview panel."""
-    path = Path("/tmp/taipeidrift_overview_camera.sdf")
-    path.write_text(f"""<?xml version="1.0"?>
-<sdf version="1.10">
-  <model name="overview_camera">
-    <static>true</static>
-    <link name="link">
-      <sensor name="overview" type="camera">
-        <topic>{OVERVIEW_TOPIC}</topic>
-        <update_rate>5</update_rate>
-        <always_on>true</always_on>
-        <camera>
-          <horizontal_fov>1.2</horizontal_fov>
-          <image><width>800</width><height>450</height></image>
-          <clip><near>1</near><far>20000</far></clip>
-        </camera>
-      </sensor>
-    </link>
-  </model>
-</sdf>
-""")
-    return path
-
-
 def views_gui_config() -> Path:
-    """The Gazebo window for the strait world: the 3rd-person chase view of the drone, with two panels beside it:
-    the overview of the ships and the drone's down camera (the desktop's top-right slot holds
-    the RF navigation display instead, nodes/aoa_map.py). The far clip is raised so ships kilometres away
-    are drawn (the default cuts them off)."""
+    """The Gazebo window for the strait world: the 3rd-person chase view of the drone, with the drone's down camera
+    floating over its top-left corner, like a game's minimap (the desktop's top-right slot holds the RF navigation
+    display, nodes/aoa_map.py). The far clip is raised so ships
+    kilometres away are drawn (the default cuts them off)."""
     text = (SIM / "config/gui.config").read_text()
     text = text.replace("<camera_pose>-6 0 6 0 0.5 0</camera_pose>",
                         "<camera_pose>-6 0 6 0 0.5 0</camera_pose>\n"
                         "  <camera_clip><near>0.25</near><far>30000</far></camera_clip>")
-    panel = lambda title, topic: f"""
+    def inset(title, topic, x, y, width, height):
+        return f"""
 <plugin filename="ImageDisplay" name="{title}">
   <gz-gui>
     <title>{title}</title>
-    <property type="bool" key="showTitleBar">true</property>
-    <property type="string" key="state">docked</property>
+    <property type="string" key="state">floating</property>
+    <property type="double" key="x">{x}</property>
+    <property type="double" key="y">{y}</property>
+    <property type="double" key="width">{width}</property>
+    <property type="double" key="height">{height}</property>
+    <property type="bool" key="showTitleBar">false</property>
+    <property type="string" key="cardBackground">#202020</property>
+    <property type="bool" key="resizable">false</property>
   </gz-gui>
   <topic>{topic}</topic>
   <topic_picker>false</topic_picker>
 </plugin>
 """
-    text += panel("Overview: ships and drone (red ball)", OVERVIEW_TOPIC) + panel("Drone view: down camera",
-                                                                                 "/camera/down/image_raw")
+    text += inset("Down camera", "/camera/down/image_raw", *INSET_DOWN)
     path = Path("/tmp/taipeidrift_gui_views.config")
     path.write_text(text)
     return path
@@ -366,7 +337,7 @@ def setup(context):
         except ValueError:
             sys.exit(f"wind must be SPEED_MPS,FROM_DEG (for example 6,20), not {wind!r}")
         world_file = windy_world(world, speed, from_deg)
-    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, views=ships, wind=world_file != world,
+    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, wind=world_file != world,
                       rf_cfg=yaml.safe_load(RF_CONFIG.read_text()) if ships else None)
     gui_config = views_gui_config() if ships else SIM / "config/gui.config"
     sim_time = {"use_sim_time": True}
@@ -473,10 +444,6 @@ def setup(context):
                             "-z", str(rf["sea_level_z"])])
             for ship in rf["ships"]
         ]
-        x, y, z, roll, pitch, yaw = OVERVIEW_POSE
-        actions.append(Node(package="ros_gz_sim", executable="create", output="screen", arguments=[
-            "-world", world.stem, "-file", str(overview_camera_sdf()), "-name", "overview_camera",
-            "-x", str(x), "-y", str(y), "-z", str(z), "-R", str(roll), "-P", str(pitch), "-Y", str(yaw)]))
         actions += [
             # set_pose's name holds the world, so it is bridged here rather than in config/bridge.yaml
             Node(package="ros_gz_bridge", executable="parameter_bridge", name="set_pose_bridge", output="screen",
@@ -500,7 +467,7 @@ def setup(context):
                                     *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else [])],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
-            # down camera is a panel in the Gazebo window and this slot shows the RF navigation display.
+            # down camera floats over the Gazebo window and this slot shows the RF navigation display.
             TimerAction(period=20.0, actions=[
                 ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem],
                                output="screen", respawn=True, respawn_delay=2.0) if ships else

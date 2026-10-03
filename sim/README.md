@@ -275,9 +275,9 @@ GNSS is available at the start and is cut `gnss_cutoff_s` (20) seconds after its
 
 The browser desktop shows:
 - **Gazebo window, main view:** the chase camera behind the drone.
-- **Gazebo window, right-hand panels:** an overview from a fixed camera high in the south, showing the islands and all three ships, and the drone's down camera. A red ball floats 30 m above the drone so it can be found in the overview. It is only a visual, and the down camera does not see it.
-- **Top right:** the RF navigation display (see [RF_README.md](RF_README.md), section 4).
-- **Bottom right:** the navigation dashboard (`nodes/nav_dashboard.py`): tabs Overview (GNSS state; each estimator's position error, 2σ bound and whether the error is within it, heading and height error; sensor health), Navigation, Sensors and AIS. `monitor:=terminal` shows the same information in a terminal instead (`nodes/sensor_monitor.py`).
+- **Gazebo window, top left:** the drone's down camera floats over the chase view, like a game's minimap (position and size: `INSET_DOWN` in `launch/sim.launch.py`).
+- **Top right:** the RF navigation display (see [RF_README.md](RF_README.md), section 4). It opens when the first ship is heard, about 20 s in, when the ships start transmitting.
+- **Bottom right:** the navigation dashboard (`nodes/nav_dashboard.py`; until the first ship is heard it fills the whole right side and adds the AIS receiver's state and the live sensor readings, so it hides the Sensors and AIS tabs until then): tabs Overview (GNSS state; each estimator's position error, 2σ bound and whether the error is within it, heading and height error; sensor health), Navigation, Sensors and AIS. `monitor:=terminal` shows the same information in a terminal instead (`nodes/sensor_monitor.py`).
 
 `worlds/strait.sdf` is the islands world with three warships at full size. The scenery is the same, and the `islands` world itself has no ships. Each ship patrols a box at one corner of a triangle around the drone's route, so the drone always hears them from three well-separated directions:
 
