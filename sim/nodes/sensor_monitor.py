@@ -6,7 +6,7 @@ Shows what the drone's sensors report, next to the ground truth, refreshed 5 tim
 Rates are measured in simulation time.
 
 At the top, NAVIGATION compares the position estimates that run on this flight, each against ground truth:
-    RF only    nodes/rf_nav.py: the ships' bearings (strait world)
+    RF (AoA)   nodes/rf_nav.py: the ships' angles of arrival and the gyro, in a Kalman filter (strait world)
     ESKF       nodes/eskf_ros_adapter.py: IMU + barometer + forward camera, GNSS until the cutoff
     ESKF + RF  the same ESKF, also fusing the RF position fix (strait world)
 """
@@ -34,9 +34,9 @@ BOLD, DIM, GREEN, RED, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[31m", "\0
 YELLOW, CYAN = "\033[33m", "\033[36m"
 # The estimates compared in NAVIGATION: key, odometry topic, status topic, name, what it uses, whose
 ESTIMATORS = [
-    ("rf", "/rf_nav/odom", None, "RF only", "ships' bearings + gyro", "rf_nav, Dan"),
-    ("eskf", "/nav/odom", "/nav/estimator_status", "ESKF", "IMU+baro+camera, GNSS", "Alessandro"),
-    ("eskf_rf", "/nav_rf/odom", "/nav_rf/estimator_status", "ESKF + RF", "the ESKF + the RF fix", "combined"),
+    ("rf", "/rf_nav/odom", None, "RF (AoA)", "AIS AoA + gyro"),
+    ("eskf", "/nav/odom", "/nav/estimator_status", "ESKF", "IMU + baro + camera"),
+    ("eskf_rf", "/nav_rf/odom", "/nav_rf/estimator_status", "ESKF + RF", "ESKF + AoA fix"),
 ]
 
 
@@ -70,7 +70,7 @@ class Estimate:
             c = self.counts.setdefault(ev.split("_")[0], [0, 0])
             c[0 if d["accepted"] else 1] += 1
             if d.get("reanchored"):
-                self.counts.setdefault("reset to RF", [0, 0])[0] += 1
+                self.counts.setdefault("re-anchor", [0, 0])[0] += 1
         elif ev == "visual_span":
             c = self.counts.setdefault("vision", [0, 0])
             c[0 if d.get("rotation_accepted") or d.get("direction_accepted") else 1] += 1
@@ -163,20 +163,20 @@ class Monitor(Node):
         if self.gnss_on is None:
             gnss = f"{DIM}GNSS gate not running{RESET}"
         elif self.gnss_on:
-            gnss = f"{GREEN}GNSS ON{RESET}"
+            gnss = f"{GREEN}GNSS AVAILABLE{RESET}"
         else:
-            since = (f" {self.sim_t - self.cut_t:.0f} s ago" if self.cut_t is not None
-                     else " before this monitor started (RMS counts from its start)")
-            gnss = f"{RED}GNSS CUT{since}{RESET}: the estimates are on their own"
+            since = (f"  T+{self.sim_t - self.cut_t:.0f} s" if self.cut_t is not None
+                     else "  (before monitor start; RMS from monitor start)")
+            gnss = f"{RED}GNSS DENIED{since}{RESET}"
         tp = self.truth.pose.pose.position
         tyaw = quat_yaw(self.truth.pose.pose.orientation)
         out = [f"{BOLD}NAVIGATION{RESET}  {gnss}",
-               f"  {DIM}error = how far the estimate is from the true position; bar: log scale, "
-               f"green < {GOOD_M:.0f} m, yellow < {FAIR_M:.0f} m, red beyond{RESET}",
-               f"  {DIM}{'estimate':<11}{'uses':<23}{'error now':>10}  {f'error 1m…{10 ** BAR_DECADES / 1000:.0f}km':<12} {'its 2σ':>7}"
-               f" {'RMS since cut':>14} {'height':>7} {'heading':>8}  fused (✓ used / ✗ rejected){RESET}"]
+               f"  {DIM}error vs sim truth · bar log 1 m…{10 ** BAR_DECADES / 1000:.0f} km: green < {GOOD_M:.0f} m, "
+               f"amber < {FAIR_M:.0f} m · 2σ green: within bound · ✓ accepted ✗ rejected{RESET}",
+               f"  {DIM}{'estimator':<10}{'sources':<21}{'error':>8}  {'':<12} {'2σ':>6} {'RMS denied':>11}"
+               f" {'height':>7} {'heading':>7}{RESET}"]
         errs = {}
-        for (key, _, _, name, uses, who), e in live:
+        for (key, _, _, name, uses), e in live:
             o = e.odom
             p, c = o.pose.pose.position, o.pose.covariance
             err = math.hypot(p.x - tp.x, p.y - tp.y)
@@ -184,27 +184,26 @@ class Monitor(Node):
             two_sigma = 2 * math.sqrt(max(c[0] + c[7], 0.0))
             if self.gnss_on is False:
                 e.sq, e.n, e.max = e.sq + err * err, e.n + 1, max(e.max, err)
-            rms = f"{math.sqrt(e.sq / e.n):7.1f} m" if e.n else "       —"
-            inside = GREEN if err <= two_sigma else RED  # the estimate is honest when the truth is inside its 2σ
+            rms = f"{math.sqrt(e.sq / e.n):.1f} m" if e.n else "—"
+            inside = GREEN if err <= two_sigma else RED  # within its own 2σ bound, or exceeded
             height = f"{p.z - tp.z:+6.1f}m" if key != "rf" else "     — "
             heading = (math.degrees(quat_yaw(o.pose.pose.orientation) - tyaw) + 180) % 360 - 180
-            fused = "  ".join(f"{src} {a}✓" + (f" {r}✗" if r else "") for src, (a, r) in e.counts.items())
+            fused = "  ".join(f"{src} {a}✓" + (f"{r}✗" if r else "") for src, (a, r) in e.counts.items())
             if key == "rf":  # rf_nav reports no status: count the bearings it was given
                 fused = f"bearings {sum(r['decoded'] for r in self.rf.values())}"
-            out.append(f"  {BOLD}{name:<11}{RESET}{uses:<23}{err:8.1f} m  {error_bar(err)} "
-                       f"{inside}{two_sigma:5.0f} m{RESET} {rms:>14} {height:>7} {heading:+7.1f}°  {DIM}{fused}{RESET}")
-            out.append(f"  {DIM}{'(' + who + ')':<11}{RESET}")
+            out.append(f"  {BOLD}{name:<10}{RESET}{uses:<21}{err:6.1f} m  {error_bar(err)} "
+                       f"{inside}{two_sigma:4.0f} m{RESET} {rms:>11} {height:>7} {heading:+6.1f}°")
+            out.append(f"  {'':<10}{DIM}{fused}{RESET}")  # its own line, so the table fits the window
         if self.gnss_on is False and "eskf_rf" in errs:
             mine = max(errs["eskf_rf"], 0.1)  # m; keeps the ratio finite when the error is near zero
             parts = []
-            for k, n in (("eskf", "the ESKF alone"), ("rf", "RF alone")):
+            for k, n in (("eskf", "ESKF"), ("rf", "RF (AoA)")):
                 if k in errs:
                     ratio = errs[k] / mine
-                    parts.append(f"{ratio:.1f}x closer than {n}" if ratio >= 1 else
-                                 f"{1 / ratio:.1f}x farther than {n}")
-            out.append(f"  {CYAN}→ ESKF + RF is {', '.join(parts)} right now{RESET}")
+                    parts.append(f"{ratio:.1f}x lower than {n}" if ratio >= 1 else f"{1 / ratio:.1f}x higher than {n}")
+            out.append(f"  {CYAN}ESKF + RF error: {', '.join(parts)}{RESET}")
         elif self.gnss_on:
-            out.append(f"  {DIM}→ with GNSS every estimate is near the truth; the difference shows after the cut{RESET}")
+            out.append(f"  {DIM}GNSS available: all estimators aided; the comparison starts at denial{RESET}")
         return out + [""]
 
     def on_rf_truth(self, m):
@@ -222,8 +221,8 @@ class Monitor(Node):
     def draw(self):
         out = [f"{BOLD}TaipeiDrift sensor monitor{RESET}   Ctrl+C to quit"]
         if self.sim_t is None:
-            out.append("waiting for the simulator (/clock)...")
-            print("\033[H\033[J" + "\n".join(out), flush=True)
+            out.append("Waiting for simulation clock (/clock)")
+            self.render(out)
             return
         rtf = (self.sim_t - self.sim0) / max(1e-6, time.time() - self.wall0)
         out.append(f"sim time {self.sim_t:8.1f} s    real-time factor {rtf:4.2f}\n")
@@ -266,7 +265,7 @@ class Monitor(Node):
             out.append(f"  lat {self.gps.latitude:11.6f}  lon {self.gps.longitude:11.6f}  alt {self.gps.altitude:7.1f} m")
             out.append(f"  as metres E {e:8.2f}   N {n:8.2f}{err}\n")
         else:
-            out.append(f"  {RED}no fix{RESET} (gps:=false, or no signal)\n")
+            out.append(f"  {RED}NO FIX{RESET} {DIM}(receiver off or denied){RESET}\n")
 
         out.append(f"{BOLD}DOWN CAMERA{RESET}")
         if self.info:
@@ -274,10 +273,10 @@ class Monitor(Node):
             ground = 2 * tz if tz and tz > 0 else None  # 90 deg FOV: footprint = 2 x height
             fp = f"   footprint {ground:6.1f} m  ({100 * ground / self.info.width:5.1f} cm/px)" if ground else ""
             out.append(f"  {self.info.width}x{self.info.height}  fx {self.info.k[0]:.0f}  "
-                       f"{ok}{r['cam']:5.1f} fps{RESET} (want 25){fp}")
+                       f"{ok}{r['cam']:5.1f} fps{RESET} (nominal 25){fp}")
 
         if self.rf and not self.rf_nav:
-            out.append(f"\n{BOLD}RF NAVIGATION{RESET} {DIM}waiting for bearings to three ships...{RESET}")
+            out.append(f"\n{BOLD}RF NAVIGATION{RESET} {DIM}acquiring: bearings to 3 ships needed for the first fix{RESET}")
 
         if self.rf:
             out.append(f"\n{BOLD}AIS RECEIVER{RESET} {DIM}(GMSK 9600 bit/s, 162 MHz; angle of arrival, error against truth){RESET}")
@@ -288,11 +287,18 @@ class Monitor(Node):
                     # the last decoded packet; its truth is the one sent at the same time
                     err = math.degrees((d["azimuth_body_rad"] - t["azimuth_body_rad"] + math.pi) % (2 * math.pi) - math.pi) \
                         if abs(d["t"] - t["t"]) < 1e-6 else None
-                    e = f"{err:+5.1f} deg" if err is not None else "  (old)  "
+                    e = f"{err:+5.1f} deg" if err is not None else " (stale) "
                     line += (f"\n    AoA {math.degrees(d['azimuth_body_rad']):+6.1f} deg from the nose"
                              f"  error {e} (sigma {math.degrees(d['azimuth_std_rad']):.1f})")
                 out.append(line)
-        print("\033[H\033[J" + "\n".join(out), flush=True)
+        self.render(out)
+
+    @staticmethod
+    def render(out):
+        """Clear the terminal and print the page, without blank lines: the bold section names separate the
+        sections, and the whole page fits the window."""
+        page = [line for line in "\n".join(out).split("\n") if line.strip()]
+        print("\033[H\033[J" + "\n".join(page), flush=True)
 
 
 def main():
