@@ -17,6 +17,7 @@ import json
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime, timedelta
 from dataclasses import replace
 from pathlib import Path
 
@@ -27,11 +28,13 @@ BASELINE_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = BASELINE_DIR.parent
 sys.path.insert(0, str(BASELINE_DIR))
 
-from src.data.sim_replay import SimReplayConfig, load_sim_flight, with_heading  # noqa: E402
+from src.data.camera_model import CameraModel  # noqa: E402
+from src.data.sim_replay import SimReplayConfig, load_sim_flight, with_camera, with_heading  # noqa: E402
 from src.estimation.camera_navigator import NavigatorConfig, calibrate, navigate  # noqa: E402
 from src.estimation.image_motion import shifts_for_flight  # noqa: E402
 from src.evaluation.navigation_metrics import integrity_summary, navigation_errors, summarize_navigation  # noqa: E402
-from src.sensors.heading import compass_heading  # noqa: E402
+from src.sensors.heading import compass_heading, sun_position  # noqa: E402
+from src.sensors.sun_sensor import SunSensorModel, sun_heading_readings  # noqa: E402
 
 _FLIGHTS: dict[str, object] = {}  # one loaded flight per worker process and map
 
@@ -45,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--workers", type=int, default=6)
     p.add_argument("--recording", help="another recorded flight, e.g. recordings/wufeng_south_80m")
     p.add_argument("--route", help="its route file, e.g. sim/scenarios/wufeng_south_80m.json")
+    p.add_argument("--camera", default="ideal", help="a camera from the config's cameras: ideal (the simulator's frames) or realistic")
     return p.parse_args()
 
 
@@ -55,34 +59,69 @@ def _path(cfg: dict, key: str) -> str:
 
 def flight_for(cfg: dict, map_name: str):
     """The recorded flight with the chosen map, with the true heading (loaded once per process)."""
-    if map_name not in _FLIGHTS:
+    key = f"{cfg['recording']}|{map_name}|{json.dumps(cfg.get('camera'), sort_keys=True)}"
+    if key not in _FLIGHTS:
         tif = Path(cfg["maps"][map_name])
-        _FLIGHTS[map_name] = load_sim_flight(SimReplayConfig(
+        flight = load_sim_flight(SimReplayConfig(
             recording=_path(cfg, "recording"), map_tif=str(tif if tif.is_absolute() else REPO_ROOT / tif),
             route=_path(cfg, "route"), cache_dir=_path(cfg, "cache_dir")))
-    return _FLIGHTS[map_name]
+        camera = cfg.get("camera")
+        _FLIGHTS[key] = with_camera(flight, CameraModel(**camera) if camera else None)
+    return _FLIGHTS[key]
 
 
 def compass(cfg: dict, flight, seed: int) -> np.ndarray:
     return compass_heading(flight.metadata["true_heading_deg"], np.random.default_rng(seed), **cfg["heading"]["compass"])
 
 
-def flow_path(cfg: dict, seed: int) -> Path:
-    """Where the camera motion of one compass draw is cached.
+def heading_reading(cfg: dict, flight, seed: int) -> np.ndarray:
+    """The heading sensor's readings for one draw (seed): the compass, or a sun sensor (src/sensors/sun_sensor.py).
 
-    The name carries a fingerprint of the recording's image list and of the compass settings, so a
-    flight recorded again under the same name, or another compass, never reuses old camera motion.
+    A sun sensor is told the flight's date and time (``heading.when``) and the world's latitude and longitude
+    (the recording's meta.json). Under the realistic camera's clouds, the sun is hidden when the drone's line
+    to the sun passes through a cloud: traced down to the ground, it ends in that cloud's shadow.
+    """
+    source = cfg["heading"].get("source", "compass")
+    if source == "compass":
+        return compass(cfg, flight, seed)
+    model = SunSensorModel(**cfg["heading"][source])
+    meta = json.loads((Path(flight.metadata["recording"]) / "meta.json").read_text())
+    lat, lon = meta["origin"]["lat_deg"], meta["origin"]["lon_deg"]
+    start = datetime.fromisoformat(cfg["heading"]["when"])
+    hidden = None
+    camera = flight.metadata.get("camera")
+    if camera is not None:
+        az_el = np.array([sun_position(lat, lon, start + timedelta(seconds=float(s))) for s in flight.timestamp])
+        a, zenith = np.radians(az_el[:, 0]), np.radians(90.0 - az_el[:, 1])
+        reach = flight.metadata["height_m"] * np.tan(zenith)  # from the drone along the sun's ray to the ground
+        north = flight.position_gt[:, 0] - reach * np.cos(a)
+        east = flight.position_gt[:, 1] - reach * np.sin(a)
+        hidden = camera.shadow_at(north, east, flight.timestamp) > 0.5 * camera.model.cloud_shadow
+    reading, _ = sun_heading_readings(model, flight.metadata["attitude_q"], flight.timestamp, start, lat, lon,
+                                      np.random.default_rng(seed), hidden)
+    return reading
+
+
+def flow_path(cfg: dict, seed: int) -> Path:
+    """Where the camera motion of one heading-sensor draw is cached.
+
+    The name carries a fingerprint of the recording's image list and of the heading sensor's settings, so
+    a flight recorded again under the same name, or another sensor, never reuses old camera motion.
     """
     recording = Path(_path(cfg, "recording"))
-    content = (recording / "images.csv").read_bytes() + json.dumps(cfg["heading"]["compass"], sort_keys=True).encode()
-    return Path(_path(cfg, "cache_dir")) / f"sim_flow_{recording.name}_{hashlib.sha1(content).hexdigest()[:10]}_compass_seed{seed}.npy"
+    source = cfg["heading"].get("source", "compass")
+    sensor = cfg["heading"]["compass"] if source == "compass" else {source: cfg["heading"][source], "when": cfg["heading"]["when"]}
+    content = (recording / "images.csv").read_bytes() + json.dumps(sensor, sort_keys=True).encode()
+    if cfg.get("camera"):  # the ideal camera keeps the fingerprint it always had
+        content += json.dumps(cfg["camera"], sort_keys=True).encode()
+    return Path(_path(cfg, "cache_dir")) / f"sim_flow_{recording.name}_{hashlib.sha1(content).hexdigest()[:10]}_{source}_seed{seed}.npy"
 
 
 def flow_job(job: tuple) -> str:
-    """Camera motion for one compass draw: the frames are turned north up by its readings."""
+    """Camera motion for one heading-sensor draw: the frames are turned north up by its readings."""
     cfg, seed = job
     flight0 = flight_for(cfg, "2018")
-    shifts_for_flight(with_heading(flight0, compass(cfg, flight0, seed)), flow_path(cfg, seed))
+    shifts_for_flight(with_heading(flight0, heading_reading(cfg, flight0, seed)), flow_path(cfg, seed))
     return f"seed {seed}"
 
 
@@ -90,7 +129,7 @@ def one_run(job: tuple) -> dict:
     cfg, name, settings, seed, keep_result = job
     settings = dict(settings)
     flight0 = flight_for(cfg, settings.pop("map"))
-    reading = compass(cfg, flight0, seed)
+    reading = heading_reading(cfg, flight0, seed)
     flight = with_heading(flight0, reading)
     shifts = shifts_for_flight(flight, flow_path(cfg, seed))
     run = replace(NavigatorConfig(**cfg["navigator"]), **settings)
@@ -116,6 +155,11 @@ def main() -> int:
     if args.recording:
         cfg["recording"], cfg["route"] = args.recording, args.route or cfg["route"]
         cfg["output_dir"] = f"{cfg['output_dir']}_{Path(args.recording).name}"
+    cfg["camera"] = cfg.get("cameras", {}).get(args.camera)
+    if args.camera != "ideal":
+        if args.camera not in cfg.get("cameras", {}):
+            raise SystemExit(f"no camera {args.camera!r} in {args.config}")
+        cfg["output_dir"] = f"{cfg['output_dir']}_{args.camera}_camera"
     seeds = args.seeds or cfg["seeds"]
     runs = {n: s for n, s in cfg["runs"].items() if not args.only or n in args.only}
     out = Path(args.output_dir or REPO_ROOT / cfg["output_dir"])

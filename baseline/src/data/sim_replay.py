@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 
 from src.data.camera_flight import CameraFlight, ReferenceMap
+from src.data.camera_model import CameraModel, RealisticCamera
 from src.data.ground_map import GroundMap
 
 FRAME_PX = 360  # int(512 / sqrt(2)) - 2: the largest square inside a 512 px image at any angle
@@ -119,6 +120,7 @@ def load_sim_flight(cfg: SimReplayConfig, heading_deg: np.ndarray | None = None)
             "map": Path(cfg.map_tif).name,
             "origin_enu_m": [float(east[first]), float(north[first])],
             "true_heading_deg": true_heading[keep],
+            "attitude_q": q[keep],  # (M, 4) qw, qx, qy, qz: body (forward, left, up) to ENU, for sensor models only
             "height_m": up[keep],
             "recording_t_s": t[keep],
             "image_paths": paths,
@@ -134,7 +136,26 @@ def with_heading(flight: CameraFlight, heading_deg: np.ndarray) -> CameraFlight:
     if heading.shape != (len(flight),):
         raise ValueError(f"heading has shape {heading.shape}, expected ({len(flight)},)")
     paths = flight.metadata["image_paths"]
-    return replace(flight, load_frame=lambda i: north_up(cv2.imread(paths[i], cv2.IMREAD_GRAYSCALE), heading[i]), heading_deg=heading)
+    camera = flight.metadata.get("camera")  # a RealisticCamera, or None for the simulator's ideal frames
+
+    def raw(i: int) -> np.ndarray:
+        image = cv2.imread(paths[i], cv2.IMREAD_GRAYSCALE)
+        return image if camera is None else camera.frame(i, image)
+    return replace(flight, load_frame=lambda i: north_up(raw(i), heading[i]), heading_deg=heading)
+
+
+def with_camera(flight: CameraFlight, model: CameraModel | None) -> CameraFlight:
+    """The same flight seen through a realistic camera (src/data/camera_model.py); None: the ideal frames.
+
+    The camera's cloud shadows and footprint follow the true path, heading and height: they belong to the
+    simulated world, which the navigator does not see.
+    """
+    camera = None
+    if model is not None:
+        camera = RealisticCamera(model, flight.timestamp, flight.position_gt, flight.metadata["true_heading_deg"],
+                                 flight.metadata["height_m"])
+    flight = replace(flight, metadata={**flight.metadata, "camera": camera})
+    return with_heading(flight, flight.heading_deg)
 
 
 def _ground_map(tif: Path, origin_en: tuple[float, float], start_ne: np.ndarray, metres_per_pixel: float,

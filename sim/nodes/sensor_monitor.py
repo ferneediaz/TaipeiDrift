@@ -6,6 +6,7 @@ Shows what the drone's sensors report, next to the ground truth, refreshed 5 tim
 Rates are measured in simulation time.
 """
 import argparse
+import json
 import math
 import time
 import xml.etree.ElementTree as ET
@@ -18,6 +19,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, FluidPressure, Image, Imu, NavSatFix
+from std_msgs.msg import String
 
 WORLDS = Path(__file__).resolve().parents[1] / "worlds"
 M_PER_DEG_LAT = 111_320.0
@@ -67,6 +69,12 @@ class Monitor(Node):
         self.create_subscription(CameraInfo, "/camera/down/camera_info", lambda m: setattr(self, "info", m), sd)
         # Images are counted without decoding them; Python is too slow to decode every frame
         self.create_subscription(Image, "/camera/down/image_raw", lambda _: self.rates["cam"].tick(self.sim_t), 10, raw=True)
+        # AIS from the ships (nodes/rf_sensor.py): last truth and detection per MMSI, and decoded/sent counts
+        self.rf = {}
+        self.create_subscription(String, "/rf/truth", self.on_rf_truth, 50)
+        self.create_subscription(String, "/rf/detections", self.on_rf_detection, 50)
+        self.rf_nav = None  # drone position from the ships' bearings (nodes/rf_nav.py)
+        self.create_subscription(Odometry, "/rf_nav/odom", lambda m: setattr(self, "rf_nav", m), 10)
         self.create_timer(0.2, self.draw, clock=rclpy.clock.Clock())  # wall-clock refresh
 
     def on_clock(self, m):
@@ -82,6 +90,18 @@ class Monitor(Node):
         if self.p0 is None:
             self.p0 = m.fluid_pressure
         self.keep("baro", m)
+
+    def on_rf_truth(self, m):
+        t = json.loads(m.data)
+        r = self.rf.setdefault(t["mmsi"], {"ship": t["ship"], "sent": 0, "decoded": 0, "det": None})
+        r["sent"] += 1
+        r["decoded"] += t["decoded"]
+        r["truth"] = t
+
+    def on_rf_detection(self, m):
+        d = json.loads(m.data)
+        if d["mmsi"] in self.rf:
+            self.rf[d["mmsi"]]["det"] = d
 
     def draw(self):
         out = [f"{BOLD}TaipeiDrift sensor monitor{RESET}   Ctrl+C to quit"]
@@ -138,6 +158,38 @@ class Monitor(Node):
             fp = f"   footprint {ground:6.1f} m  ({100 * ground / self.info.width:5.1f} cm/px)" if ground else ""
             out.append(f"  {self.info.width}x{self.info.height}  fx {self.info.k[0]:.0f}  "
                        f"{ok}{r['cam']:5.1f} fps{RESET} (want 25){fp}")
+
+        if self.rf_nav:
+            n = self.rf_nav
+            p, c = n.pose.pose.position, n.pose.covariance
+            yaw = math.degrees(2 * math.atan2(n.pose.pose.orientation.z, n.pose.pose.orientation.w))
+            sig = math.sqrt(max(c[0] + c[7], 0.0))
+            out.append(f"\n{BOLD}RF NAVIGATION{RESET} {DIM}(position from the ships' bearings, no GNSS){RESET}")
+            line = f"  estimate  E {p.x:8.1f}   N {p.y:8.1f}  m   heading {yaw:6.1f} deg   sigma {sig:6.1f} m"
+            if self.truth:
+                tp, q = self.truth.pose.pose.position, self.truth.pose.pose.orientation
+                tyaw = math.degrees(math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y**2 + q.z**2)))
+                err = math.hypot(p.x - tp.x, p.y - tp.y)
+                col = GREEN if err < 3 * max(sig, 1.0) else RED
+                line += (f"\n  error     {col}{err:6.1f} m{RESET}   heading {(yaw - tyaw + 180) % 360 - 180:+5.1f} deg"
+                         f"   {DIM}(against ground truth){RESET}")
+            out.append(line)
+        elif self.rf:
+            out.append(f"\n{BOLD}RF NAVIGATION{RESET} {DIM}waiting for bearings to three ships...{RESET}")
+
+        if self.rf:
+            out.append(f"\n{BOLD}AIS RECEIVER{RESET} {DIM}(GMSK 9600 bit/s, 162 MHz; bearing error against truth){RESET}")
+            for mmsi, r in sorted(self.rf.items()):
+                t, d = r["truth"], r["det"]
+                line = f"  {r['ship']:<20} {mmsi}  range {t['range_m'] / 1e3:6.2f} km  decoded {r['decoded']:3d}/{r['sent']}"
+                if d:
+                    # the last decoded packet; its truth is the one sent at the same time
+                    err = math.degrees((d["azimuth_body_rad"] - t["azimuth_body_rad"] + math.pi) % (2 * math.pi) - math.pi) \
+                        if abs(d["t"] - t["t"]) < 1e-6 else None
+                    e = f"{err:+5.1f} deg" if err is not None else "  (old)  "
+                    line += (f"\n    RSSI {d['rssi_dbm']:5.0f} dBm  bearing {math.degrees(d['azimuth_body_rad']):+6.1f} deg"
+                             f"  error {e} (sigma {math.degrees(d['azimuth_std_rad']):.1f})")
+                out.append(line)
         print("\033[H\033[J" + "\n".join(out), flush=True)
 
 
