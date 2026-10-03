@@ -1,0 +1,70 @@
+# ESKF relative navigation on Mid-Air: IMU prediction + forward-camera relative rotation
+# + downward-camera flow velocity. Relative paths are resolved from the repository root.
+
+vio_config: vio/configs/midair_vio.yaml   # cameras (intrinsics, mounting, sync) and tracker settings
+gnss_cutoff_s: 5.0
+output_dir: outputs/midair_eskf
+error_horizons_s: [10, 30, 60]
+rpe_delta_s: 10.0
+
+# Process noise and initial uncertainty. Defaults from the IMU errors measured on the
+# 30 sunny flights (docs/findings.md on main, section 2.3). Per-sample stds are converted
+# to densities inside the code (x sqrt(0.01 s)).
+imu_noise:
+  gyro_noise_per_sample: 0.021      # rad/s
+  accel_noise_per_sample: 0.04      # m/s^2
+  gyro_bias_change_per_flight: 0.003   # rad/s over ~80 s -> random walk
+  accel_bias_change_per_flight: 0.04   # m/s^2 over ~80 s
+  init_pos_std: 0.5
+  init_vel_std: 0.05
+  init_att_std_deg: 0.2
+  init_gyro_bias_std: 0.003         # rad/s
+  init_accel_bias_std: 0.06         # m/s^2
+
+forward_camera:
+  camera: left                      # entry of cameras in vio_config
+  max_keyframe_age: 25              # frames per relative-rotation measurement (1 s)
+  sigma_deg: 0.2                    # per axis per span; tuned on trajectory_0001 (vio/scripts/tune_eskf.py)
+  gate_prob: 0.99
+
+down_camera:
+  camera: down
+  rel_height_std: 1.0               # height above ground: unknown terrain + barometer, along the velocity (tuned)
+  dir_sigma_deg: 2.0                # direction noise, across the velocity (tuned)
+  min_sigma_mps: 0.05
+  every_n_frames: 5                 # use one consecutive-frame pair in n: 5 Hz (tuned)
+  gate_prob: 0.99
+  min_tracks: 40
+  min_inlier_ratio: 0.5               # homography inliers = points on the dominant ground plane
+  max_residual_px: 1.0
+  height_learning_window_s: 2.0     # learn height above ground in the last 2 s before the cutoff (GNSS velocity)
+
+barometer:                          # SIMULATED, measured real-sensor model (research/offline-nav-evidence); fused in all but imu_only
+  white_std_m: 0.30
+  bias_walk_m_per_sqrt_s: 0.112
+  drift_sigma_m_per_s: 0.0024       # per-flight drift slope ~ N(0, 0.0024)
+  scale_error_min: 0.03             # per-flight scale error +/- U(0.03, 0.07)
+  scale_error_max: 0.07
+  scale_error_rms: 0.052            # used by the update noise
+  seed: 0
+  every_n_samples: 20               # altitude update at 5 Hz
+
+direction:                          # forward-camera translation DIRECTION as a velocity-direction update
+  sigma_deg: 1.5                    # from the measured 1.0 deg median / 2.7 deg p90 direction error (not tuned)
+  min_speed_mps: 0.5                # below this the velocity direction is undefined: skip
+  gate_prob: 0.99
+
+sim_gnss:                           # Gazebo NavSatFix covariance is empty in this plugin build.
+  fallback_sigma_m: [1.5, 1.5, 3.0] # matches the simulator SDF's documented sensor noise
+  gate_prob: 0.999
+  attitude_init_samples: 50         # 0.5 s IMU gravity average; yaw remains unobservable
+  velocity_window_s: 8.0            # local WLS fit; non-overlapping windows avoid correlated repeated updates
+  velocity_min_samples: 6
+  velocity_min_span_s: 6.0
+  velocity_outlier_mahalanobis_sq: 16.27  # one-pass 3D residual rejection (~99.9% chi-square threshold)
+
+bias_injection:                     # used with --inject-bias
+  gyro: [0.003, -0.002, 0.0025]     # rad/s, gyroscope axes (world for Mid-Air)
+  accel: [0.06, -0.05, 0.04]        # m/s^2, body
+
+tuning_trajectory: {condition: sunny, trajectory: trajectory_0001}

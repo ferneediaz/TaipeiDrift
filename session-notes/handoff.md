@@ -1,57 +1,142 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 00:55.
+Last updated: Saturday 3 October 2026, 20:18. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
 
-## Current objective
+## Resume here
 
-The team stays with Challenge 2 (decided Friday night). Saturday morning: agree roles, merge the open branches, record the phone walk, and move the ALTO experiment into shared code.
+**Next steps, as of Saturday 20:18 (read this first; details in the blocks below).**
 
-## State
+1. **Pull request 4** (`integration` to `main`, https://github.com/dwn97/TaipeiDrift/pull/4) is open and holds everything. Merge only on Dustin's word.
+2. **Teammates push often.** Before every push: `git fetch --all`, merge what is new into `integration`, run the tests, check `git diff frozen-navigator -- baseline` is empty. Dan copies files into his branches instead of merging: keep our `baseline/` files, take his `sim/` work. All of Ilhan's, Dan's and Alessandro's branches are merged as of 20:18.
+3. **Dan may integrate the fused filter live** (Dustin asked; answer: yes). He needs from `scripts/fused_replay.py`: `soft_update`, the tilt correction (`camera_offset` in `run_filter`), the drift budget on the position covariance, and a start uncertainty of 3 m at the GNSS loss. Missing for a live run: a simulator node that publishes the sun heading, the camera step and the map fix (as his `rf_nav.py` does for the ships).
+4. **Dustin's order: finish the simulation, then the demo.** Simulation state: frozen navigator with sealed result; fused filter with sealed result; stated-error fix found and tested on development flights. Open on the simulation side: the filter steering the map search; the live version; Ilhan's map replacing ours (Dustin: "if Ilhan is able to add his map then we remove ours"; open how: his matcher on our simulated pictures needs torch and `vismatch` here, or a simulator world built from his Tuniu map).
+5. **The demo and the deck** (due Sunday 12:00, a deck with a link to a demo video): not started. Still open with Dustin: the team number, where the deck is uploaded, who writes the business part (three of seven jury criteria).
+6. **Do not** change `baseline/`, rerun anything on the sealed flights, or add assistant attribution to commits. Check `date` before writing a time.
 
-- Challenge 2, navigation without GNSS. Team name Taipei Drift, repository github.com/dwn97/TaipeiDrift (private). Six members have write access: dwn97, alessandrodipiano, ferneediaz (Dan), IlhanTech, FelixZukunft, rychardsandreireyes-rgb. The last two have not pushed anything yet.
-- We build software, not a drone. Target, set with the mentor: low-cost drones, with about 500 dollars as an orientation and not a hard cap. The one thing: position fixes from the drone's own camera against free aerial images, with a check that rejects a wrong fix.
-- `docs/PLAN.md` is the plan (three results, roles, timeline, slide story, next steps, mentor feedback). `docs/findings.md` holds every measurement. `docs/landscape.md` holds the research on Raptor and VNS01.
-- Data is on Dustin's laptop under `data/raw/` (not committed). `data/README.md` says how to get it.
-  - Mid-Air: all 38 archives, complete and verified (9.8 GB).
-  - ALTO: the validation section (1.73 GB). The training section (9.93 GB) is not downloaded.
-- Experiments on `main`, scripts `e` to `m` in `experiments/`. Headline numbers:
-  - Mid-Air IMU-only drift: 485 m after 78 s in the median, 50 m after 36 s.
-  - ALTO end to end: camera only 472 m median error, 26 to 31 m with a fix every 100 to 300 m.
-  - One fix costs 285 ms on one laptop core, 20 ms at 125 pixels, with the same fix error.
+**Saturday 20:10: the fused filter works and has its own sealed result.**
+
+- **`scripts/fused_replay.py`** replays a recorded flight through Alessandro's ESKF as his live adapter runs it, and feeds it our sun heading (yaw update), our camera ground speed (tilt-corrected with the filter's own attitude; `soft_update` weakens a reading that is far from what the filter expects; steps under 0.3 of the cruising step are not fused), the frozen navigator's used map fixes (position update behind a 99 percent gate, reset after three rejections, as Dan's RF fix) and the navigator's uncertainty rule (10 percent of the distance since the last fix, added to the horizontal position covariance). Settings fixed at tag `frozen-fused-replay` (20:06), chosen on the development flights only.
+- **Sealed flights, run once (20:07 to 20:09, log `outputs/fused_sealed_run.log`), median / 90 percent / worst:** 90 m flight 32.2 / 64 / 78 m (navigator alone 36.3 / 70 / 90), 110 m flight 11.5 / 27 / 42 m (navigator 16.2 / 38 / 58); realistic camera 18.3 and 11.2 m (navigator 21.8 and 15.3). Every fix fused, no reset. Its stated error holds 98.2 and 99.7 percent (lowest draw); the navigator's holds 100. Development flights: 18.4 / 31.0 / 11.0 m (navigator 16.5 / 32.3 / 18.0). With a compass in place of the sun: 21.6 / 36.3 / 20.5 m. Step by step on the 100 m flight: IMU and barometer alone 3 km median; plus sun heading 2.4 km (heading 1.3 degrees, from 55); plus camera speed 57 m; plus map fixes 18 m. All in `docs/simulation-results.md`.
+- **Its stated error, 20:18:** the sealed run's 98.2 percent was traced on the development flights to the first seconds after the GNSS loss (the filter starts too sure of itself: about 1 m stated, up to 5 m true), small in size and never hazardous. With the navigator's start uncertainty (`--start-sigma 3`, added once at the loss; default 0 reproduces the declared sealed run) the development flights hold 100 / 99.4 / 99.9 percent with clean pictures and 100 / 99.9 / 93.1 with the realistic camera (the 93.1 is the navigator's wrong fix on the 65 m flight). Not rerun on the sealed flights, on purpose: their declared result stays. Dustin asked whether Dan should integrate it: yes, with the start uncertainty of 3 m.
+- **What it is not yet:** the navigator still finds the fixes on its own (the filter does not steer the map search); nothing of it runs live in the simulator (there is no node that publishes the sun heading, the camera step or the map fix; Dan would integrate that into his adapter); the tilt correction assumes flat ground; the stated error is a little optimistic on one flight.
+- **Dustin's decisions today:** finish the simulation before the demo; if Ilhan can add his map, ours is removed (his fixes would enter the filter the same way; his Tuniu flight has no IMU recording, so the filter cannot run on it as it is). Pull request 4 (`integration` to `main`) is open; merging needs his word.
+- **Since 19:36 also merged:** Ilhan's closed-loop results on the real flight (3.3 m median over 4.0 km without GNSS, no loss of lock in 20 of 20 runs, no wrong fix among 1,646; `docs/research/tuniu-level2-results.md`) and his plan for the runs with his own survey map; Dan's `strait-eskf-velfit` (identical to our join except one comment).
+
+**Saturday 19:27: the navigator is frozen, the sealed flights are run, everyone's work is in `integration`.**
+
+- **Frozen at 18:46** (tag `frozen-navigator`): the navigator of save point 4, code identical to `sp4-sun-heading`. The fog check was removed in its own commit (f73b366); the fog, scale and turn experiments are kept as patches in `outputs/experiments/` (not in git) and written up in `docs/simulation-results.md`. **Do not change `baseline/` any more**: `git diff frozen-navigator -- baseline` must stay empty.
+- **Sealed flights, run once (18:46 to 18:52, log `outputs/sealed_run.log`):** 90 m flight 36.3 m median (90 percent below 70, worst 90; camera alone 70.6; draws 20.4, 36.3, 42.2; fixes used 12, 7, 7); 110 m flight 16.2 m (38, 58; camera alone 57.6; fixes 14, 15, 15). No wrong fix, the stated bound held 100 percent in every draw, never hazardous; the same with the realistic camera (21.8 and 15.3 m). Figures: `docs/figures/sealed_*.png`.
+- **Merged into `integration` and pushed (4ab668b; 304 tests and 18 simulator tests pass):** Ilhan's Tuniu work (results on real photos, audit, team explainer, the plan for a closed-loop replay; his branch `research/offline-nav-evidence` up to ac18f70), Dan's `strait-eskf` (999bdc7) and Alessandro's `ale-simulation` (7e25899). Dan had copied Alessandro's files and older copies of our navigator files into his branch: our `baseline/` files were kept, Alessandro's newer filter files taken, the adapter is Dan's RF fusion plus Alessandro's GNSS velocity fit (three-way merge on Alessandro's first commit; an RF start sets the fit clock at the first GNSS fix), and the launch file holds every option of the three (ships, wind, stereo, the estimator, the city world, `run_label`). Ask Alessandro and Dan to start from `integration` from now on. `main` is 18 commits behind: a pull request is due (needs Dustin's OK).
+- **The simulator container** lacked `h5py` (the image is older than the Dockerfile line): installed inside the running container with apt. It is lost on `docker compose down` or a rebuild; `docker compose build` in `sim/` makes it permanent. Every launch now runs the ESKF, a rosbag recorder and a run logger, adds a forward camera, and cuts GNSS 20 s after the first fix (`gnss_cutoff_s:=-1` keeps it; `record_mode:=off` records no bag).
+- **Checked after the merge:** terrain (headless), strait (4 minutes with the window, scored with `sim/scripts/check_rf_nav.py`), city (85 s): the launch comes up, both filter instances start from GNSS, the cut comes at 21 s. In that strait run, 106 to 235 s after the cut: ships' bearings alone 39 m median; the ESKF alone diverged (median 9.9 km); the ESKF with the ships' fix 55 m median, the truth inside its 2 sigma 48 percent of the time. One run. Alessandro's own city run with the cut (his `outputs/sim_runs/velocity_phase/README.md`): 28 m after 20 s, 259 m after 105 s, and he finds the speed error dominant.
+- **How the parts fit (for the deck, and for a fused navigator):** Alessandro's filter is the core (IMU, barometer; GNSS while it lasts). It lacks speed, heading and position once GNSS is gone. Dan's `on_rf` in `sim/nodes/eskf_ros_adapter.py` is the hook: a horizontal position and a heading with a covariance, fused like a GNSS fix behind a gate, with a reset after three rejections. Our map fix and sun heading have that shape; our down-camera ground speed fits `ESKF.update_camera_velocity_xy` (already used offline in `vio/estimation/eskf_runner.py`). Ilhan's agreement rule (ZNCC and XFeat within 4 m) is the acceptance step; it needs torch and `vismatch`, which our environment lacks. Proposed, not started: an offline fused replay on the development flights (their recordings hold IMU at 100 Hz, barometer and GNSS), 3 to 4 hours, only after the deck and video exist unless Dustin says otherwise.
+- **Ilhan asks Dustin** (his explainer, section 12): run the audit, recompute one number, plug the agreement rule into the navigator. The audit cannot run here: `data/processed/x_tuniu` is not in git.
+- **Next, in order:** the demo video and the deck (the submission, due Sunday noon); the business part (three of seven criteria, nobody assigned); then the fused replay if time is left. Still open with Dustin: team number, where the deck is uploaded, who writes the business part, fused replay before or after the deck.
+
+**Saturday 18:32: what changed since 17:42** (superseded where the block above says otherwise: the two rules were not kept, `ale-simulation` is merged).
+
+- **The organisers' guide** ("How to Succeed at an EDTH Hackathon", 4 pages, link from Dustin: https://drive.google.com/file/d/1wmhnvGZiKiZKEgLl2jeRdqqusi4w6jrD/view). What we hand in: **a deck (PDF or PPTX) by Sunday noon**, file name starting with the team number (e.g. `07_ProjectName.pdf`), with **a link to a demo video** (YouTube, Vimeo or Drive). No repo or README is asked for. Pitch: 3 minutes, strict, then 1 to 2 questions. Jury: 5 to 7 people (Ukrainian and European military, industry, investors, technical experts), each scoring 0 to 10 on seven criteria: relevant problem; feasibility (does it work?); originality; mass-manufacturability; business opportunity; size of the opportunity; pitch and demo. The deck covers: the problem, how we solve it, how it is deployed and mass-produced, what we achieved this weekend; then business, market size, team, a call to action. Its example for feasibility is "in the field, at night": expect the night question (our system needs daylight). "The single biggest mistake teams make is not talking to mentors." After the event: a form, forms.gle/yVn6Lrzn67bRqd2W6. Still to ask Dustin: the team number, where the deck is uploaded, who writes the business part (three of the seven criteria, nothing written yet).
+- **New branch `ale-simulation`** (Alessandro, 17:50, one commit on the 14:07 base, 51 files): his ESKF live in Gazebo (`sim/nodes/eskf_ros_adapter.py`: GNSS, IMU, barometer, camera rotation and direction), a GNSS gate that starts with GNSS and cuts it after `gnss_cutoff_s` (renamed from our `gnss_cut_s`, now seconds since the first fix, default 20), a `city` world, a run logger, tests. Not merged: one conflict in `sim/launch/sim.launch.py`; three run folders under `outputs/` were force-added. His committed run with the cut: 1.6 m median with GNSS, 116 m off 65 s after the cut (no map fixes). It does not touch `baseline/`.
+- **Our replay never reads the simulator's GPS sensor:** the "GNSS" of the first 450 m is the true position (`truth.csv`); `gnss.csv` is recorded and unused. The camera navigator runs no ESKF: position and one variance, a scalar Kalman update at each used fix (`navigator_core.blend`). No IMU, no barometer.
+- **Fog step, measured** (logs in `outputs/fog_step_1_prejam_reference.log`, `fog_step_2_clear_day_reference.log`): the check as committed does nothing in fog from take-off, because its reference (the frames before the jam) is as dull as the rest (share about 1.00). With a clear-day reference (the realistic camera's clear detail: 0.060, 0.062, 0.048 for the 100, 120 and 65 m flights) the dead-reckoning bound holds again at 1 km (99.6 to 100 percent, from 92) and nearly at 500 m (98.8 to 99.3); what still fails in fog are wrong fixes. The clear-day reference is a two-line option (`detail_reference`), parked as `scratchpad/fog_reference.patch`, not committed.
+- **Found on the way: the realistic camera fails the 65 m flight in clear weather at save point 4** (one fix 54 m off, score 0.36, used in 2 of 3 draws; the 100 and 120 m flights work). That fix is taken while the drone turns on the spot at the end of a leg (30 degrees per second, tilt up to 20 degrees). Two candidate rules, both written with unit tests, neither committed, under test on the development flights with both cameras (`outputs/step_*.log`): `anchor_zoom` (search only the scale learned before the jam, never all zooms) and `max_turn_rate_dps` (no fix while the heading turns faster than 10 degrees per second, nor for 2 s after). Alone, the anchored zoom removed one of the two wrong fixes and cost flight 1 a little (16.5 to 19.0 m); the turn rule alone made things worse (it shifts every later attempt, and wrong-scale look-alikes from the all-zooms search got confirmed). Keep a rule only if every development flight works with both cameras and the ideal ones are not worse; otherwise stay on save point 4 and say what the realistic camera showed.
+- **Correct below:** the GPS adapter was proposed, not approved ("Dustin: yes" was wrong; he asked whether we need it).
+
+**Saturday 17:42: the state (older notes below still hold).**
+
+- **Rule from Dustin: one change at a time, smallest test first, a save point after each.** The demo will be the simulation; first the solution must be done, then video, README, pitch.
+- **`main` = save point 4** (`sp4-sun-heading`, PR #3 merged 17:38). Branches left on GitHub, all inside main: `integration` (ours), `simulations` (Dan), `research/offline-nav-evidence` and `docs/denseuav-critical-review` (Ilhan), `mid-air-vio` (Alessandro). Deleted with Dustin's OK: `alto-navigator`, `mid-air-baseline`, `mid-air-baseline-fix`. MIT licence added.
+- **Save points:** sp2 scale kept; sp3 every development flight works (zooms 0.45 to 1.05 after the jam too, confirmation of jumps from 100 m); sp4 heading from the simulated sun sensor (development medians 16.5, 32.3, 18.0 m, no wrong fix, bound 100%). Stage by stage, reproducible: `scripts/sim_progress.py`, figures `scripts/sim_figures.py`, page `docs/simulation-results.md`.
+- **Now under test: the fog step (its code went into commit 741094b by mistake, inert: off by default; remove it in its own commit if the step fails):** `detail_scaling` in `camera_navigator.py` (drift budget x 1/s with s = picture detail over the pre-jam median, at most x5; below s = 0.25 the camera is not believed), `picture_detail` / `detail_for_flight` in `image_motion.py`, `detail_path` in `run_sim_navigator.py`. Test running (background, output in the task file `b9rh0tkce`): clear ON, fog 1 km OFF, fog 1 km ON, 500 m ON, 300 m ON. Results so far: clear ON made flight 1 worse (16.5 -> 21.4 m, fixes 14 -> 10: low-texture fields lower s in clear weather too); fog 1 km OFF fails on all three flights (bound 75 to 98%). Next small step: a threshold, widen only below about s = 0.7 (clear frames: 10th percentile about 0.75; fog 1 km 0.54), then the same five runs; keep only if fog holds the bound and clear weather is unchanged -> save point 5.
+- **Then:** freeze; the two sealed flights (`wufeng_north_90m`, `wufeng_south_110m`, never run so far) run once with `run_sim_navigator.py --recording ... --route ...`; those are the numbers we quote. Then the GPS adapter (MAVLink `GPS_INPUT`, minimal: messages to a telemetry log; proposed, not approved by Dustin; cut first if short), the demo video (make_replay sim + Gazebo screen recording), README (draft in the scratchpad), pitch (draft parked in `scratchpad/parked/pitch.md`; 3 minutes + 1 to 2 minutes of questions).
+- **Parked:** 3D world from the Tuniu photos (ODM: September mesh built, texturing killed by Docker memory; converter `scratchpad/parked/make_odm_world.py`), wind (launch option written, not flown), rain, spoofing, closed loop, fusion with Alessandro's filter. Dan's 3D map: only as an extra test once frozen.
+- **Ilhan:** pre-registered an XFeat + ZNCC agreement rule on the real Tuniu photos (`docs/research/tuniu-consensus-prereg.md`); asked to push code and seed 1 to 19 results.
+- **A deep review prompt for Claude Fable:** `session-notes/review-prompt.md`.
+
+**Where the work lives (read this first).**
+
+- **`main` holds everything since 14:49** (pull request 2 merged by Dustin's decision, merge commit 3854c7c); every team branch on GitHub is fully contained in it, `sim-demo` was deleted. **Work on branch `integration`** in **`~/Projects/DefenseHackathon-sim`** (a git worktree outside iCloud), started from `main`; bring work back to `main` by pull request (never push to `main`). `alto-navigator` is kept at the same commit as `integration` so old links show the current docs.
+- `~/Projects/DefenseHackathon` (branch `alto-navigator`) is the older checkout; `~/Desktop/DefenseHackathon` is stale (iCloud).
+- Python: `~/.venvs/defensehackathon/bin/python` (`.venv` links to it). Run from outside the iCloud folder.
+- Data: `~/Desktop/DefenseHackathon/data/raw.nosync` and `processed.nosync`, linked as `data/raw` and `data/processed` in both checkouts. Simulator recordings in `recordings/` (ignored by git), outputs in `outputs/`.
+- **The working doc: `docs/status-saturday.md`** (link for the team: https://github.com/dwn97/TaipeiDrift/blob/integration/docs/status-saturday.md). Phone test plan: `docs/phone-sun-test.md`. Competitors: `docs/landscape.md`.
+
+**Rules from Dustin.** Never push to `main`; work on a branch and push it by name. Pull, then commit, then push, and say what the pull brought in. No assistant attribution in commits or pull requests. Plain language, no middle dot, no "not X but Y". Explain math from small numbers. Communicate clearly: say where we stand, what changed and why; stop at checkpoints when asked. Check the clock with `date` before writing times.
+
+**Right now (14:45, before a context compaction).**
+
+- **Flight 2 is recording** in the simulator: `recordings/wufeng_south_80m` (route `sim/scenarios/wufeng_south_80m.json`: south first, 80 m, 8 m/s, 5.1 km; the recorder runs 900 s). It is the honest test of the simulator settings, which were adapted on flight 1. When it has landed (`/tmp/flight.log` in the container ends with `done:`), run it with the settings frozen at save point 1: `python baseline/scripts/run_sim_navigator.py --recording recordings/wufeng_south_80m --route sim/scenarios/wufeng_south_80m.json`, and compare with flight 1 (camera alone 75.9 m, 2018 map 26.5 m, ideal 2020 map 17.3 m, seed 3). Report it plainly, good or bad. The first attempt stalled at the south U-turn (drone spinning on the spot); `route_flight.py` now stops and turns on the spot, with a stall guard.
+- **Save point check running** (`python scripts/check_save_point.py`) to confirm the new zoom-edge error does not fire on ALTO or UAV-VisLoc. Flight 1 was already rerun: numbers identical.
+- Commit 99f0a14 holds those fixes; save point 1 is tag `sp1-merged-camera-navigator` (f3a755f).
+- The draft README for the jury is in the session scratchpad: `/private/tmp/claude-501/-Users-dustin-Desktop-DefenseHackathon/caaf3f37-cab1-430f-8ff7-5d98b7e5a250/scratchpad/README_draft.md` (Felix's TRN removed at Dustin's request). It goes in with save point 2.
+- **Dustin decided:** leave Felix's TRN out of our story, README and checks (the folder stays in the repo). Concentrate on the simulation and test whether it works.
+
+**The risks from the review (14:40) and what we do** (an independent review of the repo, checked):
+
+- Done 14:50: the two arXiv PDFs removed (linked in `research/README.md`; still in the git history); pull request 2 merged. The only dataset the organisers sent is ATREIDES, a maritime-domain-awareness sample (one CSV, `MDA Sensor Mini Sample_APRIL_26.csv`, 2.4 MB) for another challenge; its WeTransfer link expired at 14:04 today. It is almost certainly not Challenge 2's suggested dataset; Dustin can ask the organisers whether Challenge 2 has one.
+- Dustin, today: back up `outputs/replay` off the laptop; decide whether the repo goes public (then also `docs/brief.md`, the mentor table in `docs/PLAN.md`, Ilhan's DeepSeek line at `docs/research/overnight-synthesis.md:173`, and a history rewrite for the PDFs).
+- Claude, save point 2 (after the flight-2 test): the README with every headline number as median, 90 percent and worst, labelled real or simulated; UAV-VisLoc steps in `data/README.md`; `sim/README.md` still says `git checkout simulations`; `docs/findings.md` still says 134 tests; final figures into `docs/figures/`; credits (OpenAerialMap CC BY 4.0, Google Earth through UAV-VisLoc) in README and video titles; hedge the NLSC free-maps claim (offline rights unconfirmed); the sun-sensor model gets a fixed per-flight error like the compass (now only random noise, which flatters it), rerun the UAV-VisLoc sun runs and report both; re-time the widest fix (11 zooms after 400 m without a fix, about 4 to 5 s, not 2 s), labelled Intel emulation; call the 2020 map an ideal bound (it is the ground itself); one consistency pass in the status doc (27 vs 41 m for flight 03, the wrong-fix threshold 25 vs 50 m, blur 8 and 16 m also let wrong fixes through).
+- Accepted and said in the pitch: wrong fixes on look-alike ground (flight 04, whose 90 percent and worst values are worse with fixes), no gain on changed ground (flight 01), GNSS needed before the jam, no autopilot link (a MAVLink GPS_INPUT adapter only if time is left), Alessandro's VIO numbers rerunnable only with his Mid-Air downloads.
+
+**After save point 2: the fused navigator, timeboxed to 20:00** (if it is not measurably better by then, the demo stays on the last save point). Its heading source on our down-camera-only drone is a simulated sun sensor, the micro sensor of Fan, Peng and Gao 2016 (Rev. Sci. Instrum. 87, 075003, checked from the PDF): 0.1 degree, field of view plus or minus 65 degrees (no reading when the sun is outside it, for example lower than 25 degrees or the drone banking away), 25 Hz, 35 g, 200 mW; plus a per-flight bias; with the compass as the fallback. The update goes into Alessandro's ESKF as `update_sun_direction` (residual s_meas minus R_hat transposed s_world, H on the attitude error = R_hat transposed [s_world]x; his version lives in `vio/estimation/gyro_bias_kf.py`). His README warns that the down camera alone loses the heading (NEES up to 226): the sun or compass update is what makes fusion possible here.
+
+**Simulator demo: done so far.**
+
+1. The container `taipeidrift-sim` runs from `~/Projects/DefenseHackathon-sim/sim` (`docker compose up -d`), mounting the worktree at `/ws/TaipeiDrift`. Start: `docker compose exec -d sim bash -ic "cd /ws/TaipeiDrift && ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=terrain > /tmp/sim.log 2>&1"`.
+2. Ground: `python sim/scripts/make_ground.py --aerial --fill-empty` (the 2020 photo, empty parts filled with the procedural landscape); trees off (`make_trees.py --count 0`).
+3. Route: `python sim/scripts/plan_route.py` writes `sim/scenarios/wufeng_corridor.json` (4.8 km along the corridor both images cover, 100 m, 10 m/s, out north, 180-degree turn, back south).
+4. Recorded: `recordings/wufeng_corridor_100m` (recorder `sim/nodes/recorder.py --image-rate-hz 5 --cam-res 512 --duration-s 660`, then `python3 sim/scripts/route_flight.py` in the container). GNSS stays on in the recording; the jam is applied by distance (450 m).
+5. Loader `baseline/src/data/sim_replay.py`; runs `baseline/scripts/run_sim_navigator.py` (config `baseline/configs/sim_navigator.yaml`, `motion_fit: rotation_scale`): camera alone 76 m median, 2018 map 26.5 m, fresh 2020 map 17.3 m, no wrong fix, bound held 100 percent. Video: `python baseline/scripts/make_replay.py sim --seed 3`.
+6. Findings: the drone pitches 9.5 degrees in cruise, up to 16 in turns; the fixed down camera then looks 16 to 22 m behind; corrected with the true attitude the fix error is 2 to 5 m. Image of the down camera: top = forward, right = body right; frames are turned north up by the heading (`north_up`), zoom = height / 128 for the 0.5 m map.
+
+**Next: the fused navigator** (Alessandro's ESKF plus our fixes, on the same recording). Plan:
+
+- Reuse `vio/estimation/eskf.py` (`ESKF`, ENU world: gravity (0, 0, -9.81), `gyroscope_frame="body"`, IMU body FLU from `imu.csv`), start state from the truth at the jam (as his runner does at the cutoff).
+- Updates: barometer height (his `update_altitude`, noise from his `BaroUpdateConfig`); a compass heading (truth yaw plus 4-degree offset and 1-degree noise, a new yaw update, H on the attitude error's world-up axis); down-camera velocity with his `camera_velocity_from_flow` (needs feature tracks and `R_bc` for the sim camera; derive it from `meta.json` `T_body_cam`, and note his `_flow_update` assumes NED down = (0, 0, 1), so pass world down = (0, 0, -1) for ENU).
+- Map fix every 300 m: search centre = ESKF position plus where the camera looks (ray through the image centre, from the ESKF attitude and the barometer height); radius 3 sigma from the ESKF covariance, 60 to 600 m; zoom from the height; the fix minus that look offset is the drone's position, 15 m, through `ESKF.update` with the 99 percent gate and our confirmation of large jumps.
+- Compare four runs on the same flight: camera alone, ESKF without fixes, fused, fused with the 2020 map. Alessandro's caveat: his filter's stated uncertainty was 2 to 5 times too small on Mid-Air; check NEES on the simulated flight before trusting its gate.
+- Dan's new recorder (`sim/nodes/record_midair.py`) writes Mid-Air format; an alternative path to run Alessandro's own pipeline unchanged (down camera only; the simulated drone has no forward camera).
+
+**Also left** (status doc section 7): computing time per fix and per frame and map storage per square kilometre; the README for the submission; slides with Dustin; team decisions on `main`.
+
+## State, in short
+
+- **ALTO validation (USA, real):** camera alone 472 m median; with map fixes every 300 m, 31 m. The search no longer uses the true path (findings 3.8).
+- **UAV-VisLoc (China, real photos and a 2.5 to 5 years older map; dead reckoning simulated between photos):** development flight 03: wrong fixes used from about 12 to 0 to 2 with the new checks, median 28 m. Held out, run once: flight 04, 675 m without fixes to 60 m with them, but 18 to 32 wrong fixes still pass; flight 01, the ground changed since the map, fixes do not help (findings 3.9).
+- **Limits (findings 3.10):** robust to 1/64 of the light; a dangerous failure (camera loses track, estimate stands still and stays sure of itself) closed by flying on at cruising speed; blur of about 4 m remains a blind spot.
+- **Demo clips:** `outputs/replay/alto_val.mp4`, `outputs/replay/visloc_04_confirm_body_seed2.mp4`, stills next to them.
+- **The mentor's phone sun compass:** `baseline/scripts/phone_sun_compass.py` is ready; photos go into `data/raw/phone_sun/chessboard/` and `sun/` (steps in the status doc). Alessandro has his own sun detector on `mid-air-vio`; use his.
+- 134 tests pass on `alto-navigator`.
 
 ## Branches on GitHub
 
 | Branch | Owner | Content | State |
 |---|---|---|---|
-| `mid-air-baseline` | Alessandro | Package `baseline/`: Mid-Air loader, IMU dead reckoning, metrics, plots, 50 tests | Uses the textbook gyroscope rule, which is wrong on Mid-Air |
-| `mid-air-baseline-fix` | pushed from Dustin's laptop | The same plus one commit: gyroscope rule, scipy fix, 3 tests | 53 tests pass. Median 491 m on the 30 sunny flights. Waiting for Alessandro to confirm |
-| `simulations` | Dan | Gazebo in Docker, drone with camera, IMU, barometer, GNSS; worlds `terrain` and `islands` | Pull request 1 is open, without description or review. No recording or export code yet |
-| `docs/denseuav-critical-review` | Ilhan | A review of the DenseUAV idea with a proposal for verified fixes | One document, 547 lines |
-
-Merge test on Saturday 00:35: each branch merges into `main` cleanly. Merged one after the other, the only conflict is in `.gitignore` (the baseline and the simulator both add lines at the end). After merging all three, 53 tests pass.
-
-## Notes for building on the team's code
-
-- The baseline's `Trajectory` type requires accelerometer, gyroscope and attitude for every sample. ALTO has none of these, so the ALTO loader needs its own type or the fields have to become optional. The metrics only need a timestamp and a position, so they can be reused.
-- The baseline imports its code as `src.*` with `baseline/` on the path. New code for ALTO fits next to it: `src/data/alto.py`, `src/estimation/`, `src/evaluation/`.
-- The simulator publishes `/imu/data`, `/air_pressure`, `/gps/fix`, `/ground_truth/odom` and `/camera/down/image_raw`. Its IMU is in the drone's own axes. The image has rosbag with mcap storage installed, but nothing records yet. Its frames are East, North, Up.
-- The simulator's gyroscope noise bounds are below what Mid-Air contains (median 0.014 to 0.021 rad/s per sample).
-- Ilhan's review specifies states (ACQUIRING, TRACKING, DEGRADED, LOST), rejection reasons and metrics. It proposes SIFT keypoints as the verifier; on ALTO keypoints fail and brightness matching works (`docs/findings.md`, 3.2).
-- ALTO orientation: x forward, y right, z down. The camera frame needs a rotation of 90 degrees minus the heading (`experiments/m_alto_orientation.py`).
+| `main` | | Plan, findings up to Friday, experiments; Felix's `TRN/` ("Final TRN", baa4326) | Not reviewed by us |
+| `alto-navigator` | Dustin and the assistant | The camera navigator, UAV-VisLoc, heading sensors, checks, limits, replay; the working doc | Pushed, 134 tests |
+| `sim-demo` | Dustin and the assistant | Dan's simulator plus Ilhan's patch | Pushed 3e9458a; the demo work goes here |
+| `simulations` | Dan | ROS 2 and Gazebo simulator | Last push Friday 22:19; pull request 1 open |
+| `mid-air-vio` | Alessandro | Error-state Kalman filter on Mid-Air, benchmark, gyro-bias filter, sun detector | 13 to 33 m after 83 s on held-out flights; see status doc 5a |
+| `research/offline-nav-evidence` | Ilhan | Overnight research (in French): ALTO Round 2 held-out test, quarters rule, Taiwan coverage, simulator patch | His ALTO numbers used the old search; asked to rerun |
+| `docs/denseuav-critical-review` | Ilhan | Review of the DenseUAV idea | |
+| `mid-air-baseline`, `mid-air-baseline-fix` | Alessandro, Dustin | IMU baseline on Mid-Air | Superseded by `mid-air-vio` |
 
 ## Open issues
 
-- Roles are not assigned. Targets for the integrity check are not agreed.
-- Results 2 and 3 exist only as experiment scripts.
-- ALTO results are tuned and reported on the same 4.6 km section. The training section has to be downloaded in a browser.
-- Turns are not handled on ALTO.
-- The phone walk has no owner. It needs daylight.
+- Which branches reach `main`, and the one story for the slides: team decisions.
+- `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers; remove both before the repository is made public. Five more papers of Dustin's sit untracked in the old Desktop copy's `research/`, on purpose.
+- Mid-Air is licensed for non-commercial use; UAV-VisLoc states no licence.
 - Nothing has been timed on a small board.
-- `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers. Remove both before the repository is made public. `docs/brief.md` paraphrases the members-only challenge page.
-- Mid-Air is licensed for non-commercial use.
+- `docs/brief.md` paraphrases the members-only challenge page; check before the repository is made public (Ilhan).
 - The formulas in `docs/data.md` and in the review use `\[ ... \]`, which GitHub does not render.
 - The native uv is at `~/.local/bin/uv` on Dustin's laptop; the `uv` on the shell path is still the Intel build.
 
-## Next exact step
+## Overnight research, Saturday 3 October 00:00-09:30 (branch `research/offline-nav-evidence`)
 
-Saturday morning, in this order: Alessandro confirms `mid-air-baseline-fix`; merge the three branches into `main`; the team fills the roles table; then `experiments/h_alto_end_to_end.py` is turned into shared code for result 2.
+- Start with `docs/research/overnight-synthesis.md`. Details per track in `docs/research/`; open questions in `questions.md`.
+- Most important result, rerun leak-free at 13:00 with our navigator (`experiments/w_dustin_heldout.py`): on ALTO Round 2 Train (37.4 km, never used for tuning, pre-registered, parameters frozen) the median of the section medians is 131 m with a fix every 300 m (Val: 31 m). Treat the Val numbers as tuned on the test set.
+- `data/raw/alto/Val.zip` and `UAV_Round2_Train.zip` are on Ilhan's laptop, fetched with per-file Dropbox links (method in `docs/research/datasets-replay-sim.md`).
+- New experiment scripts use prefixes `n_` to `v` in `experiments/`; outputs in `data/processed/`. Optional dependencies: `uv sync --extra research`.
+- Context for Alessandro's VIO work: `docs/research/contesto-alessandro.md` (Italian) and `docs/research/context-alessandro-en.md` (English).
+- Context for Dustin's ALTO navigator, including the Round 1 Train position files that unblock his held-out test: `docs/research/context-dustin.md`.
+- The ALTO scripts on this branch (`t_alto_heldout.py`, `r_alto_matchers.py`) still search the reference images centred on the true path. Rerun them with the one-map search of `alto-navigator` before quoting their numbers.

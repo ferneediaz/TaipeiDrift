@@ -22,5 +22,25 @@ dependencies = [
     "h5py>=3.16.0",
 ]
 
+[project.optional-dependencies]
+research = [
+    "kornia>=0.8.3",
+    "pyshp>=3.1.6",
+    "pyulog>=1.2.4",
+    "romatch",
+    "rosbags>=0.11.5",
+    "shapely>=2.1.2",
+    "torch>=2.14.1",
+    "tqdm>=4.70.1",
+    "vismatch>=1.2.1",
+]
+
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+romatch = { git = "https://github.com/Parskatt/RoMa" }
+
+[tool.pytest.ini_options]
+testpaths = ["baseline/tests", "vio/tests"]
+pythonpath = ["baseline", "."]

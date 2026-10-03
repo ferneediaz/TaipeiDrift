@@ -1,0 +1,6 @@
+Run city_20261003_085928; launch logs are emitted by ros2 launch.
+sim_t=0.10s gnss_available=True gt_enu=(0.0,0.0,0.0) csv_rows=1
+sim_t=10.00s gnss_available=True gt_enu=(0.0,0.0,0.0) csv_rows=100
+sim_t=20.00s gnss_available=True gt_enu=(0.4,0.0,17.4) csv_rows=200
+sim_t=30.00s gnss_available=True gt_enu=(1.0,0.0,47.4) csv_rows=300
+sim_t=40.00s gnss_available=True gt_enu=(1.6,0.0,77.4) csv_rows=400
