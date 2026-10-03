@@ -56,3 +56,16 @@ Last updated: Saturday 3 October 2026, 13:05. Code freeze Sunday 10:00, demo 13:
 - `docs/PLAN.md` contains a mentor table and `research/` contains other authors' papers; remove both before the repository is made public. Five more papers of Dustin's sit untracked in the old Desktop copy's `research/`, on purpose.
 - Mid-Air is licensed for non-commercial use; UAV-VisLoc states no licence.
 - Nothing has been timed on a small board.
+- `docs/brief.md` paraphrases the members-only challenge page; check before the repository is made public (Ilhan).
+- The formulas in `docs/data.md` and in the review use `\[ ... \]`, which GitHub does not render.
+- The native uv is at `~/.local/bin/uv` on Dustin's laptop; the `uv` on the shell path is still the Intel build.
+
+## Overnight research, Saturday 3 October 00:00-09:30 (branch `research/offline-nav-evidence`)
+
+- Start with `docs/research/overnight-synthesis.md`. Details per track in `docs/research/`; open questions in `questions.md`.
+- Most important result, rerun leak-free at 13:00 with our navigator (`experiments/w_dustin_heldout.py`): on ALTO Round 2 Train (37.4 km, never used for tuning, pre-registered, parameters frozen) the median of the section medians is 131 m with a fix every 300 m (Val: 31 m). Treat the Val numbers as tuned on the test set.
+- `data/raw/alto/Val.zip` and `UAV_Round2_Train.zip` are on Ilhan's laptop, fetched with per-file Dropbox links (method in `docs/research/datasets-replay-sim.md`).
+- New experiment scripts use prefixes `n_` to `v` in `experiments/`; outputs in `data/processed/`. Optional dependencies: `uv sync --extra research`.
+- Context for Alessandro's VIO work: `docs/research/contesto-alessandro.md` (Italian) and `docs/research/context-alessandro-en.md` (English).
+- Context for Dustin's ALTO navigator, including the Round 1 Train position files that unblock his held-out test: `docs/research/context-dustin.md`.
+- The ALTO scripts on this branch (`t_alto_heldout.py`, `r_alto_matchers.py`) still search the reference images centred on the true path. Rerun them with the one-map search of `alto-navigator` before quoting their numbers.
