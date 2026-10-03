@@ -27,6 +27,7 @@ from vio.data.midair_camera import frame_to_imu_index, open_frames
 from vio.estimation.eskf import ImuNoiseModel
 from vio.estimation.eskf_runner import (
     BaroUpdateConfig,
+    DirectionUpdateConfig,
     EskfInputs,
     EskfOutput,
     FlowUpdateConfig,
@@ -43,7 +44,7 @@ from vio.vision.optical_flow import FlowConfig, flow_pairs_from_tracks, height_f
 
 BIAS_SCORE_WINDOW_S = 20.0
 
-# name: (forward relative rotation, down-camera flow, barometer altitude)
+# name: (forward relative rotation, down-camera flow, barometer altitude[, forward translation direction])
 # The assumed platform carries a barometer (docs/PLAN.md), so every visual configuration is
 # compared against "imu_baro". "imu_only" is the pure IMU-only baseline, kept for continuity.
 ABLATIONS = {
@@ -52,6 +53,8 @@ ABLATIONS = {
     "forward_rotation": (True, False, True),
     "down_flow": (False, True, True),
     "both": (True, True, True),
+    "forward_direction": (True, False, True, True),
+    "both_direction": (True, True, True, True),
 }
 
 
@@ -70,7 +73,7 @@ def noise_model(cfg: dict) -> ImuNoiseModel:
 # ------------------------------------------------------------ front ends (cached)
 def _cached_tracks(traj: Trajectory, setup: CameraSetup, tracker, first_frame: int, last_frame: int,
                    cache_dir: Path | None) -> tuple[list[TrackResult], tuple[int, int]]:
-    frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream)
+    frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream, traj.metadata.get("frames_dir"))
     shape = frames.read_gray(first_frame, setup.downscale).shape
     key = hashlib.sha1(json.dumps([traj.metadata["file"], traj.metadata["trajectory"], setup.stream, setup.downscale,
                                    first_frame, last_frame, tracker.__dict__], sort_keys=True).encode()).hexdigest()[:16]
@@ -108,7 +111,7 @@ def prepare_visual_inputs(traj: Trajectory, cfg: dict, vio_cfg: dict, k0: int, i
         fc = cfg["forward_camera"]
         setup = CameraSetup.from_config(vio_cfg, fc["camera"])
         tr_cfg = replace(tracker_config(vio_cfg), max_keyframe_age=int(fc["max_keyframe_age"]))
-        frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream)
+        frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream, traj.metadata.get("frames_dir"))
         rng = frame_range(frames, setup, imu_rate, k0, len(traj))
         tracks, shape = _cached_tracks(traj, setup, tr_cfg, rng.start, rng.stop - 1, cache_dir)
         K = setup.intrinsics(shape[1], shape[0])
@@ -118,7 +121,7 @@ def prepare_visual_inputs(traj: Trajectory, cfg: dict, vio_cfg: dict, k0: int, i
         dc = cfg["down_camera"]
         setup = CameraSetup.from_config(vio_cfg, dc["camera"])
         tr_cfg = replace(tracker_config(vio_cfg), max_keyframe_age=1)
-        frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream)
+        frames = open_frames(Path(traj.metadata["file"]), traj.metadata["trajectory"], setup.stream, traj.metadata.get("frames_dir"))
         rng = frame_range(frames, setup, imu_rate, 0, len(traj))
         to_imu = lambda i: frame_to_imu_index(i, imu_rate, setup.rate_hz, setup.frame_offset_samples)  # noqa: E731
         learn_frames = int(round(dc["height_learning_window_s"] * setup.rate_hz))
@@ -177,12 +180,12 @@ def learn_height_before_cutoff(traj: Trajectory, pairs: list, R_bc: np.ndarray, 
 
 # ------------------------------------------------------------------ running
 def run_ablation(traj: Trajectory, k0: int, vis: VisualInputs, cfg: dict, name: str) -> EskfOutput:
-    use_rot, use_flow, use_baro = ABLATIONS[name]
+    use_rot, use_flow, use_baro, use_dir = (ABLATIONS[name] + (False,))[:4]
     fc, dc = cfg["forward_camera"], cfg["down_camera"]
     inp = EskfInputs(
         traj.timestamp[k0:], traj.accelerometer[k0:], traj.gyroscope[k0:], traj.gyroscope_frame, traj.gravity_world,
         NavState(traj.position_gt[k0].copy(), traj.velocity_gt[k0].copy(), traj.attitude_gt[k0].copy()), k0,
-        rotation_measurements=vis.rotation_measurements if use_rot else None, R_bc_forward=vis.R_bc_forward,
+        rotation_measurements=vis.rotation_measurements if (use_rot or use_dir) else None, R_bc_forward=vis.R_bc_forward,
         flow_pairs=vis.flow_pairs if use_flow else None, R_bc_down=vis.R_bc_down, focal_px_down=vis.focal_px_down,
         height_above_ground=vis.height_above_ground if use_flow else None,
         baro_altitude_change=vis.baro_altitude_change if use_baro else None,
@@ -199,7 +202,10 @@ def run_ablation(traj: Trajectory, k0: int, vis: VisualInputs, cfg: dict, name: 
                                 gate_prob=dc["gate_prob"],
                                 flow=FlowConfig(min_tracks=dc["min_tracks"], min_inlier_ratio=dc["min_inlier_ratio"],
                                                 max_residual_px=dc["max_residual_px"]))
-    return run_eskf(inp, noise_model(cfg), rot_cfg, flow_cfg, baro_cfg=baro_cfg)
+    dc = cfg.get("direction", {})
+    dir_cfg = DirectionUpdateConfig(enabled=use_dir, sigma_deg=dc.get("sigma_deg", 1.5), min_speed_mps=dc.get("min_speed_mps", 0.5),
+                                    gate_prob=dc.get("gate_prob", 0.99))
+    return run_eskf(inp, noise_model(cfg), rot_cfg, flow_cfg, baro_cfg=baro_cfg, dir_cfg=dir_cfg)
 
 
 # --------------------------------------------------------------- evaluation

@@ -209,3 +209,34 @@ def ntu_rows(seq: str, d: dict, cal: dict, vio_cfg: dict, max_seconds: float | N
         pj = np.array([np.interp(iv.t_j, p_t, P[:, k]) for k in range(3)])
         rows.append(interval_row("ntu", "viral", seq, iv, Ri, Rj, pi, pj, cal["R_bc"]))
     return rows, {"image_rate_hz": float(rate), "frames_per_interval": age, "frames_processed": n}
+
+
+def ntu_visual_measurements(d: dict, cal: dict, vio_cfg: dict, imu_t: np.ndarray, span_s: float = 1.0):
+    """Forward-camera keyframe measurements for the ESKF on NTU (same front end, undistorted points).
+
+    Keyframe age is time-based (closest frame count to ``span_s``); one measurement per completed
+    span, with the relative rotation (body axes) and the translation direction (camera axes).
+    """
+    from vio.vision.measurements import VisualMeasurement
+    img_t = d["img_t"] + cal["t_shift"]
+    rate = 1.0 / np.median(np.diff(img_t))
+    age = frames_for(rate, span_s)
+    tracker = KeyframeTracker(replace(TrackerConfig(**vio_cfg["tracker"]), max_keyframe_age=age))
+    K, D, R_bc = cal["K"], cal["D"], cal["R_bc"]
+    undist = lambda p: cv2.undistortPoints(p.reshape(-1, 1, 2), K, D, P=K).reshape(-1, 2)  # noqa: E731
+    pose_cfg = PoseConfig(**vio_cfg["pose"])
+    out = []
+    for i in range(len(img_t)):
+        tr = tracker.process(d["imgs"][i], i)
+        if not getattr(tr, "reanchor", ""):
+            continue
+        ii, jj = int(np.searchsorted(imu_t, img_t[tr.keyframe_index])), int(np.searchsorted(imu_t, img_t[tr.frame_index]))
+        a, b = tr.keyframe_points.astype(np.float64), tr.current_points.astype(np.float64)
+        pose = estimate_relative_pose(undist(a), undist(b), K, pose_cfg) if len(a) >= 5 else None
+        ok = pose is not None and pose.valid
+        out.append(VisualMeasurement(tr.frame_index, tr.keyframe_index, jj, ii, ok,
+                                     [R_bc @ pose.rotation @ R_bc.T] if ok else [], pose.translation_dir if ok else None,
+                                     n_correspondences=len(a), n_inliers=pose.n_inliers if pose else 0,
+                                     inlier_ratio=pose.inlier_ratio if pose else 0.0, end_of_span=True,
+                                     reason="" if ok else (pose.reason if pose else "too few tracks")))
+    return out, rate, age
