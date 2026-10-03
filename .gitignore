@@ -39,3 +39,6 @@ sim/models/islands/
 sim/bags/
 *.mcap
 *.db3
+
+# simulator recordings (sim/nodes/recorder.py)
+recordings/

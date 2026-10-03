@@ -1,0 +1,40 @@
+# Camera navigator on the simulated Wufeng flight (sim/scripts/route_flight.py, recorded by sim/nodes/recorder.py).
+# Relative paths are resolved from the repository root.
+#
+# Unlike UAV-VisLoc, the dead reckoning here is real: optical flow on the simulated camera images, as on ALTO.
+# The ground the camera sees is the 2020 aerial image; the map is the 2018 image (map_2018) or, to show the
+# price of an old map, the 2020 image itself (map_2020_fresh).
+
+output_dir: outputs/sim_navigator
+recording: recordings/wufeng_corridor_100m
+route: sim/scenarios/wufeng_corridor.json
+cache_dir: data/processed
+maps:
+  "2018": data/raw/aerial/wufeng_2018-05-03_x4.tif
+  "2020": data/raw/aerial/wufeng_2020-03-23_x4.tif
+seeds: [1, 2, 3]          # each seed draws its own compass error
+alert_limit_m: 50.0
+plot: [camera_alone, map_2018, map_2020_fresh]
+
+navigator:                # the settings frozen for the UAV-VisLoc held-out test (confirm_body), GNSS for the first 450 m
+  jam_after_m: 450.0
+  search: area
+  fix_every_m: 300.0
+  min_score: 0.33
+  fix_sigma_m: 15.0
+  drift_rate: 0.10
+  gate_sigmas: 3.0
+  min_search_radius_m: 60.0
+  max_search_radius_m: 600.0
+  confirm_jumps: true
+  offset_frame: body
+  camera_motion_floor: 0.3
+  motion_fit: rotation_scale  # the fixed camera of a quadcopter tilts in turns; see navigator_core.fit_rotation_scale
+
+heading:                  # src/sensors/heading.py
+  compass: {offset_sd_deg: 4.0, noise_sd_deg: 1.0}
+
+runs:
+  camera_alone:   {map: "2018", fix_every_m: null}
+  map_2018:       {map: "2018"}
+  map_2020_fresh: {map: "2020"}
