@@ -128,4 +128,32 @@ python baseline/scripts/run_sim_navigator.py --recording recordings/wufeng_north
 python baseline/scripts/run_sim_navigator.py --recording recordings/wufeng_south_110m --route sim/scenarios/wufeng_south_110m.json [--camera realistic]
 ```
 
-Results: not run yet.
+### The result
+
+Run once on Saturday 3 October 2026, 18:46 to 18:52, at tag `frozen-navigator` (log: `outputs/sealed_run.log`).
+Three draws of the heading sensor; medians over the draws, in metres.
+
+| Sealed flight | Camera alone | With the 2018 map: median / 90 percent / worst | Fixes used per draw | Wrong fixes | Stated bound held | With the 2020 map |
+|---|---|---|---|---|---|---|
+| North first, 90 m, 4.3 km without GNSS | 70.6 | **36.3 / 70 / 90** | 12, 7, 7 | none | 100% in every draw | 18.4 |
+| South first, 110 m, 4.5 km without GNSS | 57.6 | **16.2 / 38 / 58** | 14, 15, 15 | none | 100% in every draw | 11.8 |
+
+With the realistic camera: 21.8 / 60 / 85 m and 15.3 / 33 / 48 m, no wrong fix, the bound held 100 percent.
+Both flights work, with both cameras: no wrong fix used, the true error within the stated 3 sigma all the time,
+never "within 50 m" while further off.
+
+![Sealed flight, 90 m](figures/sealed_north_90m.png)
+
+![Sealed flight, 110 m](figures/sealed_south_110m.png)
+
+How to read it:
+
+- **The map fixes cut the camera's drift** from 71 to 36 m on one flight and from 58 to 16 m on the other, with a map
+  two years older than the ground.
+- **The 90 m flight is the weaker one.** Its three draws give 20, 36 and 42 m: in two of them the navigator used only
+  7 of its 16 fix attempts and held the others back. It stayed honest and became less accurate. The largest error
+  in any draw was 128 m (62 m on the 110 m flight), inside the bound it stated at that moment.
+- **The bound is honest and wide.** Three sigma is above 50 m for 71 to 81 percent of the time, so with an alert
+  limit of 50 m the navigator says "I cannot promise 50 m" most of the time, and is right when it does promise.
+- **Two flights, one place, one simulator.** The development flights showed what a turn and fog can do; these two
+  flights did not show it, and that is no proof it cannot happen.
