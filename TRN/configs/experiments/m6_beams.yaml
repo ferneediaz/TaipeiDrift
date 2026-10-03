@@ -1,0 +1,11 @@
+name: m6_beams
+description: M6 - single nadir beam vs 3 slant beams (25 deg), clear and 50 % cloud.
+routes: [A_mountain_crossing, B_coastal_plain, C_foothills]
+filters: [mpf_baseline, mpf_proposed]
+runs: 20
+quick_runs: 4
+overrides:
+  atmosphere.enabled: true
+sweep:
+  laser.beam_set: [nadir, slant3]
+  atmosphere.cloud_fraction: [0.0, 0.5]

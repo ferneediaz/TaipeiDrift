@@ -1,0 +1,10 @@
+name: m5_clouds
+description: M5 - cloud fraction sweep 0-90 %, baseline vs proposed (paired runs, same sensor data).
+routes: [A_mountain_crossing, B_coastal_plain, C_foothills]
+filters: [tercom, mpf_baseline, mpf_gated, mpf_proposed]
+runs: 30
+quick_runs: 6
+overrides:
+  atmosphere.enabled: true
+sweep:
+  atmosphere.cloud_fraction: [0.0, 0.1, 0.3, 0.5, 0.7, 0.9]

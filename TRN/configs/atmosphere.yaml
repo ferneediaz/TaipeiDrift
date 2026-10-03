@@ -1,0 +1,27 @@
+enabled: false
+cloud_fraction: 0.0          # scenario parameter 0..1: coverage of the cloud layer
+field_res_m: 100.0           # resolution of random fields
+wind_mps: [8.0, 3.0]         # E, N cloud advection
+clear_air:
+  ext_surface_per_km: 0.1    # 1550 nm, clear air
+  scale_height_m: 1200.0
+layer:                       # per-route cloud layer (MSL); thickness tapers to 0 at cloud edges
+  corr_length_m: 4000.0
+  max_thickness_m: 400.0
+  edge_width: 0.6            # in field std units: thickness ramps from 0 to max over this
+  ext_per_km: 25.0           # stratocumulus-like extinction
+  base_msl_m:
+    A_mountain_crossing: 2000.0
+    B_coastal_plain: 700.0
+    C_foothills: 1000.0
+valley_fog:
+  enabled: true
+  fraction: 0.5              # coverage of fog-prone valley cells when clouds are enabled
+  scale_with_cloud_fraction: true
+  corr_length_m: 3000.0
+  top_msl_m:
+    A_mountain_crossing: 900.0
+    B_coastal_plain: 60.0
+    C_foothills: 500.0
+  tpi_radius_m: 1500.0       # valley = terrain below its local mean (topographic position index < 0)
+  ext_per_km: 20.0           # ~200 m visibility

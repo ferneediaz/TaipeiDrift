@@ -1,0 +1,8 @@
+source: moi_dem              # moi_dem | glo30 (placeholder)
+resolution_m: 30.0           # 30 or 40 (mimics global DEM products)
+error_field:
+  sigma_m: 0.0               # smooth correlated error field (0 = off)
+  corr_length_m: 1000.0
+shift_m: [0.0, 0.0]          # horizontal mis-registration E, N
+glo30:
+  path: null                 # Copernicus GLO-30 GeoTIFF (EGM2008 heights, WGS84) - not yet available

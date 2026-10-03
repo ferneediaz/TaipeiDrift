@@ -1,0 +1,15 @@
+[project]
+name = "trn"
+version = "0.1.0"
+description = "Obscuration-aware laser terrain-referenced navigation simulator (Taiwan)"
+requires-python = ">=3.11,<3.12"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["trn*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
