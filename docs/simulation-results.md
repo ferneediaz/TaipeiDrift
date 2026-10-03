@@ -289,3 +289,56 @@ needs the fix check to improve, not the filter.
 
 **This version has not been run on the sealed flights.** Their result above is the declared one, and it stays.
 For a live integration use the start uncertainty of 3 m.
+
+## Live in the city world: Alessandro's speed from the downward camera and a range finder
+
+Saturday 3 October 2026, 20:48. His commit c24118c (20:25) and his note [`VERY IMPORTANT.md`](../VERY%20IMPORTANT.md).
+It is a second way to measure ground speed with the downward camera, live in the simulator, and it is switched
+off by default (`metric_flow:=true` turns it on).
+
+**What it does.** A range finder points down (one beam, up to 100 m). Corner points are tracked between two
+pictures 0.04 s apart; assuming flat ground at the measured range, their motion in the picture becomes metres
+per second; the filter takes that speed behind its usual 99 percent gate.
+
+**His result** (one run, city world, 80 m above the street, 8 m/s, GNSS cut after 20 s):
+
+| Time without GNSS | 5 s | 10 s | 20 s | 30 s | 136 s (the end) |
+|---|---|---|---|---|---|
+| Position error | 1.6 m | 3.0 m | 4.7 m | 12.3 m | 426 m (644 m at worst) |
+
+The speed readings were 4.45 m/s off in the median (7.58 m/s at the 90th percentile) at a cruising speed of 8 m/s.
+Of 266 readings offered to the filter it took 88 and turned down 178. His conclusion: leave it off, and do not
+present the run as navigation without GNSS. His earlier run without this measurement was 28 m off after 20 s and
+259 m after 105 s; the two are single runs with different settings, so they do not show whether the new
+measurement helps or hurts, as he writes himself.
+
+**Why the readings are that far off: our check** (`python scripts/metric_flow_check.py`: his code on made-up
+points, no simulator; his run files are on his machine, so this is a check of the method and not of his run).
+The city's buildings are 16 to 63 m high and the drone flies at 80 m. A point on the street is 80 m below the
+camera, a point on a 58 m roof only 22 m. The one beam reads one of those depths; the tracked points lie at the
+other, or at both.
+
+| Case, at a true speed of 8 m/s | Speed error |
+|---|---|
+| Points on the street, beam on a 58 m roof (the speed comes out 22/80 of the truth) | 5.8 m/s |
+| Points on a 58 m roof, beam on the street (80/22 = 3.6 times too fast) | 21 m/s |
+| The same with an 18 m building | 1.8 to 2.3 m/s |
+| Half the points on roofs, beam on the street | 2.5 m/s; the fit's own check turns down 0 to 4 percent |
+| Flat ground and the right range, tracking noise only (25 points, half a pixel) | 1.25 m/s |
+| The same with pictures 0.2 s apart | 0.25 m/s |
+
+A wrong depth gives errors of the size he measured; tracking noise alone gives less than a third of it. The
+noise is that large only because the picture moves 1.0 pixel between two frames 0.04 s apart; with frames 0.2 s
+apart it moves 5.1 pixels and the same noise matters five times less. His `flow_velocity.csv` can settle it:
+a wrong depth leaves the direction right and the speed wrong.
+
+**What it means for our numbers.**
+
+- None of them change. Our camera speed is measured in another way: flow over the whole picture, pictures 0.2 s
+  apart, one scale learned against GNSS before the loss and kept, the heading from the sun sensor, and a reading
+  far from what the filter expects is weakened instead of turned down.
+- It rests on the same assumption, flat ground: one scale for the whole picture. Our simulated ground is a flat
+  photo, so our flights never tested that. Over buildings that are tall compared with the flight height it would
+  fail in the same way. His run is the first measurement of what happens when the assumption is broken.
+- Live in the simulator, without GNSS, only the ships' radio fix holds the position so far (Dan's strait world).
+  The live filter on its own diverges, with or without the new measurement.
