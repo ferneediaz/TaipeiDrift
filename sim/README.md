@@ -91,8 +91,9 @@ The Gazebo window appears in the browser tab. Launch options:
 | `cam_res` | `1024` | Down camera width and height in pixels. 1024 matches Mid-Air; use 512 if the simulation runs slowly |
 | `gps` | `true` | `false` removes the GNSS receiver |
 | `gui` | `true` | `false` runs Gazebo without its window |
-| `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods) or `islands` (two islands and open sea) |
+| `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods), `islands` (two islands and open sea) or `strait` (the islands with warships that transmit AIS) |
 | `demo` | `false` | `true` flies circles (in `islands`: from island to island) and opens the camera view and the sensor monitor |
+| `ships` | `auto` | `true` sails AIS-transmitting ships and runs the drone's AIS receiver (see below); `auto` means on in `strait` only |
 
 Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gps:=false`.
 
@@ -222,6 +223,80 @@ docker compose exec sim bash -ic "python3 sim/nodes/record_midair.py --world isl
 
 `--route pads` flies between the helipads, and `--route survey` flies lines over both islands. Each run of the recorder adds the next `trajectory_XXXX`. Wait until the drone has climbed (about 20 s) before recording. Sizes: about 45 kB per frame over open sea and about 150 kB over land, so roughly 0.5 GB for a flight from pad to pad and back and 3 GB for a full survey. `data/sim/` is not committed.
 
+## The `strait` world: warships, their radios, and a direction finder on the drone
+
+How the position is worked out from the ships' radio, with the math and results: [RF_README.md](RF_README.md).
+
+```bash
+sim/run.sh     # on the host: starts the container, launches this world without GPS, opens the browser
+```
+
+The same by hand: `docker compose exec -d sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=strait demo:=true gps:=false cam_res:=512 > /tmp/sim.log 2>&1"`. `sim/run.sh islands` starts another world, extra arguments go to the launch file, and `PORT=6081 sim/run.sh` moves the browser desktop to another port.
+
+`gps:=false` takes the drone's GNSS receiver away for the run; the drone then finds its position from the ships (below).
+
+The browser desktop shows:
+- **Gazebo window, main view:** the chase camera behind the drone.
+- **Gazebo window, right-hand panels:** an overview from a fixed camera high in the south, showing the islands and all three ships, and the drone's down camera. A red ball floats 30 m above the drone so it can be found in the overview. It is only a visual, and the down camera does not see it.
+- **Top right:** the RSSI map (see [RF_README.md](RF_README.md)).
+- **Bottom right:** the sensor monitor.
+
+`worlds/strait.sdf` is the islands world with three warships at full size. The scenery is the same, and the `islands` world itself has no ships. Each ship patrols a box at one corner of a triangle around the drone's route, so the drone always hears them from three well-separated directions:
+
+| Ship | Size | Patrol |
+|---|---|---|
+| carrier | 330 × 77 m, mast top 60 m | north corner, x 100 to 800 m, y 750 to 900 m, 15 knots |
+| destroyer | 155 × 20 m, mast top 40 m | south-west corner, x −650 to −250 m, y −550 to −350 m, 18 knots |
+| frigate | 138 × 14 m, mast top 35 m | south-east corner, x 1100 to 1500 m, y −550 to −350 m, 10 knots |
+
+Change their sizes and routes in `config/rf.yaml`. The ships transmit AIS, the radio every large ship carries. The drone receives them and measures the bearing to each, and works out its own position from those bearings.
+
+**Why not Gazebo's `RFComms`.** Gazebo's RF system cannot switch to GMSK: QPSK is hardcoded in its bit error rate and the `<modulation>` setting is never used. It also only says whether a unicast packet arrived; it has no broadcast and no bearing. And it under-counts lost packets about 8 times, by raising the bit error rate to the number of bytes, not bits. So the radio is modelled in `nodes/rf_model.py` instead, along the same chain (path loss, shadowing, bit error rate, packet error rate) with GMSK and those errors fixed.
+
+**The radio.** All numbers are in `config/rf.yaml` (from ITU-R M.1371-5 and IEC 61993-2). GMSK has no spreading factor; that belongs to LoRa.
+
+| | |
+|---|---|
+| Frequencies | 161.975 and 162.025 MHz (AIS 1 and 2), used in turn |
+| Modulation | GMSK, BT 0.4, 9600 bit/s, 25 kHz channel, 256-bit packets |
+| Transmit power | Class A (the warships here) 12.5 W = 41 dBm; Class B (small craft) 2 W = 33 dBm |
+| How often | Class A every 10 s up to 14 knots, 6 s up to 23 knots; Class B every 30 s; ±10 % jitter |
+| Drone receiver | 0 dBi whip, noise figure 6 dB, noise floor −124 dBm, sensitivity −110 dBm at 20 % packets lost |
+| Path loss | direct ray plus the ray reflected off the sea, nothing past the radio horizon (about 48 km for Class A), 3 dB shadowing |
+| Bearing | in the drone's body frame; σ 3° at good signal, more when weak; a fixed bias of about 1° drawn per run |
+
+The receiver loses about 10 dB against an ideal GMSK detector. That loss is computed at startup so the receiver meets its sensitivity exactly. `python3 sim/scripts/check_rf.py` prints the link budget against range and checks the model; no simulator is needed. A Class A ship is heard out to the radio horizon, about 48 km from a drone at 40 m.
+
+**Topics** (JSON in `std_msgs/String`; fields in `nodes/rf_sensor.py`):
+
+| Topic | What |
+|---|---|
+| `/rf/detections` | one per decoded packet: MMSI, channel, RSSI, SNR, bearing in the body frame and its σ. This is all the drone knows |
+| `/rf/truth` | one per transmission, decoded or not: true range, bearings, received power, packet error rate. For scoring only |
+| `/rf/params` | the receiver calibration and the bias drawn for this run (latched) |
+| `/ships/<name>/odom` | each ship's true position, heading and speed |
+
+The bearing is in the body frame because a direction finder measures it against the airframe. Each detection also carries the position the ship reports (latitude and longitude, from the ship's own GNSS, 3 m error), as a real AIS position report does. The sensor monitor shows each ship's range, packets decoded, last RSSI and bearing error.
+
+### The drone's position from the ships, without GNSS
+
+`nodes/rf_nav.py` works out where the drone is from the bearings alone, and publishes it on `/rf_nav/odom`:
+
+- **Why three ships.** A bearing measured against the airframe depends on the drone's position and on its heading, and without GNSS the heading is unknown too. That is three unknowns, so it takes bearings to three ships at known positions for a fix (resection).
+- **First fix.** Once three ships have been heard within 12 s, it solves position and heading by least squares, after a grid search so it does not settle on a wrong solution.
+- **Then a Kalman filter** (state: position, velocity, heading, gyro bias). The noisy gyro carries the heading between bearings, a constant-velocity model carries the position, and each new bearing corrects both. A bearing arrives every 2 to 3 s.
+- **Inputs:** only `/rf/detections` and the noisy IMU; never ground truth.
+
+**Position from signal strength only.** The top-right window, `nodes/rssi_map.py`, shows what a plain AIS receiver could do with no direction finder. Each ship's RSSI is turned into a distance by inverting free-space loss, assuming a nominal Class A installation (41 dBm EIRP). Around each ship it draws a circle at that distance, with a ring for ±3.7 dB of uncertainty (fading, RSSI error, the model being simpler than reality). Where the three rings overlap is shaded red, 68 % and 95 %, and the most likely point is marked with an ×. Nothing is drawn until three different ships have been heard within the last 30 s; until then the map says how many it has. The bearing estimate and the true position are drawn too, for comparison. It is typically hundreds of metres off, against tens of metres for bearings. The sea reflection makes the signal 4 to 6 dB stronger or weaker than free space at some distances, and the receiver cannot know which. The map is for watching only; the navigator does not use RSSI.
+
+To score it against ground truth, with a map and an error plot saved to `data/sim/rf_nav/`:
+
+```bash
+docker compose exec sim bash -ic "python3 sim/scripts/check_rf_nav.py 300"
+```
+
+A first run (one pass from pad A to pad B, 170 s of simulation, real-time factor about 0.5) gave a median error of 48 m and a 95th percentile of 113 m, with heading within 2° RMS. The filter's own 2σ ellipse held the truth 98 % of the time. That is what 3° bearings over 0.6 to 1 km give: about 40 m across each line of bearing. A single three-ship snapshot is good to about 70 m; the filter does better by combining bearings over time.
+
 ## Frames
 
 Gazebo and ROS use ENU (x east, y north, z up) and a body frame that is forward, left, up. Mid-Air and `docs/PLAN.md` use NED. The live ROS topics are in ENU; `record_midair.py` converts to NED when it writes a recording.
@@ -229,6 +304,8 @@ Gazebo and ROS use ENU (x east, y north, z up) and a body frame that is forward,
 ## Files
 
 ```
+RF_README.md                position from ships' radio (AIS): bearings and RSSI, the math, results
+run.sh                      starts the container and the strait world, opens the browser
 compose.yaml, docker/       the container: ROS 2 Jazzy, Gazebo Harmonic, browser desktop
 launch/sim.launch.py        starts Gazebo, spawns the drone, bridges topics, adds noise
 models/midair_quad/         the drone
@@ -237,12 +314,21 @@ models/trees/               generated 3D trees (not committed)
 models/islands/             generated islands, sea and helipads (not committed)
 worlds/terrain.sdf          fields and woods
 worlds/islands.sdf          two islands and open sea
+worlds/strait.sdf           the islands with warships that transmit AIS
 config/bridge.yaml          Gazebo ↔ ROS topics
 config/sensor_noise.yaml    IMU noise bounds, barometer drift
 nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift
 nodes/sensor_monitor.py     live sensor values in the terminal
 nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
 nodes/record_midair.py      records a flight in the Mid-Air dataset format
+config/rf.yaml              ships, AIS radio, drone receiver and direction finder
+nodes/rf_model.py           AIS (GMSK) link model and bearing noise, no ROS
+nodes/rf_sensor.py          ship transmissions as the drone's AIS receiver hears them
+nodes/ship_traffic.py       sails the ships in Gazebo, publishes their true positions (drawn by launch/sim.launch.py)
+nodes/rf_nav.py             the drone's position and heading from bearings to three ships, without GNSS
+scripts/check_rf_nav.py     scores rf_nav against ground truth, saves a map and an error plot
+nodes/rssi_map.py           live map: where the drone could be from the ships' signal strength alone
+scripts/check_rf.py         link budget table and checks of the RF model
 scripts/record_islands_set.sh  records a set of flights over the islands world
 scripts/frame_info.py       prints the sensor values recorded with one picture
 scripts/check_recording.py  checks a recording: shapes, files, sensors against the truth, pictures against the map
