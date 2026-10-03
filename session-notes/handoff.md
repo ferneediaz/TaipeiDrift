@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 13:35. Code freeze Sunday 10:00, demo 13:00.
+Last updated: Saturday 3 October 2026, 13:05. Code freeze Sunday 10:00, demo 13:00.
 
 ## Resume here
 
@@ -23,7 +23,7 @@ Last updated: Saturday 3 October 2026, 13:35. Code freeze Sunday 10:00, demo 13:
    - 2018 (our on-board map): 10,851 x 14,820 px at 0.195 m, bounds W 216121.2, E 218233.8, S 2659765.7, N 2662651.0. In simulator metres its top-left corner is north +1393.45, east -1042.45. Load it as a `GroundMap`, resampled to about 0.5 m per pixel.
    - Only 33 percent of the rectangle holds imagery: a motorway corridor 300 to 600 m wide. The flight must follow it; get the centreline from the coverage mask.
 4. Flight: Ilhan's `sim/scripts/t_scenario.py` (velocity commands, altitude and heading hold from the simulator's truth) adapted: climb to about 120 m (90-degree camera: 240 m footprint, 0.47 m per pixel at 512 px), about 10 m/s along the corridor with its turns, GNSS cut after about 300 m (`gnss_cut_s`), `cam_res:=512 gui:=false` (real-time factor about 0.94). Record with `sim/nodes/recorder.py` (format `taipeidrift-replay/1`: CSVs imu, baro, gnss, images, truth). Known bug from Ilhan: the GNSS cut is written in simulation time, not in the recording's `t_s`.
-5. A loader from the replay format to `CameraFlight` (frames, truth north/east, timestamps, heading from the truth quaternion plus compass noise as the sensor), the 2018 image as `ground_map`, then the navigator (`search: area`, `camera_motion_floor: 0.3`, `confirm_jumps`), then `make_replay.py` for the video.
+5. A loader from the replay format to `CameraFlight` (frames, truth north/east, timestamps, heading from the truth quaternion plus compass noise as the sensor), the 2018 image as `ground_map`, then the navigator (`search: area`, `camera_motion_floor: 0.3`, `confirm_jumps`), then `make_replay.py` for the video. Run the navigator twice: with the 2018 image (two years old) and with the 2020 image (the ground itself, a fresh map as Ukraine's Eagle Eyes has). The difference is the price of an old map (`docs/landscape.md`, Eagle Eyes section).
 6. Later, if time allows: Alessandro's ESKF on the same recording, with our fixes as position updates (his `ESKF.update(r, H, R, gate_prob)`; a fix is a north/east measurement with 15 m accuracy). His filter's uncertainty is 2 to 5 times too small and he flagged a missing propagation term; both matter before fusing (status doc 5a).
 
 **Also left** (status doc section 7): computing time per fix and per frame and map storage per square kilometre; the README for the submission; slides with Dustin; team decisions on `main`.

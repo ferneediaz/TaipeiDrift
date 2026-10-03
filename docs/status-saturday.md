@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 13:15.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 13:05.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
@@ -45,6 +45,12 @@ What it says:
 | Navigator ignores the heading | Navigator uses the drone's heading (compass, or the mentor's sun sensor) | The brief lists heading, every drone has it, and without it we fail at the first turn |
 | Next step: blurred and dark frames | First: make the check against wrong fixes hold on unseen flights | Both held-out tests (ours and Ilhan's) show it is the weak point |
 | Sun sensor as a "future" slide | Sun sensor simulated now; the mentor's phone test measures it for real | The mentor's idea; gives a measured number |
+
+**Similar systems in the field** (researched at 13:00; details and sources in [landscape.md](landscape.md#eagle-eyes-and-the-systems-fielded-in-ukraine)):
+
+- Ukraine's special forces fly our idea at scale. Their "Eagle Eyes" matches live video of the ground against a map stitched from recent reconnaissance flights; in use since 2023, no accuracy published. The Tomahawk missile did the same in the 1980s. So we say openly that the idea is proven, and claim only the measured, honest weekend version.
+- Fielded systems that publish a number claim 15 to 20 m. We are at 28 to 31 m on the development flights and 60 m on held-out flight 04.
+- Their map is fresh; ours is years old, and that is exactly why flight 01 fails. The simulator will show the price of an old map: the same flight with the 2020 image and with the 2018 image as the map.
 
 **Achieved**
 
