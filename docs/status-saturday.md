@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 12:45.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 12:25.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
@@ -52,6 +52,12 @@ What it says:
 - **China (real drone photos against a map 2.5 years older):** the matcher, unchanged, finds 80 percent of the photos within 30 m.
 - **74 km without GNSS:** median 27 m, against 1,041 m without fixes. But about 11 wrong fixes slipped through and the drone got lost in stretches: our honest weakness. Ilhan found the same independently on unseen ALTO data (94 m instead of 31 m).
 - Built against it: confirmation of large jumps by the next fix, Ilhan's quarters check, the fix offset in the drone's own frame (fix error 19 to 13 m), compass and sun-sensor models, the aviation integrity measure.
+
+**Demo clips (ready)**, made with `python baseline/scripts/make_replay.py alto` and `... visloc --flight 04`; the videos are in `outputs/replay/` on Dustin's laptop (not in git, 20 MB each):
+
+- `alto_val.mp4`, 26 s: the real ALTO flight, camera motion and map fixes every 300 m.
+- `visloc_04_confirm_body_seed2.mp4`, 30 s: the unseen flight 04 with the frozen method (seed 2, the median of the three), over survey legs with turns; fixes used in green, refused in red, the search circle, the status.
+- Still images at 25, 50, 75 and 100 percent of each run, for the slides.
 
 **Asks to the team**
 
