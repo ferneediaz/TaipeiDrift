@@ -8,9 +8,10 @@ fixes used, and the status it reports.
 
 From the repository root:
 
-    python baseline/scripts/run_limits.py
+    python baseline/scripts/run_limits.py                 # as the navigator was
+    python baseline/scripts/run_limits.py --floor 0.3     # with the check that the camera still sees motion
 
-Results go to outputs/limits/: limits.csv, limits.png (the chart) and examples.png (what the
+Results go to outputs/limits/ (or outputs/limits_floor_0.3/): limits.csv, limits.png (the chart) and examples.png (what the
 camera sees at each level).
 """
 from __future__ import annotations
@@ -49,10 +50,10 @@ LABELS = {
 OUT = REPO_ROOT / "outputs" / "limits"
 
 
-def _setup():
+def _setup(floor: float | None = None):
     cfg = yaml.safe_load((BASELINE_DIR / "configs" / "alto_navigator.yaml").read_text())
     flight = load_alto_flight(AltoConfig(data_root=str(REPO_ROOT / "data/raw/alto"), ground_map=True, map_cache_dir=str(REPO_ROOT / "data/processed")))
-    run = replace(NavigatorConfig(**cfg["navigator"]), **cfg["runs"]["map_every_300"])
+    run = replace(NavigatorConfig(**cfg["navigator"]), **cfg["runs"]["map_every_300"], camera_motion_floor=floor)
     return flight, run
 
 
@@ -62,9 +63,9 @@ def degraded(flight, kind: str, level: float):
     return replace(flight, load_frame=lambda i: degrade(original(i), kind, level, i, FRAME_METRES_PER_PIXEL) if i > jam else original(i))
 
 
-def one_level(job: tuple[str, float]) -> dict:
-    kind, level = job
-    flight, run = _setup()
+def one_level(job: tuple[str, float, float | None]) -> dict:
+    kind, level, floor = job
+    flight, run = _setup(floor)
     clean_shifts = shifts_for_flight(flight, REPO_ROOT / "data/processed/alto_val_flow.npy")
     calibration = calibrate(flight, clean_shifts, run)
     t0 = time.time()
@@ -81,6 +82,7 @@ def one_level(job: tuple[str, float]) -> dict:
         "fixes_used": s.fixes_used, "fixes_refused": s.fixes_rejected, "used_but_wrong": s.used_but_wrong,
         "within_3_sigma": s.within_3_sigma, "tracking": float(np.mean(status == "TRACKING")),
         "degraded": float(np.mean(status == "DEGRADED")), "lost": float(np.mean(status == "LOST")),
+        "camera_lost_track": float(np.mean(result.lost_track)) if result.lost_track is not None else 0.0,
         "seconds": round(time.time() - t0, 1),
     }
 
@@ -139,8 +141,14 @@ def examples(path: Path) -> None:
 
 
 def main() -> int:
-    OUT.mkdir(parents=True, exist_ok=True)
-    jobs = [("clean", 1.0)] + [(kind, v) for kind, levels in LEVELS.items() for v in levels]
+    import argparse
+
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--floor", type=float, default=None, help="camera_motion_floor: share of the cruising step below which the camera is not believed")
+    args = p.parse_args()
+    out = OUT if args.floor is None else OUT.with_name(f"limits_floor_{args.floor:g}")
+    out.mkdir(parents=True, exist_ok=True)
+    jobs = [("clean", 1.0, args.floor)] + [(kind, v, args.floor) for kind, levels in LEVELS.items() for v in levels]
     t0 = time.time()
     rows = []
     with ProcessPoolExecutor(max_workers=8) as pool:
@@ -148,16 +156,53 @@ def main() -> int:
             rows.append(r)
             print(f"{r['kind']:5s} {r['level']:8.4g}: median {r['median']:6.1f} m, 90% below {r['p90']:6.1f}, "
                   f"fixes used {r['fixes_used']:2d} (wrong {r['used_but_wrong']}), refused {r['fixes_refused']:2d}, "
-                  f"within 3 sigma {r['within_3_sigma']:.0%}, lost {r['lost']:.0%} ({r['seconds']:.0f} s)", flush=True)
-    with open(OUT / "limits.csv", "w", newline="") as fh:
+                  f"within 3 sigma {r['within_3_sigma']:.0%}, lost {r['lost']:.0%}, camera lost track {r['camera_lost_track']:.0%} ({r['seconds']:.0f} s)", flush=True)
+    with open(out / "limits.csv", "w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
-    chart(rows, OUT / "limits.png")
-    examples(OUT / "examples.png")
-    print(f"results in {OUT} ({time.time() - t0:.0f} s)")
+    chart(rows, out / "limits.png")
+    examples(out / "examples.png")
+    print(f"results in {out} ({time.time() - t0:.0f} s)")
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def before_after(before_csv: Path, after_csv: Path, path: Path) -> None:
+    """One chart for the slides: the error and whether the stated bound held, without and with the check."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    def read(p):
+        with open(p) as fh:
+            return [{k: (v if k == "kind" else float(v)) for k, v in row.items()} for row in csv.DictReader(fh)]
+
+    runs = {"without the check": read(before_csv), "with the check": read(after_csv)}
+    colours = {"without the check": "#d64a4a", "with the check": "#1baf7a"}
+    fig, axes = plt.subplots(2, 3, figsize=(15, 7), sharey="row")
+    for col, kind in enumerate(LEVELS):
+        name, fmt = LABELS[kind]
+        for label, rows in runs.items():
+            clean = next(r for r in rows if r["kind"] == "clean")
+            mine = [clean] + sorted((r for r in rows if r["kind"] == kind), key=lambda r: -r["level"] if kind != "blur" else r["level"])
+            x = np.arange(len(mine))
+            axes[0, col].plot(x, [r["median"] for r in mine], "o-", color=colours[label], label=label)
+            axes[1, col].plot(x, [100 * r["within_3_sigma"] for r in mine], "o-", color=colours[label], label=label)
+        ticks = ["as recorded"] + [fmt(r["level"]) for r in mine[1:]]
+        for row in (0, 1):
+            axes[row, col].set_xticks(np.arange(len(ticks)), ticks)
+        axes[0, col].set_title(name)
+        axes[0, col].set_yscale("log")
+    axes[0, 0].set_ylabel("median position error (m)")
+    axes[1, 0].set_ylabel("frames where the stated\nbound held (%)")
+    axes[0, 0].axhline(472.4, color="#888", lw=1, ls=":")
+    axes[0, 0].legend(fontsize=9)
+    fig.suptitle("When the camera loses track of the motion: the navigator flies on at cruising speed and says so")
+    fig.tight_layout()
+    fig.savefig(path, dpi=140)
+    plt.close(fig)

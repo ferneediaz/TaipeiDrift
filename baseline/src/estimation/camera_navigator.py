@@ -64,6 +64,10 @@ class NavigatorConfig:
     # jump_limit_m is held until the next attempt, over different ground, agrees with it; then both are used
     jump_limit_m: float = 30.0  # twice the accuracy of one fix: a wrong fix closer than this does little harm
     confirm_above_radius_m: float = 150.0  # only searches wider than this need confirming: look-alikes come from wide searches
+    camera_motion_floor: float | None = None  # a camera step shorter than this share of the cruising step is not
+    # believed (the camera has lost track; a flying drone does not stop): the navigator then flies on at the
+    # cruising speed learned with GNSS, along the last believable direction. None switches the check off.
+    fallback_drift_rate: float = 0.30  # uncertainty growth while flying on like that, as a share of the distance
     quad_check: bool = False  # area search: the four quarters of the frame, searched alone, must land with the whole
     quad_needed: int = 3  # this many of the four quarters (Ilhan's rule "quad >= 3")
     quad_tolerance_share: float = 4.0 / 56.0  # Ilhan's 4 pixels on 56-pixel quarters, as a share of the quarter
@@ -100,6 +104,8 @@ class Calibration:
     fix_offset: np.ndarray  # (2,) a fix lands this far from the true position: north, east in m, or
     # forward, right in m when offset_frame is "body"
     offset_frame: str = "world"
+    cruise_speed_mps: float = 0.0  # mean ground speed while GNSS worked
+    last_direction: np.ndarray | None = None  # (2,) unit vector (north, east) of the motion just before the jam
 
     def offset_at(self, heading_deg: float | None) -> np.ndarray:
         """The fix offset in north and east at a heading (bearing from north, degrees).
@@ -144,6 +150,7 @@ class NavigatorResult:
     fixes: list[FixRecord]
     calibration: Calibration
     config: NavigatorConfig = field(repr=False)
+    lost_track: np.ndarray | None = None  # (M,) frames where the camera lost track and the navigator flew on at cruising speed
 
 
 def jam_index(flight: CameraFlight, jam_after_m: float) -> int:
@@ -182,6 +189,8 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
         offsets = np.column_stack([offsets[:, 0] * np.cos(a) + offsets[:, 1] * np.sin(a), -offsets[:, 0] * np.sin(a) + offsets[:, 1] * np.cos(a)])
     elif cfg.offset_frame != "world":
         raise ValueError(f"unknown offset frame {cfg.offset_frame!r}")
+    elapsed = float(flight.timestamp[jam] - flight.timestamp[0])
+    last = truth[jam] - truth[max(0, jam - 5)]
     return Calibration(
         jam_index=jam,
         motion_matrix=matrix,
@@ -189,6 +198,8 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
         angle=float(np.median([f.angle for f in fixes])),
         fix_offset=np.median(offsets, axis=0),
         offset_frame=cfg.offset_frame,
+        cruise_speed_mps=float(flight.travelled[jam] / elapsed) if elapsed > 0 else 0.0,
+        last_direction=last / max(float(np.linalg.norm(last)), 1e-9),
     )
 
 
@@ -227,19 +238,36 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
     pending: tuple[np.ndarray, int] | None = None  # a large jump waiting for the next fix: position, frame
     since_pending = 0.0
 
+    # The uncertainty grows with a drift budget: 10 percent of every believable camera step, more for a
+    # step flown on at cruising speed. With only camera steps this is drift_rate * since_fix, as before.
+    drift_since_fix = 0.0
+    direction = calibration.last_direction if calibration.last_direction is not None else np.array([1.0, 0.0])
+    lost_track = []  # per frame: did the camera lose track of the motion?
+
     path = [estimate.copy()]
     sigma = [float(np.sqrt(variance))]
     fixes: list[FixRecord] = []
     for k in range(jam + 1, len(flight)):
         step = shifts[k] @ calibration.motion_matrix * scale
+        rate = cfg.drift_rate
+        length = float(np.linalg.norm(step))
+        expected = calibration.cruise_speed_mps * float(flight.timestamp[k] - flight.timestamp[k - 1])
+        if cfg.camera_motion_floor is not None and expected > 0 and length < cfg.camera_motion_floor * expected:
+            step, rate, length = direction * expected, cfg.fallback_drift_rate, expected
+            lost_track.append(True)
+        else:
+            if length > 0:
+                direction = step / length
+            lost_track.append(False)
         estimate = estimate + step
-        since_fix += float(np.linalg.norm(step))
-        since_try += float(np.linalg.norm(step))
-        since_pending += float(np.linalg.norm(step))
+        since_fix += length
+        since_try += length
+        since_pending += length
+        drift_since_fix += rate * length
 
         if cfg.fix_every_m and since_try >= cfg.fix_every_m:
             since_try = 0.0
-            predicted = predicted_variance(variance, since_fix, cfg.drift_rate)
+            predicted = predicted_variance(variance, drift_since_fix, 1.0)
             zooms = np.clip(zoom + np.arange(-cfg.zoom_reach, cfg.zoom_reach + 0.01, cfg.zoom_step), *cfg.zoom_limits)
             radius = max(cfg.min_search_radius_m, cfg.gate_sigmas * float(np.sqrt(predicted)))
             if cfg.search == "area" and cfg.max_search_radius_m is not None:
@@ -280,7 +308,7 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
                 fixes.append(FixRecord(k, float("nan"), nothing, float("nan"), float("nan"), -1, 0, float("nan"), allowed, False, OFF_MAP, 0, searched))
                 pending = None
                 path.append(estimate.copy())
-                sigma.append(float(np.sqrt(predicted_variance(variance, since_fix, cfg.drift_rate))))
+                sigma.append(float(np.sqrt(predicted_variance(variance, drift_since_fix, 1.0))))
                 continue
             found = found_all[-1]
             position, score, agreeing = moved[-1], found.score, 1
@@ -327,9 +355,10 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
                 zoom = found.zoom
                 scale = zoom / calibration.zoom
                 since_fix = 0.0
+                drift_since_fix = 0.0
 
         path.append(estimate.copy())
-        sigma.append(float(np.sqrt(predicted_variance(variance, since_fix, cfg.drift_rate))))
+        sigma.append(float(np.sqrt(predicted_variance(variance, drift_since_fix, 1.0))))
 
     return NavigatorResult(
         start_index=jam,
@@ -337,6 +366,7 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
         sigma=np.array(sigma),
         status=[status(s, cfg.degraded_above_m, cfg.lost_above_m) for s in sigma],
         fixes=fixes,
+        lost_track=np.array([False] + lost_track),
         calibration=calibration,
         config=cfg,
     )

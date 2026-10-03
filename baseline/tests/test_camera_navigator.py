@@ -255,3 +255,28 @@ def test_area_search_off_the_map_is_reported(flight, shifts, area_calibration):
     assert result.fixes and all(f.reason == OFF_MAP and not f.used for f in result.fixes)
     alone = navigate(flight, shifts, area_calibration, replace(AREA, fix_every_m=None))
     np.testing.assert_array_equal(result.position, alone.position)
+
+
+def test_when_the_camera_loses_track_the_navigator_flies_on_and_says_so(flight, shifts, calibration):
+    """With no image motion after the jam, the estimate used to stand still and stay sure of itself."""
+    dead = np.array(shifts)
+    dead[calibration.jam_index + 1 :] = 0.0  # the camera sees no motion at all
+    alone = replace(CFG, fix_every_m=None)
+    stuck = navigate(flight, dead, calibration, alone)
+    errors = navigation_errors(stuck, flight)
+    assert errors.error[-1] > 100.0 and stuck.sigma[-1] < 5.0  # far off, and sure of itself: the hazard
+    assert not stuck.lost_track.any()
+
+    flown_on = navigate(flight, dead, calibration, replace(alone, camera_motion_floor=0.3))
+    errors = navigation_errors(flown_on, flight)
+    assert flown_on.lost_track[1:].all()
+    assert np.all(errors.error <= 3 * flown_on.sigma + 1e-6)  # the stated bound holds throughout
+    assert errors.error[-1] < 0.2 * errors.distance_since_jam[-1]  # flying on at cruising speed keeps it close
+    assert flown_on.status[-1] in ("DEGRADED", "LOST")
+
+
+def test_the_camera_check_changes_nothing_on_clean_frames(flight, shifts, calibration):
+    a = navigate(flight, shifts, calibration, CFG)
+    b = navigate(flight, shifts, calibration, replace(CFG, camera_motion_floor=0.3))
+    assert not b.lost_track.any()
+    np.testing.assert_array_equal(a.position, b.position)

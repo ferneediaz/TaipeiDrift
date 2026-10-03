@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 12:25.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 13:05.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
@@ -52,6 +52,12 @@ What it says:
 - **China (real drone photos against a map 2.5 years older):** the matcher, unchanged, finds 80 percent of the photos within 30 m.
 - **74 km without GNSS:** median 27 m, against 1,041 m without fixes. But about 11 wrong fixes slipped through and the drone got lost in stretches: our honest weakness. Ilhan found the same independently on unseen ALTO data (94 m instead of 31 m).
 - Built against it: confirmation of large jumps by the next fix, Ilhan's quarters check, the fix offset in the drone's own frame (fix error 19 to 13 m), compass and sun-sensor models, the aviation integrity measure.
+
+**The limits: a worse camera picture** (the brief's "limits when sensors fail or noise rises"; ALTO, frames made darker, blurred or hazy after the jam; `python baseline/scripts/run_limits.py`, chart `outputs/limits_floor_0.3/before_after.png`):
+
+- **It holds** down to 1/64 of the light (31 m, no wrong fixes), blur up to 2 m, haze down to half the contrast.
+- **A dangerous failure was found and closed.** When the picture is bad enough that the camera cannot see the motion any more, the estimate used to stand still while its stated uncertainty stopped growing: "tracking, sure to a few metres" while 1 to 2 km off. Now a camera step shorter than 30 percent of the cruising step (learned with GNSS) is not believed: the navigator flies on at cruising speed along the last good direction and its uncertainty grows three times faster. Haze with 10 percent of the contrast left: 1,640 m and a bound that held in 0 percent of frames before; 54 m, status LOST, bound held in 100 percent after. Clean frames: unchanged.
+- **One blind spot remains:** moderate blur (4 m), where the camera's motion is wrong but looks plausible; 4 wrong fixes pass. Catching it needs a second motion source to cross-check, which is what Alessandro's IMU filter does. The fallback flies on in the last good direction, which suits a straight flight; through turns it needs the heading sensor.
 
 **Demo clips (ready)**, made with `python baseline/scripts/make_replay.py alto` and `... visloc --flight 04`; the videos are in `outputs/replay/` on Dustin's laptop (not in git, 20 MB each):
 
