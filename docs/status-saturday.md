@@ -1,10 +1,26 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 13:15.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 14:15.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch **`integration`**, which holds every team branch and is up for merging into `main` as [pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2); the details are in [findings.md](findings.md).
 
 ## Now, in short
 
-The system works on real data from two countries, and we now know how well. On the flights it was developed on, it holds about 30 m where the camera alone drifts 470 to 820 m. On flights it never saw, the fixes cut the drift by 40 percent (ALTO, 219 to 131 m, Ilhan's test at 13:00) to tenfold (UAV-VisLoc 04, 675 to 60 m); where the ground was rebuilt since the map (UAV-VisLoc 01) they do not help. Fielded systems claim 15 to 20 m. **Section 2 explains in detail what the system does and what it gives a user.** The three parts of the team (our map fixes, Alessandro's IMU filter, Ilhan's checks and simulator patch) are not combined in code yet; they can only run together in the simulator, which is the next job.
+The system works on real data from two countries, and we now know how well. On the flights it was developed on, it holds about 30 m where the camera alone drifts 470 to 820 m. On flights it never saw, the fixes cut the drift by 40 percent (ALTO, 219 to 131 m, Ilhan's test at 13:00) to tenfold (UAV-VisLoc 04, 675 to 60 m); where the ground was rebuilt since the map (UAV-VisLoc 01) they do not help. Fielded systems claim 15 to 20 m. **Section 2 explains in detail what the system does and what it gives a user.** All team branches now sit in one branch, `integration` (297 tests pass), up for merging as pull request 2.
+
+**The simulated flight over Wufeng (new, 14:00).** Dan's simulator with Ilhan's patch; the real Wufeng 2020 aerial photo as the ground, the 2018 photo of the same place as the navigator's map; a 4.8 km route along the motorway corridor at 100 m and 10 m/s, with a 180-degree turn; GNSS lost after 450 m; camera motion is real optical flow on the simulated images, the heading a simulated compass (median over three compass error draws; `python baseline/scripts/run_sim_navigator.py`):
+
+| | Median error | 90% below | Worst | Fixes used (wrong) | Error within the stated 3 sigma |
+|---|---|---|---|---|---|
+| Camera alone | 76 m | 181 m | 234 m | | 100% |
+| Map fixes, 2018 map (two years old) | **26.5 m** | 75 m | 92 m | 12 (0) | 100% |
+| Map fixes, fresh 2020 map | **17.3 m** | 36 m | 68 m | 17 (0) | 100% |
+
+- **The price of an old map, measured:** 26.5 against 17.3 m, and 12 against 17 accepted fixes. This is the Eagle Eyes lesson in numbers.
+- **A camera fixed to a quadcopter looks backwards when the drone tilts forward** (9.5 degrees in cruise, up to 16 in turns): each fix lands 16 to 22 m behind the drone. Corrected with the drone's true tilt, the fixes are 2 to 5 m off. The IMU knows the tilt, so this is the measured case for fusing with Alessandro's filter; the camera-only navigator absorbs only the steady part, as a learned offset.
+- **The same tilt broke the first run** (no fix used, 1 km drift): the banking turns before the jam spoiled the learned motion scale. Fixed with a fit of one turn and one scale from medians (`motion_fit: rotation_scale`, tested); ALTO and UAV-VisLoc keep the old fit, so their numbers do not change.
+- Demo clip: `outputs/replay/sim_map_2018_seed3.mp4` (seed 3 is the median of the three), stills next to it.
+- The simulated ground is a flat photo: no 3D, no change of light, no wind. The test is easier than a real flight, and the 2018 map carries real changes on the ground.
+
+**Alessandro's push at 13:58:** a new measurement for his filter, the direction of travel seen by the forward camera (direction only, no speed; 1.0 degree median error on Mid-Air), his baselines rerun with Ilhan's measured barometer, and a transfer test on NTU VIRAL (real data, no retuning). Numbers not in the repository yet. **Dan's push at 13:14:** a recorder that writes simulated flights in the Mid-Air format, so Alessandro's code reads them unchanged; his simulator is now in `main`.
 
 **The new checks, on the development flight** (UAV-VisLoc 03, 74 km without GNSS, median over 3 seeds; "all clear while wrong" = the share of the flight where the navigator's stated bound is within 50 m but the true error is above it):
 
@@ -333,9 +349,9 @@ Read on Saturday at 12:40 from branch `mid-air-vio` (commits 4d60f38 and 7773c95
 
 ## 7. What is done, what is left, and who does it
 
-Code freeze Sunday 10:00, demo 13:00. Updated 13:15.
+Code freeze Sunday 10:00, demo 13:00. Updated 14:15.
 
-**Done** (all on branch `alto-navigator`):
+**Done** (all on branch `integration`):
 
 | What | Where |
 |---|---|
@@ -349,23 +365,24 @@ Code freeze Sunday 10:00, demo 13:00. Updated 13:15.
 | The mentor's phone sun compass: code ready, waiting for photos | `baseline/scripts/phone_sun_compass.py` |
 | Eagle Eyes and the other fielded systems compared with ours | [landscape.md](landscape.md#eagle-eyes-and-the-systems-fielded-in-ukraine), top of page |
 | The system in detail: what it does, step by step, and what it gives the user | section 2 |
+| **One branch with everything**, `integration`: every team branch merged, 297 tests pass | [pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2) |
+| **The simulated flight over Wufeng**: route, aerial ground, recorded flight, camera navigator with the 2018 and the 2020 map, demo clip | top of this page |
+| The phone sun test, written up for the teammate | [phone-sun-test.md](phone-sun-test.md) |
 
 **Left:**
 
 | What | Who | State |
 |---|---|---|
-| **1. One branch with everything, `integration`:** ours, Alessandro's `mid-air-vio`, Dan's simulator with Ilhan's patch (`sim-demo`), Ilhan's research, Felix's TRN from `main`. A trial merge shows small conflicts only: `.gitignore`, `pyproject.toml`, the handoff note, and the Mid-Air baseline files that Alessandro and we both fixed on Friday. `main` stays untouched for the team to decide | Claude | Started 13:20, locally; pushed once it runs |
-| **2. The fused navigator:** Alessandro's IMU filter as the core. Our map fixes go in as position measurements (15 m) behind his 99 percent gate and our confirmation of large jumps; the barometer sets the matcher's zoom (Ilhan's finding); the filter's heading turns the frame for the search; Ilhan's quarters rule stays an option | Claude | After step 1 |
-| **3. The simulator demo:** Dan's simulator with Ilhan's patch (GNSS cut, recorder, IMU leak fixed), the real Wufeng 2020 aerial image as the ground, a flight along the motorway corridor. Four runs on the same flight: our camera navigator alone, Alessandro's filter alone, the two fused, and the fused one with the fresh 2020 image as the map (the price of an old map) | Claude | After step 2; branch `sim-demo` started 12:40 |
+| **The fused navigator on the simulated flight:** Alessandro's IMU filter as the core; the down camera's motion with its tilt removed by the IMU; our map fixes as position measurements, each corrected for the drone's tilt (2 to 5 m instead of 16 to 22), behind his 99 percent gate and our confirmation of large jumps; the barometer sets the matcher's zoom; a compass (later the sun) for the heading, since the simulated drone has no forward camera | Claude | Next, about two hours |
+| **Merge pull request 2 into `main`** | Dustin and team | Open |
 | Computing time per fix and per frame, map storage per square kilometre | Claude | Open |
 | README for the submission (one sentence, headline number, how to run, limits, each part, data and licences) | Claude | Open |
 | Fold today's numbers into `findings.md` | Claude | Open |
 | Slides and the one story | Dustin and team | Open; charts from Claude |
-| Which branches go into `main` | team | Open |
 | ~~Rerun the ALTO Train test with the map search~~ Done at 13:00: 131 m (top of page). Next: the same test with the current navigator (new checks), and the zoom from the height | Ilhan | Asked |
 | The heading drift of the visual-inertial odometry; fix the term he flagged; who adds the fix input to his filter | Alessandro | Asked |
 | One slide on terrain navigation for forest and night | Felix | Asked |
-| Phone photos for the sun compass, while the sun is high | anyone with an iPhone | Asked |
+| Phone photos for the sun compass: [phone-sun-test.md](phone-sun-test.md), tomorrow 09:00 to 09:45 | anyone with an iPhone | Asked |
 
 **The story for the slides** (proposal): the drone's camera as a GNSS replacement on cheap hardware and free maps. Dead reckoning drifts (Alessandro's visual-inertial odometry, our camera motion). Map fixes reset it. The check keeps it honest, shown on flights from another country that we never tuned on. Next steps: the sun sensor for heading, terrain navigation for forest and night, a thermal camera for night, the water crossing.
 
