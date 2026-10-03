@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 
 from src.data.camera_flight import CameraFlight, ReferenceMap
+from src.data.camera_model import CameraModel, RealisticCamera
 from src.data.ground_map import GroundMap
 
 FRAME_PX = 360  # int(512 / sqrt(2)) - 2: the largest square inside a 512 px image at any angle
@@ -45,7 +46,7 @@ class SimReplayConfig:
     map_tif: str = "data/raw/aerial/wufeng_2018-05-03_x4.tif"  # the 2020 image gives a map as fresh as the ground
     route: str = "sim/scenarios/wufeng_corridor.json"  # holds the world origin in EPSG:3826
     map_metres_per_pixel: float = 0.5
-    start_height_m: float = 95.0  # the flight starts at the first image at least this high
+    start_height_m: float | None = None  # the flight starts at the first image this high; None: 95 % of the route's height
     stop_speed_mps: float = 2.0  # and ends before the drone slows below this at the end of the route
     cache_dir: str | None = "data/processed"
 
@@ -90,10 +91,12 @@ def load_sim_flight(cfg: SimReplayConfig, heading_deg: np.ndarray | None = None)
     q = truth[["qw", "qx", "qy", "qz"]].to_numpy()[nearest]
     true_heading = heading_from_quaternion(*q.T)
 
+    route = json.loads(Path(cfg.route).read_text())
+    start_height = cfg.start_height_m if cfg.start_height_m is not None else 0.95 * route["altitude_m"]
     speed = np.r_[0.0, np.hypot(np.diff(east), np.diff(north)) / np.maximum(np.diff(t), 1e-6)]
-    high = np.nonzero(up >= cfg.start_height_m)[0]
+    high = np.nonzero(up >= start_height)[0]
     if len(high) == 0:
-        raise ValueError(f"the drone never reaches {cfg.start_height_m} m in {rec}")
+        raise ValueError(f"the drone never reaches {start_height:.0f} m in {rec}")
     first = int(high[0])
     moving = np.nonzero(speed[first:] >= cfg.stop_speed_mps)[0]
     last = first + int(moving[-1]) if len(moving) else len(t) - 1
@@ -101,7 +104,6 @@ def load_sim_flight(cfg: SimReplayConfig, heading_deg: np.ndarray | None = None)
 
     origin = np.array([north[first], east[first]])
     position = np.column_stack([north[keep], east[keep]]) - origin
-    route = json.loads(Path(cfg.route).read_text())
     ground = _ground_map(Path(cfg.map_tif), (route["origin_easting_m"], route["origin_northing_m"]), origin,
                          cfg.map_metres_per_pixel, Path(cfg.cache_dir).expanduser() if cfg.cache_dir else None)
 
@@ -118,6 +120,7 @@ def load_sim_flight(cfg: SimReplayConfig, heading_deg: np.ndarray | None = None)
             "map": Path(cfg.map_tif).name,
             "origin_enu_m": [float(east[first]), float(north[first])],
             "true_heading_deg": true_heading[keep],
+            "attitude_q": q[keep],  # (M, 4) qw, qx, qy, qz: body (forward, left, up) to ENU, for sensor models only
             "height_m": up[keep],
             "recording_t_s": t[keep],
             "image_paths": paths,
@@ -133,7 +136,26 @@ def with_heading(flight: CameraFlight, heading_deg: np.ndarray) -> CameraFlight:
     if heading.shape != (len(flight),):
         raise ValueError(f"heading has shape {heading.shape}, expected ({len(flight)},)")
     paths = flight.metadata["image_paths"]
-    return replace(flight, load_frame=lambda i: north_up(cv2.imread(paths[i], cv2.IMREAD_GRAYSCALE), heading[i]), heading_deg=heading)
+    camera = flight.metadata.get("camera")  # a RealisticCamera, or None for the simulator's ideal frames
+
+    def raw(i: int) -> np.ndarray:
+        image = cv2.imread(paths[i], cv2.IMREAD_GRAYSCALE)
+        return image if camera is None else camera.frame(i, image)
+    return replace(flight, load_frame=lambda i: north_up(raw(i), heading[i]), heading_deg=heading)
+
+
+def with_camera(flight: CameraFlight, model: CameraModel | None) -> CameraFlight:
+    """The same flight seen through a realistic camera (src/data/camera_model.py); None: the ideal frames.
+
+    The camera's cloud shadows and footprint follow the true path, heading and height: they belong to the
+    simulated world, which the navigator does not see.
+    """
+    camera = None
+    if model is not None:
+        camera = RealisticCamera(model, flight.timestamp, flight.position_gt, flight.metadata["true_heading_deg"],
+                                 flight.metadata["height_m"])
+    flight = replace(flight, metadata={**flight.metadata, "camera": camera})
+    return with_heading(flight, flight.heading_deg)
 
 
 def _ground_map(tif: Path, origin_en: tuple[float, float], start_ne: np.ndarray, metres_per_pixel: float,

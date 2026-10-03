@@ -225,21 +225,34 @@ If we fall behind, we stop climbing the build order below. Every step leaves a s
 
 First the baseline, with the features we need at least. Then one addition at a time, and after each one the whole chain still runs.
 
-| Step | What is added | Done when |
-|---|---|---|
-| Baseline | Read the ALTO flight. Learn from GNSS before the jam. Dead reckoning by camera after it. Position fixes by matching, blended with the estimate. The check that rejects a fix with a low score or one that disagrees with the estimate. A plot of path and error, a summary of the numbers, one command, tests. The IMU baseline on Mid-Air exists already and is merged | The shared code reproduces the experiment: 472 m with the camera alone, about 30 m with a fix every 300 m |
-| 1 | A search that grows with the uncertainty, and a status: tracking, degraded, lost | Fixes 1,000 m apart are recovered, at a median near 56 m |
-| 2 | The test on the training section. No new feature | The numbers on data we did not tune on are in the findings |
-| 3 | Limits: darkened, blurred and hazy camera frames | A chart shows where fixes stop and what the status reports |
-| 4 | The numbers on wrong fixes: how often an accepted fix is wrong, how often a correct one is rejected | They are in the summary of every run |
-| 5 | The demo view: the flight replayed, with the jam and the rejected fix | It runs live and as a recorded video |
-| 6 | Turns, with a heading that changes | A section with a turn stays below 50 m |
-| 7 | The phone walk as second evidence | The loop closes within a few percent |
-| 8 | A flight in the simulator with all sensors | Optional |
+| Step | What is added | Done when | State, Saturday 09:30 |
+|---|---|---|---|
+| Baseline | Read the ALTO flight. Learn from GNSS before the jam. Dead reckoning by camera after it. Position fixes by matching, blended with the estimate. The check that rejects a fix with a low score or one that disagrees with the estimate. A plot of path and error, a summary of the numbers, one command, tests. The IMU baseline on Mid-Air exists already and is merged | The shared code reproduces the experiment: 472 m with the camera alone, about 30 m with a fix every 300 m | Done on branch `alto-navigator` (findings 3.6). The IMU baseline is not merged into `main` yet |
+| 1 | A search that grows with the uncertainty, and a status: tracking, degraded, lost | Fixes 1,000 m apart are recovered, at a median near 56 m | Done: 56.3 m |
+| 2 | The test on the training section. No new feature | The numbers on data we did not tune on are in the findings | Blocked: Dropbox has disabled the link for the day (findings 3.7) |
+| 3 | Limits: darkened, blurred and hazy camera frames | A chart shows where fixes stop and what the status reports | Next |
+| 4 | The numbers on wrong fixes: how often an accepted fix is wrong, how often a correct one is rejected | They are in the summary of every run | Done in every run's summary. Agreement of nearby frames tested and dropped (findings 3.6) |
+| 5 | The demo view: the flight replayed, with the jam and the rejected fix | It runs live and as a recorded video | Open, needs an owner |
+| 6 | Turns, with a heading that changes | A section with a turn stays below 50 m | Open; the training section probably has turns |
+| 7 | The phone walk as second evidence | The loop closes within a few percent | Open, needs an owner and daylight |
+| 8 | A flight in the simulator with all sensors | Optional | Open |
 
 Steps 6 to 8 are the first to go.
 
 After tonight, no further datasets are considered.
+
+### How the team's lines of work fit together (proposal for Saturday morning)
+
+On Saturday morning four lines of work exist. A proposal for one story, to agree on as a team:
+
+| Line | Branch or folder | Measured so far | Role in the story |
+|---|---|---|---|
+| Camera fixes with a check | `alto-navigator` | Real helicopter flight: 26 to 31 m with a fix every 100 to 300 m; a wrong fix is refused | **The one thing**: an absolute position from the camera the drone already has |
+| Visual-inertial odometry (Alessandro) | `mid-air-vio` | Mid-Air: 13 to 33 m after 83 s on three flights it was not tuned on | The layer between fixes: it keeps the drift small, so fixes can be further apart |
+| Terrain navigation with a laser (Felix) | `TRN/` on `main` | Data inspection of Taiwan's elevation models; simulator planned in seven milestones | A next step where the camera sees no pattern: forest, night, cloud. Needs an extra sensor |
+| Simulator (Dan) | `simulations`, pull request 1 | Gazebo worlds with all sensors; no recorded flight yet | The demo of all sensors in one flight, and the water crossing |
+
+The drift rule of findings 3.4 links the first two: the longest gap between fixes is the size of the search divided by the drift per metre. Lower drift between fixes buys longer gaps.
 
 ## Demo
 

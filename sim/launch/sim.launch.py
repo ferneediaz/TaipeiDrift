@@ -1,14 +1,17 @@
 """Start Gazebo with the Mid-Air-like drone, the ROS bridge and the sensor noise node.
 
     ros2 launch sim/launch/sim.launch.py [cam_res:=1024] [gps:=true] [gui:=true] [world:=terrain] [demo:=false]
-                                         [ships:=auto] [gnss_cutoff_s:=20.0] [record_mode:=light]
-                                         [vision_rotation:=true] [vision_direction:=true]
+        [stereo:=false] [stereo_baseline_m:=0.30] [wind:=none] [ships:=auto] [gnss_cutoff_s:=20.0]
+        [record_mode:=light] [vision_rotation:=true] [vision_direction:=true] [run_label:=]
 
 cam_res  down camera width and height in pixels; 1024 matches Mid-Air, 512 renders faster on a CPU
 gps      false removes the GNSS receiver from the drone
 gui      false runs Gazebo without its window (server only)
-world    a file name in sim/worlds/ without .sdf: terrain (fields and woods), islands (two islands and open sea)
-         or strait (the islands with warships that transmit AIS)
+world    a file name in sim/worlds/ without .sdf: terrain (fields and woods), islands (two islands and open sea),
+         strait (the islands with warships that transmit AIS) or city (roads and buildings)
+stereo              true adds a right down-camera by generating a temporary model variant
+stereo_baseline_m   right camera offset along body -Y, in metres
+wind                SPEED_MPS,FROM_DEG, for example 6,20: 6 m/s from the north-north-east, with gusts
 ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_traffic.py), runs the drone's
          AIS receiver and direction finder (nodes/rf_sensor.py) and the triangulation navigator (nodes/rf_nav.py),
          adds a fixed overview camera, shown as a panel beside the chase view in the Gazebo window, and a red
@@ -24,15 +27,18 @@ record_mode       light records sensor and pose topics to outputs/sim_runs/<run>
                   off records no bag (the CSV logs are still written)
 vision_rotation   the estimator (nodes/eskf_ros_adapter.py) fuses the forward camera's relative rotation
 vision_direction  ... and its direction of travel
+run_label         a name (letters, digits, _ and -): the run is written to outputs/sim_runs/velocity_phase/<name>
 
 Every launch runs the ESKF estimator (GNSS + IMU + barometer + forward camera) on /nav/odom. With the ships, a
 second instance also fuses the position from the ships' bearings (rf_fix:=true) on /nav_rf/odom, so the two can be
 compared on the same flight after the GNSS cutoff; sim/scripts/check_rf_nav.py scores both against ground truth.
 """
+import copy
 import datetime as dt
 import json
 import math
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -55,7 +61,43 @@ WORLD_ASSETS = {
     "terrain": ["make_ground.py", "make_trees.py"],  # replace the ground with the orthophoto via make_ground.py --aerial
     "islands": ["make_islands.py"],
     "strait": ["make_islands.py"],  # the islands scenery, with ships
+    "city": ["make_city.py"],
 }
+
+
+WIND_FORCE_FACTOR = 0.15  # Gazebo pushes each link with this share of mass times the air's speed past it (WindEffects);
+# 0.15 lets a hovering drone in a 6 m/s wind lean about 5 degrees, as a small quadcopter does
+
+
+def windy_world(world: Path, speed_mps: float, from_deg: float) -> Path:
+    """A copy of the world with wind: ``speed_mps`` from the bearing ``from_deg`` (20: from north-north-east),
+    with gusts of about 20 percent in strength and 10 degrees in direction."""
+    tree = ET.parse(world)
+    w = tree.find("world")
+    towards = math.radians(from_deg + 180.0)
+    wind = ET.SubElement(w, "wind")
+    ET.SubElement(wind, "linear_velocity").text = f"{speed_mps * math.sin(towards):.3f} {speed_mps * math.cos(towards):.3f} 0"
+    plugin = ET.fromstring(f"""
+      <plugin filename="gz-sim-wind-effects-system" name="gz::sim::systems::WindEffects">
+        <force_approximation_scaling_factor>{WIND_FORCE_FACTOR}</force_approximation_scaling_factor>
+        <horizontal>
+          <magnitude>
+            <time_for_rise>10</time_for_rise>
+            <sin><amplitude_percent>0.2</amplitude_percent><period>15</period></sin>
+            <noise type="gaussian"><mean>0</mean><stddev>0.05</stddev></noise>
+          </magnitude>
+          <direction>
+            <time_for_rise>30</time_for_rise>
+            <sin><amplitude>10</amplitude><period>30</period></sin>
+            <noise type="gaussian"><mean>0</mean><stddev>0.03</stddev></noise>
+          </direction>
+        </horizontal>
+        <vertical><noise type="gaussian"><mean>0</mean><stddev>0.05</stddev></noise></vertical>
+      </plugin>""")
+    w.insert(0, plugin)
+    out = Path(f"/tmp/taipeidrift_{world.stem}_wind.sdf")
+    tree.write(out, xml_declaration=True, encoding="utf-8")
+    return out
 
 
 # The strait world's overview camera, shown as a panel in the Gazebo window (a gz topic, not bridged to ROS)
@@ -138,8 +180,11 @@ def df_antenna_sdf(rf_cfg: dict) -> list:
     ]
 
 
-def drone_sdf(cam_res: int, gps: bool, views: bool = False, rf_cfg: dict = None) -> Path:
+def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: float = 0.30, views: bool = False,
+              wind: bool = False, rf_cfg: dict = None) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
+    if wind:
+        ET.SubElement(tree.find("model"), "enable_wind").text = "true"
     link = tree.find(".//link[@name='sensor_link']")
     image = link.find("sensor[@name='camera_down']/camera/image")
     forward_image = link.find("sensor[@name='camera_forward']/camera/image")
@@ -147,6 +192,15 @@ def drone_sdf(cam_res: int, gps: bool, views: bool = False, rf_cfg: dict = None)
     forward_image.find("width").text = forward_image.find("height").text = str(cam_res)
     if not gps:
         link.remove(link.find("sensor[@name='navsat']"))
+    if stereo:
+        if stereo_baseline_m <= 0:
+            sys.exit("stereo_baseline_m must be > 0 when stereo:=true")
+        right = copy.deepcopy(link.find("sensor[@name='camera_down']"))
+        right.set("name", "camera_down_right")
+        right.find("pose").text = f"0 {-stereo_baseline_m:.9g} 0 0 1.5708 0"
+        right.find("topic").text = "camera/down_right/image_raw"
+        right.find("gz_frame_id").text = "camera_down_right"
+        link.append(right)
     if views:
         # A red ball high above the drone, visual only, so the drone can be found in the overview, which is
         # kilometres wide. The down camera looks the other way and never sees it.
@@ -314,6 +368,8 @@ def setup(context):
     gui = LaunchConfiguration("gui").perform(context).lower() == "true"
     world = SIM / "worlds" / f"{LaunchConfiguration('world').perform(context)}.sdf"
     demo = LaunchConfiguration("demo").perform(context).lower() == "true"
+    stereo = LaunchConfiguration("stereo").perform(context).lower() == "true"
+    stereo_baseline_m = float(LaunchConfiguration("stereo_baseline_m").perform(context))
     ships = LaunchConfiguration("ships").perform(context).lower()
     ships = world.stem == "strait" if ships == "auto" else ships == "true"
     legacy_cut = LaunchConfiguration("gnss_cut_s").perform(context)
@@ -321,6 +377,9 @@ def setup(context):
     record_mode = LaunchConfiguration("record_mode").perform(context).lower()
     vision_rotation = LaunchConfiguration("vision_rotation").perform(context).lower()
     vision_direction = LaunchConfiguration("vision_direction").perform(context).lower()
+    run_label = LaunchConfiguration("run_label").perform(context).strip()
+    if run_label and not re.fullmatch(r"[A-Za-z0-9_-]+", run_label):
+        sys.exit("run_label may contain only letters, numbers, underscores, and hyphens")
     if not world.exists():
         sys.exit(f"No world {world}. Choose one of: {', '.join(sorted(w.stem for w in world.parent.glob('*.sdf')))}")
     if record_mode not in ("off", "light", "full"):
@@ -331,12 +390,22 @@ def setup(context):
 
     for script in WORLD_ASSETS.get(world.stem, []):
         subprocess.run([sys.executable, str(SIM / "scripts" / script), "--if-missing"], check=True)
-    model = drone_sdf(cam_res, gps, views=ships, rf_cfg=yaml.safe_load(RF_CONFIG.read_text()) if ships else None)
+    wind = LaunchConfiguration("wind").perform(context).strip().lower()
+    world_file = world
+    if wind not in ("", "none"):
+        try:
+            speed, from_deg = (float(v) for v in wind.split(","))
+        except ValueError:
+            sys.exit(f"wind must be SPEED_MPS,FROM_DEG (for example 6,20), not {wind!r}")
+        world_file = windy_world(world, speed, from_deg)
+    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, views=ships, wind=world_file != world,
+                      rf_cfg=yaml.safe_load(RF_CONFIG.read_text()) if ships else None)
     gui_config = views_gui_config() if ships else SIM / "config/gui.config"
     sim_time = {"use_sim_time": True}
 
     run_id = dt.datetime.now().strftime(f"{world.stem}_%Y%m%d_%H%M%S")
-    run_dir = SIM.parent / "outputs" / "sim_runs" / run_id
+    run_dir = (SIM.parent / "outputs" / "sim_runs" / "velocity_phase" / run_label
+               if run_label else SIM.parent / "outputs" / "sim_runs" / run_id)
     run_dir.mkdir(parents=True, exist_ok=False)
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=SIM.parent,
@@ -354,10 +423,11 @@ def setup(context):
                            "min_span_s": gnss_cfg["velocity_min_span_s"],
                            "method": "robust generalized least squares; non-overlapping windows"}
     metadata = {
-        "run_id": run_id, "world": world.stem, "gnss_cutoff_s_since_first_fix": gnss_cut_s,
-        "camera_resolution": cam_res, "demo_trajectory": "default_world_route",
+        "run_id": run_label or run_id, "world": world.stem, "gnss_cutoff_s_since_first_fix": gnss_cut_s,
+        "camera_resolution": cam_res, "demo_trajectory": "city_loop" if world.stem == "city" else "default_world_route",
         "estimator_config": "vio/configs/midair_eskf.yaml; simulated GNSS + IMU + barometer; vision flags recorded below",
-        "git_commit": commit, "working_tree_dirty": working_tree_dirty, "ros_distro": os.environ.get("ROS_DISTRO", "unknown"),
+        "git_commit": commit, "working_tree_dirty": working_tree_dirty,
+        "ros_distro": os.environ.get("ROS_DISTRO", "unknown"),
         "run_created_local": dt.datetime.now().astimezone().isoformat(), "record_mode": record_mode,
         "topics": {"gt": "/ground_truth/odom", "raw_gps": "/sim/gps_raw", "gated_gps": "/gps/fix",
                    "gnss_status": "/nav/gnss_available", "imu": "/imu/data", "barometer": "/air_pressure",
@@ -403,7 +473,7 @@ def setup(context):
                  "-p", f"gps_origin_elevation:={gps_origin[2]}"]
 
     actions = [
-        ExecuteProcess(output="screen", cmd=["gz", "sim", "-r", str(world), *(
+        ExecuteProcess(output="screen", cmd=["gz", "sim", "-r", str(world_file), *(
             ["--gui-config", str(gui_config)] if gui else ["-s"])]),
         Node(package="ros_gz_sim", executable="create", output="screen",
              arguments=["-world", world.stem, "-file", str(model), "-name", "midair_quad", "-z", "0.05"]),
@@ -423,6 +493,9 @@ def setup(context):
         ExecuteProcess(output="screen", cmd=[sys.executable, str(SIM / "nodes/run_logger.py"), "--out", str(run_dir)]),
         ExecuteProcess(output="screen", cmd=estimator),
     ]
+    if stereo:
+        actions.append(Node(package="ros_gz_image", executable="image_bridge", output="screen",
+                            arguments=["/camera/down_right/image_raw"], parameters=[sim_time]))
     if ships:
         rf = yaml.safe_load(RF_CONFIG.read_text())
         actions += [
@@ -455,7 +528,8 @@ def setup(context):
         actions += [
             # Give the Gazebo window time to open before asking it to follow the drone
             TimerAction(period=15.0, actions=[
-                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem],
+                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem,
+                                    *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else [])],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
             # down camera is a panel in the Gazebo window and this slot shows the AoA map.
@@ -478,12 +552,16 @@ def generate_launch_description():
         DeclareLaunchArgument("gui", default_value="true"),
         DeclareLaunchArgument("world", default_value="terrain"),
         DeclareLaunchArgument("demo", default_value="false"),
+        DeclareLaunchArgument("stereo", default_value="false"),
+        DeclareLaunchArgument("stereo_baseline_m", default_value="0.30"),
+        DeclareLaunchArgument("wind", default_value="none"),
         DeclareLaunchArgument("ships", default_value="auto"),
         DeclareLaunchArgument("gnss_cut_s", default_value="unset", description="Legacy spelling; cutoff is relative to first GPS fix"),
         DeclareLaunchArgument("gnss_cutoff_s", default_value="20.0"),
         DeclareLaunchArgument("record_mode", default_value="light"),
         DeclareLaunchArgument("vision_rotation", default_value="true"),
         DeclareLaunchArgument("vision_direction", default_value="true"),
+        DeclareLaunchArgument("run_label", default_value=""),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])

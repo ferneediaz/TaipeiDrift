@@ -1,0 +1,187 @@
+<?xml version="1.0"?><sdf version="1.9"><model name="city"><static>true</static><link name="ground"><pose>0.00 0.00 -0.15 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>500.00 500.00 0.30</size></box></geometry>
+          <material><ambient>0.34 0.36 0.33 1</ambient><diffuse>0.34 0.36 0.33 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>500.00 500.00 0.30</size></box></geometry></collision></link><link name="road_x_0"><pose>-120.00 0.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>16.00 500.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>16.00 500.00 0.01</size></box></geometry></collision></link><link name="road_x_1"><pose>-40.00 0.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>16.00 500.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>16.00 500.00 0.01</size></box></geometry></collision></link><link name="road_x_2"><pose>40.00 0.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>16.00 500.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>16.00 500.00 0.01</size></box></geometry></collision></link><link name="road_x_3"><pose>120.00 0.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>16.00 500.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>16.00 500.00 0.01</size></box></geometry></collision></link><link name="road_y_0"><pose>0.00 -120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>500.00 16.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>500.00 16.00 0.01</size></box></geometry></collision></link><link name="road_y_1"><pose>0.00 -40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>500.00 16.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>500.00 16.00 0.01</size></box></geometry></collision></link><link name="road_y_2"><pose>0.00 40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>500.00 16.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>500.00 16.00 0.01</size></box></geometry></collision></link><link name="road_y_3"><pose>0.00 120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>500.00 16.00 0.01</size></box></geometry>
+          <material><ambient>0.16 0.17 0.18 1</ambient><diffuse>0.16 0.17 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>500.00 16.00 0.01</size></box></geometry></collision></link><link name="crosswalk_0_0"><pose>-120.00 -120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_0_1"><pose>-120.00 -40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_0_2"><pose>-120.00 40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_0_3"><pose>-120.00 120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_1_0"><pose>-40.00 -120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_1_1"><pose>-40.00 -40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_1_2"><pose>-40.00 40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_1_3"><pose>-40.00 120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_2_0"><pose>40.00 -120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_2_1"><pose>40.00 -40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_2_2"><pose>40.00 40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_2_3"><pose>40.00 120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_3_0"><pose>120.00 -120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_3_1"><pose>120.00 -40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_3_2"><pose>120.00 40.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="crosswalk_3_3"><pose>120.00 120.00 0.01 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 20.00 0.01</size></box></geometry>
+          <material><ambient>0.68 0.66 0.58 1</ambient><diffuse>0.68 0.66 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 20.00 0.01</size></box></geometry></collision></link><link name="building_0"><pose>-99.00 -97.00 9.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>25.00 25.00 18.00</size></box></geometry>
+          <material><ambient>0.68 0.52 0.39 1</ambient><diffuse>0.68 0.52 0.39 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>25.00 25.00 18.00</size></box></geometry></collision></link><link name="roof_0"><pose>-99.00 -97.00 19.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>18.00 18.00 3.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>18.00 18.00 3.00</size></box></geometry></collision></link><link name="building_1"><pose>-60.00 -61.00 15.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>28.00 31.00 30.00</size></box></geometry>
+          <material><ambient>0.48 0.55 0.62 1</ambient><diffuse>0.48 0.55 0.62 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>28.00 31.00 30.00</size></box></geometry></collision></link><link name="building_2"><pose>-99.00 -17.00 22.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>36.00 28.00 45.00</size></box></geometry>
+          <material><ambient>0.74 0.70 0.58 1</ambient><diffuse>0.74 0.70 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>36.00 28.00 45.00</size></box></geometry></collision></link><link name="roof_2"><pose>-99.00 -17.00 47.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>25.92 20.16 5.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>25.92 20.16 5.00</size></box></geometry></collision></link><link name="building_3"><pose>-60.00 19.00 12.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>28.00 31.00 24.00</size></box></geometry>
+          <material><ambient>0.54 0.60 0.48 1</ambient><diffuse>0.54 0.60 0.48 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>28.00 31.00 24.00</size></box></geometry></collision></link><link name="roof_3"><pose>-60.00 19.00 25.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.16 22.32 3.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.16 22.32 3.00</size></box></geometry></collision></link><link name="building_4"><pose>-99.00 63.00 29.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>36.00 28.00 58.00</size></box></geometry>
+          <material><ambient>0.68 0.52 0.39 1</ambient><diffuse>0.68 0.52 0.39 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>36.00 28.00 58.00</size></box></geometry></collision></link><link name="building_5"><pose>-60.00 99.00 17.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 38.00 35.00</size></box></geometry>
+          <material><ambient>0.48 0.55 0.62 1</ambient><diffuse>0.48 0.55 0.62 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 38.00 35.00</size></box></geometry></collision></link><link name="roof_5"><pose>-60.00 99.00 37.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>14.40 27.36 5.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>14.40 27.36 5.00</size></box></geometry></collision></link><link name="building_6"><pose>-19.00 -97.00 8.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>36.00 28.00 16.00</size></box></geometry>
+          <material><ambient>0.74 0.70 0.58 1</ambient><diffuse>0.74 0.70 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>36.00 28.00 16.00</size></box></geometry></collision></link><link name="roof_6"><pose>-19.00 -97.00 17.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>25.92 20.16 3.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>25.92 20.16 3.00</size></box></geometry></collision></link><link name="building_7"><pose>20.00 -61.00 9.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 38.00 18.00</size></box></geometry>
+          <material><ambient>0.54 0.60 0.48 1</ambient><diffuse>0.54 0.60 0.48 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 38.00 18.00</size></box></geometry></collision></link><link name="building_8"><pose>-19.00 63.00 15.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>22.00 22.00 30.00</size></box></geometry>
+          <material><ambient>0.68 0.52 0.39 1</ambient><diffuse>0.68 0.52 0.39 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>22.00 22.00 30.00</size></box></geometry></collision></link><link name="roof_8"><pose>-19.00 63.00 32.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>15.84 15.84 5.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>15.84 15.84 5.00</size></box></geometry></collision></link><link name="building_9"><pose>20.00 99.00 22.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>20.00 38.00 45.00</size></box></geometry>
+          <material><ambient>0.48 0.55 0.62 1</ambient><diffuse>0.48 0.55 0.62 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>20.00 38.00 45.00</size></box></geometry></collision></link><link name="roof_9"><pose>20.00 99.00 46.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>14.40 27.36 3.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>14.40 27.36 3.00</size></box></geometry></collision></link><link name="building_10"><pose>61.00 -17.00 12.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>22.00 22.00 24.00</size></box></geometry>
+          <material><ambient>0.74 0.70 0.58 1</ambient><diffuse>0.74 0.70 0.58 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>22.00 22.00 24.00</size></box></geometry></collision></link><link name="building_11"><pose>100.00 19.00 29.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>34.00 20.00 58.00</size></box></geometry>
+          <material><ambient>0.54 0.60 0.48 1</ambient><diffuse>0.54 0.60 0.48 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>34.00 20.00 58.00</size></box></geometry></collision></link><link name="roof_11"><pose>100.00 19.00 60.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>24.48 14.40 5.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>24.48 14.40 5.00</size></box></geometry></collision></link><link name="building_12"><pose>61.00 63.00 17.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>22.00 22.00 35.00</size></box></geometry>
+          <material><ambient>0.68 0.52 0.39 1</ambient><diffuse>0.68 0.52 0.39 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>22.00 22.00 35.00</size></box></geometry></collision></link><link name="roof_12"><pose>61.00 63.00 36.58 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>15.84 15.84 3.00</size></box></geometry>
+          <material><ambient>0.36 0.39 0.42 1</ambient><diffuse>0.36 0.39 0.42 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>15.84 15.84 3.00</size></box></geometry></collision></link><link name="building_13"><pose>100.00 99.00 8.08 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>34.00 20.00 16.00</size></box></geometry>
+          <material><ambient>0.48 0.55 0.62 1</ambient><diffuse>0.48 0.55 0.62 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>34.00 20.00 16.00</size></box></geometry></collision></link><link name="tree_trunk_0"><pose>-30.00 25.00 3.20 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>1.20 1.20 6.40</size></box></geometry>
+          <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>1.20 1.20 6.40</size></box></geometry></collision></link><link name="tree_crown_0"><pose>-30.00 25.00 7.00 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>7.00 7.00 4.00</size></box></geometry>
+          <material><ambient>0.16 0.38 0.18 1</ambient><diffuse>0.16 0.38 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>7.00 7.00 4.00</size></box></geometry></collision></link><link name="tree_trunk_1"><pose>-18.00 36.00 3.20 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>1.20 1.20 6.40</size></box></geometry>
+          <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>1.20 1.20 6.40</size></box></geometry></collision></link><link name="tree_crown_1"><pose>-18.00 36.00 7.00 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>7.00 7.00 4.00</size></box></geometry>
+          <material><ambient>0.16 0.38 0.18 1</ambient><diffuse>0.16 0.38 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>7.00 7.00 4.00</size></box></geometry></collision></link><link name="tree_trunk_2"><pose>-7.00 22.00 3.20 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>1.20 1.20 6.40</size></box></geometry>
+          <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>1.20 1.20 6.40</size></box></geometry></collision></link><link name="tree_crown_2"><pose>-7.00 22.00 7.00 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>7.00 7.00 4.00</size></box></geometry>
+          <material><ambient>0.16 0.38 0.18 1</ambient><diffuse>0.16 0.38 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>7.00 7.00 4.00</size></box></geometry></collision></link><link name="tree_trunk_3"><pose>14.00 35.00 3.20 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>1.20 1.20 6.40</size></box></geometry>
+          <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>1.20 1.20 6.40</size></box></geometry></collision></link><link name="tree_crown_3"><pose>14.00 35.00 7.00 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>7.00 7.00 4.00</size></box></geometry>
+          <material><ambient>0.16 0.38 0.18 1</ambient><diffuse>0.16 0.38 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>7.00 7.00 4.00</size></box></geometry></collision></link><link name="tree_trunk_4"><pose>28.00 21.00 3.20 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>1.20 1.20 6.40</size></box></geometry>
+          <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>1.20 1.20 6.40</size></box></geometry></collision></link><link name="tree_crown_4"><pose>28.00 21.00 7.00 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>7.00 7.00 4.00</size></box></geometry>
+          <material><ambient>0.16 0.38 0.18 1</ambient><diffuse>0.16 0.38 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>7.00 7.00 4.00</size></box></geometry></collision></link><link name="tree_trunk_5"><pose>8.00 5.00 3.20 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>1.20 1.20 6.40</size></box></geometry>
+          <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>1.20 1.20 6.40</size></box></geometry></collision></link><link name="tree_crown_5"><pose>8.00 5.00 7.00 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>7.00 7.00 4.00</size></box></geometry>
+          <material><ambient>0.16 0.38 0.18 1</ambient><diffuse>0.16 0.38 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>7.00 7.00 4.00</size></box></geometry></collision></link><link name="tree_trunk_6"><pose>-22.00 5.00 3.20 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>1.20 1.20 6.40</size></box></geometry>
+          <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>1.20 1.20 6.40</size></box></geometry></collision></link><link name="tree_crown_6"><pose>-22.00 5.00 7.00 0 0 0</pose>
+          <visual name="visual"><geometry><box><size>7.00 7.00 4.00</size></box></geometry>
+          <material><ambient>0.16 0.38 0.18 1</ambient><diffuse>0.16 0.38 0.18 1</diffuse></material></visual>
+          <collision name="collision"><geometry><box><size>7.00 7.00 4.00</size></box></geometry></collision></link></model></sdf>

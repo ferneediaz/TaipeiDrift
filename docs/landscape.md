@@ -6,6 +6,7 @@ Research on Friday evening, after the first experiments in [experiments.md](expe
 
 - The high end is solved. Laser velocity sensors, star trackers and magnetic-anomaly navigation hold position over land and sea, on aircraft that can carry and afford them.
 - Taiwan is already adopting a foreign product. Maxar's Raptor is being rolled out to Taiwan's drone industry through AIDC. It needs Maxar's own 3D terrain data.
+- Our core idea is proven in combat. Ukraine's special forces have flown it at scale since 2023 ("Eagle Eyes"), and the Tomahawk missile used it in the 1980s. See [the Eagle Eyes section](#eagle-eyes-and-the-systems-fielded-in-ukraine), added Saturday.
 - Open-source autopilots already estimate the wind and use it for dead reckoning when GNSS is lost. Our wind result is therefore known practice, with one catch: they learn the wind while GNSS still works.
 - The gaps we can address: cheap sensors with open maps, a system that knows when it is wrong, and a way to tell before the mission where navigation will hold.
 - Proposal: build the navigator with open data and cheap sensors, add an integrity check, and add a map of Taiwan that shows the expected position error along a planned route.
@@ -16,7 +17,10 @@ Research on Friday evening, after the first experiments in [experiments.md](expe
 |---|---|---|---|
 | [Maxar Raptor](https://vantor.com/product/mission-solutions/raptor/) | Ordinary camera matched against Maxar's Precision3D terrain data | Under 10 m RMSE, works at night and at low altitude | Needs Maxar's proprietary data. Nothing to match over open water |
 | [UAV Navigation VNS01](https://www.gpsworld.com/uav-navigation-enhances-vns01-for-precision-drone-navigation-in-gnss-denied-environments/) | Visual navigation plus terrain-referenced navigation and satellite map matching | Not stated in the sources I read | A dedicated hardware unit |
-| [OSCAR](https://thedefensepost.com/2026/01/29/ukraine-drones-vision-navigation/) (Ukraine) | Camera matched against mapped landmarks | About 20 m, in fog and at night | Land only |
+| [OSCAR](https://thedefensepost.com/2026/01/29/ukraine-drones-vision-navigation/) (Twist Robotics, Ukraine) | Camera matched against mapped landmarks | About 20 m, in fog and at night | Land only |
+| [Eagle Eyes](https://www.uasvision.com/2024/06/04/ukraines-special-forces-have-drones-that-fly-without-gps/) (Ukraine's special forces) | Live video of the ground compared with an on-board map stitched from earlier reconnaissance photos and video; also recognises targets | No accuracy published. In wide use on one-way attack drones since 2024 | Needs a recent reconnaissance flight over the route |
+| [Osiris](https://www.delian.ai/osiris) (Delian Alliance Industries, Greece) | Cameras, inertial sensing and preloaded satellite imagery | Maker: 15 m CEP by day; under 20 m on average over about 3,000 km of trial flights in Ukraine | Maker's figures. Under 300 g, 25 W |
+| [AIDC AIxVNAV](https://thedefensepost.com/2026/06/03/taiwan-drones-without-gps/) (Taiwan) | Low-cost camera against satellite-derived 3D imagery, with Vantor's Raptor Guide and ACE software under licence | Flight-tested in 2026; "centimetre-level target positioning", which is the position of a target, not of the drone | Licensed foreign data and software |
 | [Advanced Navigation LVS](https://www.advancednavigation.com/tech-articles/laser-velocity-sensor-lvs-high-accuracy-velocity-aid-gnss-denied-navigation/) | Infrared lasers measure speed over ground or sea by Doppler shift | 0.045% of distance over a 545 km flight, with a tactical-grade inertial unit | Price and weight not found. Tested with high-grade inertial hardware. It emits |
 | [Honeywell celestial navigation](https://aerospace.honeywell.com/us/en/products-and-services/products/navigation-and-sensors/navigation-systems/celestial-aided-navigation) | Star tracker measuring stars and satellites | Works over oceans | Aircraft-class equipment, needs a view of the sky |
 | [Honeywell magnetic-anomaly navigation](https://www.honeywellaerospace.com/us/en/products-and-services/products/navigation-and-sensors/navigation-systems/magnetic-anomaly-aided-navigation) and similar | Sensitive magnetometer matched against a magnetic map | Works over water | Needs magnetic maps and a magnetically quiet aircraft |
@@ -130,6 +134,46 @@ Source for this section: the company's [architecture paper](https://www.uavnavig
 - **Night needs another sensor.** Our result is for daylight. The known route to night is an infrared camera against the same reference data.
 - **Water is excluded by both vendors.** It is an open problem for everyone, and it is first on our list for Taiwan.
 - **Quote vendor figures with their document.** They vary between the vendor's own papers: accuracy "under 10 m" and "under 7 m", minimum altitude 50, 100 and 120 m.
+
+## Eagle Eyes and the systems fielded in Ukraine
+
+Researched on Saturday at 13:00, after Dustin noticed that Eagle Eyes looks like our solution. We found no technical paper for any of these systems. What follows comes from press reports and makers' pages; the Ukrainian wording was checked where the English reports summarise it.
+
+### What Eagle Eyes is
+
+- **Software of Ukraine's special operations forces,** reported by The Economist on 29 May 2024: "Using artificial-intelligence (AI) algorithms, the software compares live video of the terrain below with an on-board map stitched together from photographs and video previously collected by reconnaissance aircraft." Sources: [UAS Vision](https://www.uasvision.com/2024/06/04/ukraines-special-forces-have-drones-that-fly-without-gps/), [Business Insider](https://malaysia.news.yahoo.com/ukraines-special-forces-developed-tech-122748126.html), [online.ua](https://news.online.ua/en/ukraines-army-creates-software-to-protect-its-drones-from-russian-jamming-879390/), and a [Ukrainian summary of the Economist article](https://foreignukraines.com/2024/06/10/ukrainian-it-companies-have-developed-tools-to-protect-drones-from-russian-radio-electronic-interference/).
+- **It also recognises targets** (tanks, armoured vehicles, rocket launchers) and can drop a bomb or dive onto them without the operator. The unit names Russian jamming stations as its first target.
+- **Scale.** In spring 2023 three special-forces teams used it. By mid-2024 it was "cheap enough to be used on kamikaze drones" and in wide use, also on fixed-wing drones with a range of about 60 km. Ukraine had several hundred drones with optical navigation in autumn 2023 and close to 10,000 in mid-2024.
+- **Not public:** its accuracy, its hardware, and how the matching works.
+
+### The same idea as ours, and older than both
+
+A downward camera, a map on board, the live picture matched against the map, and nothing that can be jammed. The Tomahawk cruise missile's camera fix (DSMAC) has worked this way since the 1980s ([Irani and Christ 1994](https://secwww.jhuapl.edu/techdigest/Content/techdigest/pdf/V15-N03/15-03-Irani.pdf), in [reading-notes.md](reading-notes.md)). The jury will know this. What we can claim is how well a weekend version is measured and how honestly it reports.
+
+### Where Eagle Eyes differs from ours
+
+| | Eagle Eyes | Ours |
+|---|---|---|
+| Map | Stitched from recent reconnaissance flights over the same ground | Satellite or aerial photos, 2 to 5 years old |
+| Matching | Described as AI | Brightness correlation, the same family as Tomahawk's; one CPU core |
+| Targets | Finds and attacks them | Out of scope |
+| Evidence | In combat use since 2023; no numbers published | Recorded flights in the USA and China, one held-out test, numbers in [findings.md](findings.md) |
+
+The map is the difference that matters. Our worst result, UAV-VisLoc flight 01, fails because the ground was rebuilt between the photos and the map. A map from a recent reconnaissance flight avoids that. Tomahawk's planners worked by the same rule: a map has a limited life and is compared with new imagery at intervals, and a map made from summer imagery "is unlikely to correlate reliably during winter".
+
+### Numbers from the same report, as a yardstick
+
+- **MindCraft.ai (Lviv):** "For small drones with inexpensive optical navigation, the ideal flight altitude is about 500 metres", and the system "must lock onto at least one landmark per minute to avoid deviating from course by more than 50 metres". Our UAV-VisLoc flights are at 400 to 550 m; our fixes come every 300 m, about every 22 s there; our alert limit is 50 m.
+- **Where it works best:** "near intersections, power lines, isolated trees, large buildings and adjacent water bodies".
+- **Fielded systems that publish a number claim 15 to 20 m.** Osiris: 15 m CEP by day on the [maker's page](https://www.delian.ai/osiris); under 20 m on average over about 3,000 km of trial flights in Ukraine at 70 to 2,000 m ([Defence Express](https://en.defence-ua.com/weapon_and_tech/details_revealed_on_how_ukraine_tested_a_dsmac_style_navigation_system_on_mid_strike_drones-18750.html)). OSCAR: about 20 m. Our median is 28 to 31 m on the development flights and 60 m on held-out flight 04. We do not claim to match them.
+
+### What we take from it
+
+1. **The pitch.** The principle is proven in combat. What we add in a weekend is an open version, tested on flights it never saw, that says how sure it is and where it breaks.
+2. **Map age is the lever, and the simulator can show it.** Run the navigator twice on the same simulated flight: with the 2020 image as the map (the ground itself, a fresh map as Eagle Eyes has) and with the 2018 image (two years old). The difference is the price of an old map. It costs minutes once the simulated flight exists.
+3. **A forecast before the flight of where fixes will hold.** Tomahawk's mission planning "predicts the likelihood that the true peak will be larger than all the sidelobes" for every scene. Ours would be: at points along the planned route, how unique the map is inside the search circle. It is the navigability map of section 3 above, for camera fixes. One to two hours; after the simulator.
+4. **Not worth doing:** Tomahawk's later rule of adding up the match scores of several frames (Block IIA). It needs frames that see different ground. Ours overlap and agree on the same wrong place (findings 3.6); frames far enough apart are what the confirmation of large jumps already compares.
+5. **If the jury asks why we use no AI:** correlation is cheap and its failures can be measured. A learned matcher helps with seasons and light (the season-invariant paper on our reading list). It cannot help where the ground was rebuilt, as on flight 01.
 
 ## Correction to an earlier statement
 

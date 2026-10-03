@@ -1,10 +1,16 @@
-# datasets are fetched with scripts/fetch_data.sh, never committed
+# datasets are fetched with scripts/fetch_data.sh, never committed.
+# data/raw and data/processed may be links to *.nosync folders, which iCloud Drive does not sync.
+data/raw
 data/raw/
+data/raw.nosync/
+data/processed
 data/processed/
+data/processed.nosync/
+/data/
 data/sim/
 
 # python
-.venv/
+.venv
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -24,6 +30,19 @@ node_modules/
 .vscode/
 .idea/
 
+# Generated outputs: keep bulk research artifacts local. The compact, curated
+# ROS/Gazebo A/B/C/D diagnostics below are committed; raw bags are not.
+outputs/*
+!outputs/sim_runs/
+outputs/sim_runs/*
+!outputs/sim_runs/city_20261003_085928/
+!outputs/sim_runs/city_20261003_091945/
+!outputs/sim_runs/city_20261003_092854/
+!outputs/sim_runs/city_20261003_093825/
+!outputs/sim_runs/velocity_phase/
+!outputs/sim_runs/velocity_phase/*/
+outputs/sim_runs/**/rosbag2/
+
 # simulator: generated ground model and recorded bags
 sim/models/ground/
 sim/models/trees/
@@ -32,5 +51,7 @@ sim/bags/
 *.mcap
 *.db3
 
-# per-run bags and CSV logs written by sim/launch/sim.launch.py
-outputs/
+# simulator recordings (sim/nodes/recorder.py)
+recordings/
+
+# per-run bags and CSV logs written by sim/launch/sim.launch.py go to outputs/sim_runs/ (ignored above)

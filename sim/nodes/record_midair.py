@@ -61,7 +61,7 @@ from std_msgs.msg import String
 
 SIM = Path(__file__).resolve().parents[1]
 CAM_HZ, GT_HZ = 25, 100
-CAMERA_TOPIC = "/camera/down/image_raw"
+CAMERA_TOPICS = {"down": "/camera/down/image_raw", "forward": "/camera/forward/image_raw"}
 WGS84_A, WGS84_E2 = 6378137.0, 6.69437999014e-3
 # ENU world to NED world, and FRD body to FLU body: both swap or flip axes
 ENU_TO_NED = np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1]], float)
@@ -108,14 +108,16 @@ class Recorder(Node):
         self.executor_ = rclpy.executors.SingleThreadedExecutor()
         self.executor_.add_node(self)
         self.folder, self.traj = folder, traj
-        self.img_dir = folder / "color_down" / traj
-        self.img_dir.mkdir(parents=True, exist_ok=True)
-        self.frames = {}  # frame index -> stamp
+        self.img_dirs = {"down": folder / "color_down" / traj,
+                         "forward": folder / "color_left" / traj}
+        for path in self.img_dirs.values():
+            path.mkdir(parents=True, exist_ok=True)
+        self.frames = {name: {} for name in CAMERA_TOPICS}  # frame index -> stamp
         self.t0 = None
         self.armed = False  # frames count only once every subscription is connected
         self.odom, self.imu, self.gps, self.baro = [], [], [], []
         self.imu_params = None
-        self.images = queue.Queue()  # filled from Gazebo's transport thread, see GzWorld
+        self.images = {name: queue.Queue() for name in CAMERA_TOPICS}  # filled from Gazebo transport
         deep = QoSProfile(depth=5000, reliability=QoSReliabilityPolicy.BEST_EFFORT)  # keep every 100 Hz reading
         self.create_subscription(Odometry, "/ground_truth/odom", self.on_odom, deep)
         self.create_subscription(Imu, "/imu/data", self.on_imu, deep)
@@ -127,41 +129,46 @@ class Recorder(Node):
     def take_images(self):
         """Save the camera frames that have arrived; the ROS readings are taken in between."""
         while True:
-            try:
-                t, img = self.images.get_nowait()
-            except queue.Empty:
+            received = False
+            for name, images in self.images.items():
+                try:
+                    t, img = images.get_nowait()
+                except queue.Empty:
+                    continue
+                received = True
+                if self.armed:
+                    self.on_image(name, t, img)
+            if not received:
                 return
-            if self.armed:
-                self.on_image(t, img)
 
     def spin(self, timeout):
         self.take_images()
         self.executor_.spin_once(timeout_sec=timeout)
         self.take_images()
 
-    def on_image(self, t, img):
+    def on_image(self, name, t, img):
         if self.t0 is None:
             self.t0 = t
             self.get_logger().info(f"recording {self.traj}")
         k = round((t - self.t0) * CAM_HZ)
-        cv2.imwrite(str(self.img_dir / f"{k:06d}.JPEG"), img, [cv2.IMWRITE_JPEG_QUALITY, 90])
-        self.frames[k] = t
-        if k % (10 * CAM_HZ) == 0:
+        cv2.imwrite(str(self.img_dirs[name] / f"{k:06d}.JPEG"), img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        self.frames[name][k] = t
+        if name == "down" and k % (10 * CAM_HZ) == 0:
             self.get_logger().info(f"{k / CAM_HZ:.0f} s recorded")
 
     def step_frame(self, world, steps):
         """Advance the paused simulation by one camera period and wait until that frame has arrived."""
-        have = len(self.frames)
+        have = len(self.frames["down"])
         if not world.control(pause=True, multi_step=steps):
             return False  # the caller logs it and steps again; the frames so far are kept
         end = time.time() + 30
-        while len(self.frames) == have and time.time() < end:
+        while len(self.frames["down"]) == have and time.time() < end:
             self.spin(0.005)
-        if len(self.frames) == have:
+        if len(self.frames["down"]) == have:
             return False
         # Take in the ground truth and IMU readings of this step before the next one. Their 100 Hz ticks can sit a
         # millisecond off the camera's, so wait for the latest tick at or before the frame, not one exactly at it.
-        t = self.frames[max(self.frames)] - 1 / GT_HZ + 1e-6
+        t = self.frames["down"][max(self.frames["down"])] - 1 / GT_HZ + 1e-6
         end = time.time() + 0.5
         while time.time() < end and not (self.odom and self.imu and self.odom[-1][0] >= t and self.imu[-1][0] >= t):
             self.spin(0.005)
@@ -182,22 +189,28 @@ class Recorder(Node):
         self.baro.append((stamp(m), m.fluid_pressure))
 
     def write(self, h5_path, origin):
-        if not self.frames:
+        if not self.frames["down"]:
             self.get_logger().error("no camera frames received; is the simulator running?")
             return
-        n_s = (max(self.frames) + 1) // CAM_HZ  # whole seconds, as in Mid-Air
+        if not self.frames["forward"]:
+            self.get_logger().error("no forward camera frames received; refusing to write an incomplete two-camera trajectory")
+            return
+        n_s = (max(self.frames["down"]) + 1) // CAM_HZ  # whole seconds, as in Mid-Air
         if n_s < 1:
             self.get_logger().error("less than one second recorded; nothing written")
             return
         n_frames = n_s * CAM_HZ
-        for k in [k for k in self.frames if k >= n_frames]:
-            (self.img_dir / f"{k:06d}.JPEG").unlink()
-        missing = [k for k in range(n_frames) if k not in self.frames]
-        for k in missing:  # a dropped frame keeps the 25 Hz numbering: repeat the one before
-            prev = max(j for j in self.frames if j < k) if any(j < k for j in self.frames) else min(self.frames)
-            (self.img_dir / f"{k:06d}.JPEG").write_bytes((self.img_dir / f"{prev:06d}.JPEG").read_bytes())
-        if missing:
-            self.get_logger().warning(f"{len(missing)} of {n_frames} camera frames were dropped and repeated")
+        for name, frames in self.frames.items():
+            for k in [k for k in frames if k >= n_frames]:
+                (self.img_dirs[name] / f"{k:06d}.JPEG").unlink()
+            missing = [k for k in range(n_frames) if k not in frames]
+            for k in missing:  # keep the 25 Hz time index stable if a camera drops a frame
+                prior = [j for j in frames if j < k]
+                prev = max(prior) if prior else min(frames)
+                (self.img_dirs[name] / f"{k:06d}.JPEG").write_bytes(
+                    (self.img_dirs[name] / f"{prev:06d}.JPEG").read_bytes())
+            if missing:
+                self.get_logger().warning(f"{name} camera: {len(missing)} of {n_frames} frames dropped and repeated")
 
         t = self.t0 + np.arange(n_s * GT_HZ) / GT_HZ
         for name, rows in (("ground truth", self.odom), ("IMU", self.imu)):
@@ -237,6 +250,8 @@ class Recorder(Node):
             cam = grp.create_group("camera_data")
             cam.create_dataset("color_down", data=np.array(
                 [f"color_down/{self.traj}/{k:06d}.JPEG" for k in range(n_frames)], dtype=h5py.string_dtype()))
+            cam.create_dataset("color_left", data=np.array(
+                [f"color_left/{self.traj}/{k:06d}.JPEG" for k in range(n_frames)], dtype=h5py.string_dtype()))
             gt = grp.create_group("groundtruth")
             for name, data in (("position", pos_ned), ("velocity", vel), ("acceleration", acc),
                                ("attitude", q), ("angular_velocity", ang)):
@@ -278,11 +293,12 @@ class GzWorld:
         self.node, self.req_type, self.rep_type = GzNode(), WorldControl, Boolean
         self.service = f"/world/{world}/control"
 
-        def on_image(m):  # Gazebo's thread: copy and hand over; files are written in the main thread
+        def on_image(name, m):  # Gazebo's thread: copy and hand over; files are written in the main thread
             img = np.frombuffer(m.data, np.uint8).reshape(m.height, m.width, -1)[..., 2::-1]  # RGB to BGR for OpenCV
-            frames.put((m.header.stamp.sec + m.header.stamp.nsec * 1e-9, img.copy()))
+            frames[name].put((m.header.stamp.sec + m.header.stamp.nsec * 1e-9, img.copy()))
 
-        self.node.subscribe(GzImage, CAMERA_TOPIC, on_image)
+        for name, topic in CAMERA_TOPICS.items():
+            self.node.subscribe(GzImage, topic, lambda m, name=name: on_image(name, m))
 
     def control(self, **fields):
         ok, rep = self.node.request(self.service, self.req_type(**fields), self.req_type, self.rep_type, 5000)
@@ -337,7 +353,7 @@ def main():
                     rec.get_logger().warning("no camera frame after a step, or the step was refused; stepping again")
             else:
                 rec.spin(0.1)
-            if args.duration and rec.frames and max(rec.frames) >= args.duration * CAM_HZ:
+            if args.duration and rec.frames["down"] and max(rec.frames["down"]) >= args.duration * CAM_HZ:
                 break
     finally:
         if world:

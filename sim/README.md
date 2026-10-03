@@ -88,14 +88,50 @@ The Gazebo window appears in the browser tab. Launch options:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `cam_res` | `1024` | Down camera width and height in pixels. 1024 matches Mid-Air; use 512 if the simulation runs slowly |
+| `cam_res` | `1024` | Down-camera width and height in pixels. 1024 matches Mid-Air; use 512 if the simulation runs slowly |
 | `gps` | `true` | `false` removes the GNSS receiver |
+| `gnss_cutoff_s` | `20.0` | Seconds since the first raw GPS fix when the gate closes; negative means never |
+| `record_mode` | `light` | `light` records sensor/pose topics but no images; `full` also records down and forward images |
+| `run_label` | empty | Optional run folder under `outputs/sim_runs/velocity_phase/` |
+| `stereo` | `false` | `true` adds a second down camera at `/camera/down_right/image_raw` |
+| `stereo_baseline_m` | `0.30` | Stereo camera offset along body -Y (right), used when `stereo:=true` |
 | `gui` | `true` | `false` runs Gazebo without its window |
-| `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods), `islands` (two islands and open sea) or `strait` (the islands with warships that transmit AIS) |
-| `demo` | `false` | `true` flies circles (in `islands`: from island to island) and opens the camera view and the sensor monitor |
+| `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods), `islands` (two islands and open sea), `strait` (the islands with warships that transmit AIS) or `city` (roads and buildings) |
+| `demo` | `false` | `true` flies circles (in `islands` and `strait`: from island to island; in `city`: a loop through the streets) and opens the camera view and the sensor monitor |
 | `ships` | `auto` | `true` sails AIS-transmitting ships and runs the drone's AIS receiver (see below); `auto` means on in `strait` only |
+| `wind` | `none` | `SPEED,FROM` in m/s and degrees, e.g. `6,20`: wind from the north-north-east with gusts; the drone leans into it |
 
-Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gps:=false`.
+Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=terrain gnss_cutoff_s:=60 stereo:=true`.
+
+### City GNSS-denial run
+
+The `city` world is generated on first launch and contains roads, irregular building footprints and heights, a plaza and simple vegetation. `demo:=true` flies a loop across the city at 80 m. GNSS begins available and the gate closes 20 simulation seconds after its first fix by default. The cutoff is logged by the gate and published on `/nav/gnss_available`; raw GPS remains visible on `/sim/gps_raw`, while `/gps/fix` stops publishing after denial.
+
+Every launch creates `outputs/sim_runs/<world>_YYYYMMDD_HHMMSS/` with the rosbag, `metadata.json`, `config.json`, `sim.log`, `trajectory.csv`, `estimator_debug.csv`, `gnss_debug.csv` and `velocity_debug.csv`. Supplying `run_label:=V1_gnss_velocity_fit_open` places it under `outputs/sim_runs/velocity_phase/V1_gnss_velocity_fit_open/`. Light mode records ground truth (evaluation only), raw and gated GPS, status, IMU, barometer, camera calibration, TF/TF-static, and estimator output. Full mode also records both image streams.
+
+The live adapter does not subscribe to ground truth. It converts `/gps/fix` WGS84 coordinates into local ENU using the world's declared spherical-coordinate origin, initializes position from GNSS, initializes tilt and IMU biases from a settled stationary IMU window (yaw is unobservable and starts at 0), then fuses GNSS position updates and a robust generalized least-squares velocity fit from GNSS positions. The fit uses an 8 s window, at least six fixes spanning six seconds, the per-fix position covariance, and one normalized-residual outlier rejection pass. Velocity covariance is the slope block of the GLS parameter covariance. Fits use non-overlapping fix windows before being passed to the existing ESKF velocity update. After cutoff the estimator propagates IMU, barometer, and enabled visual updates only. Ground truth stays in the logger for evaluation. `velocity_debug.csv` records estimate and fit errors in ENU; the logger rotates Gazebo odometry's body-frame GT velocity into ENU before scoring it. `/nav/estimator_status`, `estimator_debug.csv`, and `gnss_debug.csv` contain update decisions and diagnostics. `vision_rotation:=false` and `vision_direction:=false` independently disable those updates without removing the code.
+
+PowerShell commands from `sim/`:
+
+```powershell
+docker compose up -d --build
+docker compose exec sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=city demo:=true gui:=false cam_res:=512 gnss_cutoff_s:=-1 record_mode:=light vision_rotation:=true vision_direction:=true run_label:=V1_gnss_velocity_fit_open"
+# Stop V1 with Ctrl+C, then run V2:
+docker compose exec sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=city demo:=true gui:=false cam_res:=512 gnss_cut_s:=20 record_mode:=light vision_rotation:=true vision_direction:=true run_label:=V2_gnss_velocity_fit_denial"
+```
+
+Watch Gazebo at http://localhost:6080. In a second terminal, inspect the launch and gate logs with `docker compose exec sim bash -ic "tail -f /tmp/sim.log"`. End the launch with Ctrl+C in its attached terminal, or restart the container; stop the container with `docker compose down`.
+
+### Record a common replay
+
+With the simulator running, start the recorder before the scenario. From the host, in `sim/`:
+
+```bash
+docker compose exec -d sim bash -ic "cd /ws/TaipeiDrift && python3 sim/nodes/recorder.py --name t_sim_terrain_cut60 --world terrain --duration-s 255 --image-rate-hz 5 --cam-res 512 --gnss-cut-s 60 --stereo --stereo-baseline-m 0.30 > /tmp/recorder.log 2>&1"
+docker compose exec -d sim bash -ic "cd /ws/TaipeiDrift && python3 sim/scripts/t_scenario.py > /tmp/scenario.log 2>&1"
+```
+
+The recorder writes `taipeidrift-replay/1` under `/ws/TaipeiDrift/recordings/<name>` (the mounted host working copy). Images are sampled at `image_rate_hz`; truth is evaluator-only.
 
 Docker on a Mac has no access to the graphics chip, so the processor draws the camera images. The simulation then runs slower than real time. Gazebo shows the real-time factor at the bottom right. All timestamps use simulation time, so recorded data is correct at any speed. On an M3 MacBook:
 
@@ -134,17 +170,18 @@ Its sensors match Mid-Air (Fonder and Van Droogenbroeck, CVPRW 2019, section 3.1
 
 | Sensor | Mid-Air | Here | ROS topic |
 |---|---|---|---|
-| Down camera | 1024×1024, 90° FOV, 25 Hz, ideal pinhole, global shutter | Same (`cam_res` can lower it) | `/camera/down/image_raw`, `/camera/down/camera_info` |
-| IMU | 100 Hz, eq. 1 noise: white noise + random-walk bias, drawn per flight | Same model, in `nodes/sensor_noise.py` | `/imu/data`; the draw is on `/imu/params` |
+| Down camera | 1024×1024, 90° FOV, 25 Hz, ideal pinhole, global shutter | Same (`cam_res` can lower it); optional right camera uses the same intrinsics | `/camera/down/image_raw`, `/camera/down/camera_info`, optional `/camera/down_right/image_raw` |
+| Forward camera | Forward camera for relative rotation and translation direction | 1024×1024, 90° FOV, 25 Hz, ideal pinhole | `/camera/forward/image_raw`, `/camera/forward/camera_info` |
+| IMU | 100 Hz, eq. 1 noise: white noise + random-walk bias, drawn per flight | Same model; published orientation is zeroed and marked unavailable | `/imu/data`; the draw is on `/imu/params` |
 | Barometer | none | Gazebo Air Pressure sensor, 50 Hz, 10 Pa noise + slow drift | `/air_pressure` (Pa) |
-| GNSS | 1 Hz | 1 Hz, σ 1.5 m horizontal, 3 m vertical | `/gps/fix` |
+| GNSS | 1 Hz | 1 Hz, σ 1.5 m horizontal, 3 m vertical; optional simulation-time cutoff | `/gps/fix` (gated from `/sim/gps_raw`) |
 | Ground truth | 100 Hz | 100 Hz | `/ground_truth/odom` |
 
 - **Airframe.** It is AirSim's default quadcopter, as in Mid-Air: 1 kg, arm 0.2275 m, about 4.2 N thrust per rotor.
 - **Sensor placement.** All sensors sit at one point, `sensor_link`, 0.5 m ahead of the airframe centre on the body X-axis, as in Mid-Air. That point is the model origin, so ground truth describes the IMU itself and there are no lever arms.
-- **Camera.** It looks straight down, and the top of the image points forward. Intrinsics are fx = fy = cx = cy = width/2, as in Mid-Air.
-- **IMU noise.** The bounds in `config/sensor_noise.yaml` are our assumption for a consumer MEMS IMU; Mid-Air does not publish its own. Use `seed` for repeatable runs and `scale` for the noise sweep.
-- **Untouched data.** The noise-free IMU and pressure stay available on `/sim/imu_raw` and `/sim/air_pressure_raw`.
+- **Camera.** It looks straight down, and the top of the image points forward. Intrinsics are fx = fy = cx = cy = width/2, as in Mid-Air. Stereo is generated as a temporary model variant; the base SDF remains unchanged.
+- **IMU noise.** The bounds in `config/sensor_noise.yaml` are our assumption for a consumer MEMS IMU; Mid-Air does not publish its own. Use `seed` for repeatable runs and `scale` for the noise sweep. The true Gazebo attitude is zeroed before `/imu/data` is published.
+- **Untouched data.** The noise-free IMU and pressure stay available on `/sim/imu_raw` and `/sim/air_pressure_raw`; GNSS raw data is bridged to `/sim/gps_raw`.
 
 ## The environments
 
@@ -198,7 +235,7 @@ data/sim/<world>/sunny/
   sensor_records.hdf5                         per trajectory: camera_data, groundtruth, imu, gps (as Mid-Air)
 ```
 
-- **Camera:** JPEG, as Mid-Air's colour images; Mid-Air uses PNG only for depth, disparity, segmentation and normals, which we do not record.
+- **Camera:** `color_down` remains the Mid-Air downward stream. `color_left` is the forward stream used by the visual rotation and velocity-direction experiments; both are JPEG at 25 Hz. Mid-Air uses PNG only for depth, disparity, segmentation and normals, which we do not record.
 - **Rates and rows:** frame j goes with row 4j of the 100 Hz ground truth and IMU, and row j // 25 of the 1 Hz GPS. Quaternions are w, x, y, z; axes are north, east, down.
 - **Turn rates follow the Mid-Air files, not their documentation:** the gyroscope and the true angular velocity are around the world axes, the accelerometer is in the drone's axes (forward, right, down). See `docs/findings.md`, section 2.2. Code written for Mid-Air therefore works on these recordings unchanged.
 - **Look up one picture:** `python3 sim/scripts/frame_info.py data/sim/islands/sunny/color_down/trajectory_0000/000123.JPEG` prints every sensor value recorded with it.
@@ -331,7 +368,9 @@ worlds/islands.sdf          two islands and open sea
 worlds/strait.sdf           the islands with warships that transmit AIS
 config/bridge.yaml          Gazebo ↔ ROS topics
 config/sensor_noise.yaml    IMU noise bounds, barometer drift
-nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift
+nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift and attitude zeroing
+nodes/gnss_gate.py          GNSS cutoff, counted from the first fix
+nodes/recorder.py           common replay-format recorder
 nodes/sensor_monitor.py     live sensor values in the terminal, and the NAVIGATION comparison of the estimates
 nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
 nodes/record_midair.py      records a flight in the Mid-Air dataset format
@@ -356,4 +395,5 @@ scripts/make_topo_map.py    topographic map and elevation grid of the islands wo
 maps/                       the islands map (PNG, PDF) and elevation grid (TIFF + JSON)
 scripts/check_sensors.py    checks rates, frames and camera intrinsics
 scripts/smoke_flight.py     short test flight, saves one down-camera frame
+scripts/t_scenario.py       60 m GNSS-cut flight scenario
 ```

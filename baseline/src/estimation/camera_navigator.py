@@ -82,6 +82,8 @@ class NavigatorConfig:
     start_sigma_m: float = 3.0  # uncertainty at the moment of the jam
     keep: float = KEEP
     zoom_step: float = 0.05
+    scale_from_fixes: bool = True  # after each fix, scale the camera motion by its zoom over the calibration zoom
+    # (a change of height above ground); zooms come in steps of zoom_step, so one step is a 6 to 8 percent change
     zoom_reach: float = 0.10  # zooms tried around the last zoom
     zoom_limits: tuple[float, float] = (0.5, 1.1)
     angle_reach_deg: float = 5.0  # angles tried: the learned angle and this much to either side
@@ -186,6 +188,12 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
             match(prepare(flight.frame(k)), flight.reference, flight.reference.nearest(truth[k], cfg.nearest_images), zooms, angles, cfg.keep)
             for k in frames
         ]
+    zoom = float(np.median([f.zoom for f in fixes]))
+    if zoom <= zooms[0] + 1e-9 or zoom >= zooms[-1] - 1e-9:
+        # the best of the zooms tried may not be the right one: the camera's scale (its height) lies
+        # outside what calibration_zooms covers, and every fix after the jam would be searched at the wrong scale
+        raise ValueError(f"the camera's scale lies at the edge of the zooms tried ({zoom:.2f} of {zooms[0]:.2f} to "
+                         f"{zooms[-1]:.2f}): the flight height is outside what calibration_zooms covers; widen it")
     offsets = np.array([f.position - truth[k] for f, k in zip(fixes, frames)])
     if cfg.offset_frame == "body":
         heading = _heading(flight)
@@ -199,7 +207,7 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
     return Calibration(
         jam_index=jam,
         motion_matrix=matrix,
-        zoom=float(np.median([f.zoom for f in fixes])),
+        zoom=zoom,
         angle=float(np.median([f.angle for f in fixes])),
         fix_offset=np.median(offsets, axis=0),
         offset_frame=cfg.offset_frame,
@@ -358,7 +366,8 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
                     estimate, predicted, _ = blend(estimate, predicted, earlier[0], earlier[1])
                 estimate, variance, _ = blend(estimate, predicted, position, fix_variance)
                 zoom = found.zoom
-                scale = zoom / calibration.zoom
+                if cfg.scale_from_fixes:
+                    scale = zoom / calibration.zoom
                 since_fix = 0.0
                 drift_since_fix = 0.0
 
