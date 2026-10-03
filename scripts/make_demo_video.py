@@ -83,6 +83,10 @@ class Flight:
         # the first position from the ships' bearings after the drone has left island A (else 8 s after the coast)
         fixes = [float(x["t"]) for x in rows if x["name"] == ships and float(x["t"]) >= self.coast_a]
         self.first_fix = min(fixes[0], self.coast_b) if fixes else self.coast_a + 8.0
+        # how far off the ships' bearings alone were over the water, for the caption
+        radio = [math.hypot(float(x["est_x"]) - float(x["gt_x"]), float(x["est_y"]) - float(x["gt_y"]))
+                 for x in rows if x["name"] == ships and self.coast_a <= float(x["t"]) < self.coast_b]
+        self.radio_median = float(np.median(radio)) if radio else None
         blind = (o["t"] >= self.lost) & (o["t"] <= self.pad)
         self.worst = float(o["err"][blind].max()) if blind.any() else float("nan")
         self.median = float(np.median(o["err"][blind])) if blind.any() else float("nan")
@@ -103,7 +107,9 @@ class Flight:
             (self.coast_a, ["Over open water the camera finds little to hold on to",
                             "The drone listens for the ships' AIS radio: the RF window opens at the top right"]),
             (self.first_fix, ["Bearings to three ships give a position that does not drift",
-                              "Each fix is rough, some tens of metres, but its error does not grow with time"]),
+                              "Each fix is rough, " + ("some tens of metres" if self.radio_median is None else
+                                                       f"about {self.radio_median:.0f} m here")
+                              + ", but its error does not grow with time"]),
             ((self.first_fix + self.coast_b) / 2, ["Camera, inertial sensors and radio are fused into one estimate",
                                                    "Dashboard, first row: the fused estimate and its distance from "
                                                    "the true position"]),
