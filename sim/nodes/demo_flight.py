@@ -1,9 +1,10 @@
-"""Fly the drone in a continuous demo pattern: take off, then circle at constant height. In the islands world it
-instead flies from the helipad on island A across the open sea to island B and back, again and again.
+"""Fly the drone in a continuous demo pattern: take off, then circle at constant height. In the islands world, and
+the strait world that shares its scenery, it instead flies from the helipad on island A across the open sea to
+island B and back, again and again.
 With --route survey it flies back-and-forth lines over each island in turn, so the down camera sees all of them.
 
 Started by `sim.launch.py demo:=true`, or by hand while the simulator runs:
-    python3 sim/nodes/demo_flight.py [--world terrain|islands] [--route pads|survey] [--spacing M] [--height M] [--once] [--from-waypoint N]
+    python3 sim/nodes/demo_flight.py [--world terrain|islands|strait] [--route pads|survey] [--spacing M] [--height M] [--once] [--from-waypoint N]
 
 --once flies the route a single time, then hovers; record_islands_set.sh uses it to end each recorded flight.
 It also points the Gazebo window's camera at the drone; `--camera-only` does only that. Height is held from the ground
@@ -30,6 +31,7 @@ SPEED = 6.0       # m/s forward
 YAW_RATE = 0.15   # rad/s: a circle of SPEED / YAW_RATE = 40 m radius
 ROUTE_SPEED = 8.0  # m/s between the islands
 LAYOUT = Path(__file__).resolve().parents[1] / "models" / "{world}" / "layout.json"
+SCENERY = {"strait": "islands"}  # worlds that reuse another world's scenery
 
 
 def follow_in_gui(timeout_s=180):
@@ -59,7 +61,7 @@ def route_for(world, kind="pads", spacing=60.0):
     pads: to the helipad on island B and back. survey: back-and-forth lines `spacing` m apart over each island,
     then back to the start pad.
     """
-    layout = Path(str(LAYOUT).format(world=world))
+    layout = Path(str(LAYOUT).format(world=SCENERY.get(world, world)))
     if not layout.exists():
         return None
     layout = json.loads(layout.read_text())
@@ -125,7 +127,7 @@ class Demo(Node):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--world", default="terrain", help="the world that runs; islands flies between the islands")
+    ap.add_argument("--world", default="terrain", help="the world that runs; islands and strait fly between the islands")
     ap.add_argument("--camera-only", action="store_true", help="only point the Gazebo window at the drone")
     ap.add_argument("--route", choices=["pads", "survey"], default="pads",
                     help="islands world: pads flies between the helipads, survey covers each island in lines")
