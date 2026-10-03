@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-jazzy-rqt-image-view \
         ros-jazzy-image-transport-plugins \
         ros-jazzy-rosbag2-storage-mcap \
-        python3-numpy python3-opencv python3-scipy python3-h5py \
+        python3-numpy python3-opencv python3-scipy python3-h5py python3-yaml \
         xvfb x11vnc novnc websockify fluxbox supervisor xterm mesa-utils \
     && rm -rf /var/lib/apt/lists/*
 

@@ -29,6 +29,11 @@
   ros_type_name: sensor_msgs/msg/CameraInfo
   gz_type_name: gz.msgs.CameraInfo
   direction: GZ_TO_ROS
+- ros_topic_name: /camera/forward/camera_info
+  gz_topic_name: /camera/forward/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS
 - ros_topic_name: /cmd_vel
   gz_topic_name: /midair_quad/gazebo/command/twist
   ros_type_name: geometry_msgs/msg/Twist

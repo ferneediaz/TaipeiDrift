@@ -1,0 +1,9 @@
+{
+  "world": "city",
+  "demo": true,
+  "cam_res": 512,
+  "gnss_cutoff_s_since_first_fix": -1.0,
+  "record_mode": "light",
+  "vision_rotation": true,
+  "vision_direction": true
+}
