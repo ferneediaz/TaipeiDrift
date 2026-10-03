@@ -157,3 +157,67 @@ How to read it:
   limit of 50 m the navigator says "I cannot promise 50 m" most of the time, and is right when it does promise.
 - **Two flights, one place, one simulator.** The development flights showed what a turn and fog can do; these two
   flights did not show it, and that is no proof it cannot happen.
+
+## After the freeze: the navigator's measurements in Alessandro's filter
+
+Saturday 3 October 2026, 20:04. Development flights only; the sealed flights were not run again, and the numbers we
+quote stay those of the frozen navigator above.
+
+`scripts/fused_replay.py` replays a recorded flight through Alessandro's ESKF (`vio/estimation/eskf.py`), run as his
+live adapter runs it: started on the pad from GNSS and the IMU's gravity, then IMU prediction, barometer height, and
+GNSS position with his velocity fit until GNSS is lost at the 450 m mark. From there the filter is fed what the camera
+navigator measures:
+
+- **the sun sensor's heading,** as a yaw, at every frame;
+- **the down camera's ground speed,** corrected for tilt first: a camera fixed to the drone looks at the ground a
+  little away from the point below it, so a tilt change shifts the picture (at 100 m, 1 degree is 1.75 m, which
+  over 0.2 s reads as 8.7 m/s). The filter knows its tilt and takes that shift out. A reading far from what the
+  filter expects is given less weight, not thrown out and not believed outright; a step shorter than 0.3 of the
+  cruising step is not fused (stopped, or lost track: the IMU decides);
+- **the map fixes the frozen navigator used,** as horizontal positions, the way Dan's code fuses the ships' RF fix:
+  behind the filter's gate, with a reset after three rejections in a row;
+- **the navigator's uncertainty rule** on the horizontal position: 10 percent of the distance since the last fix. The
+  filter's own uncertainty grows far too slowly, because it takes the camera's speed errors for random.
+
+Step by step on the 100 m flight (one draw), error after the GNSS loss:
+
+| Fed to the filter | Median | At the end | Heading error |
+|---|---|---|---|
+| GNSS all the way (the check that recordings and filter fit) | 1.5 m | 0.4 m | 5.8 degrees |
+| IMU and barometer only | 3.0 km | 30.8 km | 55 degrees |
+| plus the sun heading | 2.4 km | 24.1 km | 1.3 degrees |
+| plus the camera's ground speed | 57 m | 115 m | 1.3 degrees |
+| plus the navigator's map fixes | 18 m | 9 m | 1.3 degrees |
+
+On all three development flights (100 m / 120 m / 65 m), median over three draws, median error in metres with the
+worst in brackets:
+
+| | The camera's steps alone | Filter with sun and camera speed | Frozen navigator | Filter with its map fixes |
+|---|---|---|---|---|
+| Ideal camera | 69 / 95 / 54 | 62 / 83 / 26 (147 / 207 / 205) | 16.5 / 32.3 / 18.0 (72 / 118 / 85) | **18.4 / 31.0 / 11.0 (56 / 85 / 94)** |
+| Realistic camera | 69 / 98 / 53 | 62 / 81 / 31 (138 / 198 / 235) | 18.2 / 31.3 / 16.7 (57 / 149 / 104) | **14.7 / 29.5 / 9.6 (52 / 96 / 118)** |
+| Ideal camera, compass for the sun sensor | 74 / 106 / 68 | 76 / 93 / 31 (175 / 240 / 246) | 22.0 / 34.4 / 30.3 (92 / 133 / 120) | 21.6 / 36.3 / 20.5 (85 / 112 / 131) |
+
+How to read it:
+
+- **Between fixes the filter drifts less than the camera alone,** on every flight. With the map fixes it is about as
+  accurate as the frozen navigator, and its worst error is smaller on two of the three flights.
+- **The sun sensor:** it keeps the heading within 1.3 degrees, and the filter took every one of its readings. Alone
+  it does not hold the position; it is what lets the camera's speed, measured in the picture, be turned into north
+  and east. With a compass in its place every number in the last row is worse.
+- **The stated error is less reliable than the navigator's.** With the ideal camera the true error is within the
+  filter's 3 sigma 100, 98.1 and 99.9 percent of the time (lowest draw); the navigator's holds 100 percent. On the
+  realistic 65 m flight the filter fuses the navigator's one wrong fix too, and its bound holds 93 percent.
+
+Limits: three flights of one simulated place, and the filter's two settings (1 m/s for the camera's speed, the
+limit for an unexpected reading) were chosen on them. The navigator finds the fixes on its own; the filter does not
+steer the map search yet. The tilt correction assumes flat ground. The filter starts on the pad with a heading
+reading that is 1 degree off.
+
+```bash
+python scripts/fused_replay.py --flight wufeng_corridor_100m                         # GNSS all the way
+python scripts/fused_replay.py --flight wufeng_corridor_100m --cut                   # IMU and barometer only
+python scripts/fused_replay.py --flight wufeng_corridor_100m --cut --camera          # plus sun heading and camera speed
+python scripts/fused_replay.py --flight wufeng_corridor_100m --cut --camera --fixes  # plus the map fixes
+python scripts/fused_replay.py --all [--camera-model realistic] [--heading-source compass --yaw-sigma 4.1]
+```
