@@ -85,6 +85,49 @@
     }
    },
    "seconds": 380
+  },
+  {
+   "name": "sp3-all-dev-flights-work",
+   "commit": "452d15b",
+   "date": "2026-10-03 16:52",
+   "note": "Every development flight works (no wrong fix, bound held 99 percent, never within 50 m while further off); wider zooms after the jam, confirmation from 100 m search radius",
+   "tests": {
+    "passed": 304,
+    "failed": 0,
+    "skipped": 0,
+    "summary": "304 passed, 3 warnings in 103.52s (0:01:43)"
+   },
+   "visloc_03_confirm_body_seed1": {
+    "median": 28.0,
+    "p90": 176.7,
+    "worst": 368.2,
+    "fixes_used": 119.0,
+    "used_but_wrong": 0.0
+   },
+   "sim_wufeng_seed3": {
+    "camera_alone": {
+     "median": 75.9,
+     "p90": 160.1,
+     "worst": 211.3,
+     "fixes_used": 0.0,
+     "used_but_wrong": 0.0
+    },
+    "map_2018": {
+     "median": 18.2,
+     "p90": 46.3,
+     "worst": 93.9,
+     "fixes_used": 12.0,
+     "used_but_wrong": 0.0
+    },
+    "map_2020_fresh": {
+     "median": 19.0,
+     "p90": 48.4,
+     "worst": 97.3,
+     "fixes_used": 14.0,
+     "used_but_wrong": 0.0
+    }
+   },
+   "seconds": 187
   }
  ]
 }
