@@ -112,6 +112,8 @@ class RfSensor(Node):
 
     def step(self):
         t = self.get_clock().now().nanoseconds * 1e-9
+        if t < self.cfg["ais"].get("start_after_s", 0.0):
+            return
         for name, odom in self.ship_odom.items():
             ship, speed = self.ships[name], odom.twist.twist.linear.x
             if name not in self.next_tx:  # first report at a random point of the first interval
