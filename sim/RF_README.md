@@ -56,12 +56,29 @@ For each packet it decodes, `nodes/rf_sensor.py` publishes on `/rf/detections`:
 
 A **bearing** is the direction something lies in, as an angle. A bearing of 60° means the ship is 60° to the left of straight ahead. It says which way, not how far. It is the signal's angle of arrival (AoA).
 
-**The antenna that measures it.** The drone carries a rotating-loop direction finder, built by the launch file from `direction_finder` in `config/rf.yaml` (strait world only; the Mid-Air model file is unchanged). It is the classic VHF method: the loops of aircraft direction finders, inside a fairing.
-- **The loop:** a shielded loop, a ring of coax 13 cm across (0.22 wavelength, electrically small) with the shield broken at the top and a balun at the feed. A small loop's pattern is a figure 8 with two sharp nulls, 180° apart, where the ship's signal fades out. The loop must stay open: its signal is the magnetic flux through it.
-- **The spin:** a motor turns it at 25 rev/s (1500 rpm) and an encoder reads its angle. The angle of the null is the bearing. A packet lasts only 26.67 ms, and the loop must pass a null within it: any 180° of sweep holds one, so it needs at least 18.75 rev/s. At 25 rev/s it sweeps 240° per packet. `rf_sensor.py` refuses a spin rate that sweeps less than 180°.
-- **The sense whip:** the quarter-wave whip on the forward boom (0.46 m) decodes the packets and says which of the two nulls is the ship.
-- **The radome:** the spinning loop sits in a fibreglass radome on the drone's back, drawn half see-through so the loop can be watched.
-- **Accuracy:** a small loop picks up less than the whip, so the bearing is measured at the loop's SNR, 15 dB lower (`loop_gain_db`). At these ranges the ships are 60 to 85 dB above the noise even then, so the 3° floor (calibration, multipath) sets the accuracy.
+**The antenna that measures it.** The drone carries a pseudo-Doppler direction finder, built by the launch file from `direction_finder` in `config/rf.yaml` (strait world only; the Mid-Air model file is unchanged). It copies a design that has flown on a four-rotor UAS at 150 MHz, close to AIS: Gerhard and Tokekar, [Experimental Evaluation of a Pseudo-Doppler Direction-Finding System for Localizing Radio Tags](https://arxiv.org/pdf/2003.00386) (Virginia Tech, 2020), figure 1. It has no moving parts.
+- **The array:** four 17 cm helical VHF stubs standing on the rotor arms, 9.5 cm from the centre, inboard of the propeller discs. They form a square with 13 cm sides, 0.07 wavelength. A square array is unambiguous while its side is under 0.35 wavelength; `rf_sensor.py` refuses a larger one.
+- **How it measures the angle:** an RF switch connects the four stubs one after another to a single receiver, 1000 times a second. The received phase then moves as if one antenna were circling, so a ship off to one side produces a Doppler tone. The phase of that tone against the switching gives the bearing. An AIS packet lasts 26.67 ms, which is 26.7 electronic rotations; `rf_sensor.py` refuses fewer than 10.
+- **The radio:** the switch board and a software-defined radio sit on the body, as the paper's Opera Cake and HackRF One do. The packets are decoded through the same stubs, so there is no separate whip. A helical stub picks up about 5 dB less than a full whip (`antenna_gain_db: -5`). At these ranges the ships are still 70 dB or more above the noise, so the 3° floor (calibration, multipath off the airframe) sets the accuracy.
+
+**Where the design comes from.**
+
+- **The direct source:** Gerhard and Tokekar (Virginia Tech, 2020), [Experimental Evaluation of a Pseudo-Doppler Direction-Finding System for Localizing Radio Tags](https://arxiv.org/pdf/2003.00386), figure 1 on page 1. Four whips at the corners of a square feed one radio through an RF switch (their Opera Cake board and HackRF One), and the caption says the antennas "can be mounted on the arms of the hybrid UAS", a four-rotor VTOL drone. From it we take:
+  - four antennas in a square;
+  - mounted on the rotor arms;
+  - one RF switch and one radio (our green board and grey box);
+  - the size rules: under 0.35 wavelength for an unambiguous bearing, about 0.22 works best (their section III).
+
+  They flew it at 150 MHz, close to AIS's 162 MHz, and found a radio tag to within 5 m.
+- **Where they got it:** two older ideas.
+  - [Doppler direction finding](https://en.wikipedia.org/wiki/Doppler_radio_direction_finding): an antenna circling at a known rate sees the signal's frequency rise and fall, and the timing gives the direction. Pseudo-Doppler fakes the circling by switching fixed antennas; it is the standard tool of amateur-radio "fox hunting", which is where the paper's 0.22-wavelength rule comes from.
+  - [The Adcock array](https://en.wikipedia.org/wiki/Adcock_antenna) (Frank Adcock's patent of 1919): four vertical elements in a square, the standard direction-finding layout for a century, from 40 m masts to 13 cm tactical sets. Commercial direction finders still use circular arrays like this, in a radome, for example the [R&S ADD507](https://www.rohde-schwarz.com/us/products/aerospace-defense-security/compact-single-channel/rs-add507-compact-vhf-uhf-df-antenna_334290.html).
+- **Our own choices:** these adapt the design to this drone and to AIS; they are not from the paper.
+  - 17 cm helical stubs instead of the paper's full whips, to stay clear of the propellers.
+  - Placed 9.5 cm out on the arms, to fit the Mid-Air drone.
+  - Switching at 1 kHz with a minimum of 10 rotations per packet, for AIS's 26.67 ms packets. The paper tracked continuous tag beeps, not AIS.
+  - The mounts, the coax and the box's look are cosmetic.
+- **Why not a spinning antenna:** the first version of this drone carried a spinning loop. Rotating loops are historically real (the aircraft direction finders of the 1930s, such as the Bendix loop on Amelia Earhart's Lockheed Electra), but aviation replaced them with fixed antennas switched electronically, and no drone with a fast-spinning loop has been published. Drones that rotate a directional antenna, such as the wildlife-tracking multirotors that turn the whole drone with a Yagi ([ConservationBots](https://arxiv.org/pdf/2308.08104)), take seconds per bearing, too slow for 26.67 ms AIS packets.
 
 ```
             ship
