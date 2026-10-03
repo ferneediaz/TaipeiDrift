@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 12:00.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 12:20.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
@@ -16,6 +16,26 @@ The core system works on real data from two countries. The test on data it was n
 | New, with the sun sensor instead of the compass | 33 m | 162 m | 395 m | 0, 2, 2 | 96% | 0.3% |
 
 On ALTO the new checks change nothing at fixes every 300 m (31.1 m). The sun sensor does not help on this flight: here the heading is not the main error, which matches Ilhan's ALTO finding (6 percent). One seed stays poor (median about 200 m) without wrong fixes: long stretches without an accepted fix, which the navigator reports honestly as uncertain.
+
+**The held-out test** (flights 01 and 04, never looked at before, method frozen at commit f66d4b0, run once; median over 3 seeds):
+
+| Flight | | Median error | 90% below | Worst | Wrong fixes used, per seed | Error within the stated 3 sigma | All clear while wrong |
+|---|---|---|---|---|---|---|---|
+| 01 Changjiang, 66 km, map 5 years newer | Dead reckoning only | 227 m | 596 m | 973 m | | 100% | 0% |
+| | First version | 474 m | 1,604 m | 2,051 m | 17, 18, 24 | 48% | 3.1% |
+| | New, compass | 306 m | 851 m | 1,493 m | 6, 7, 4 | 97% | 0.9% |
+| | New, sun sensor | 177 m | 556 m | 1,514 m | 5, 6, 3 | 98% | 1.0% |
+| 04 Taizhou, 83 km, map 4.5 years newer | Dead reckoning only | 675 m | 1,235 m | 1,805 m | | 100% | 0% |
+| | First version | 285 m | 1,592 m | 2,244 m | 37, 31, 53 | 39% | 6.5% |
+| | New, compass | 60 m | 1,723 m | 2,620 m | 18, 27, 32 | 77% | 3.0% |
+| | New, sun sensor | 64 m | 1,206 m | 1,860 m | 17, 29, 35 | 76% | 3.2% |
+
+What it says:
+
+- **The new checks are clearly better than the first version on unseen flights:** wrong fixes down by a third to three quarters, and the stated uncertainty far more honest (97 instead of 48 percent on flight 01, 77 instead of 39 on flight 04).
+- **They are not good enough yet.** On flight 04 the typical error drops tenfold against dead reckoning (675 to 60 m), but 18 to 32 wrong fixes still pass and the worst stretches are worse than without fixes. On flight 01, map fixes do not beat dead reckoning at all.
+- **Why flight 01 fails:** it runs through a fast-growing area along the Yangtze. Bare construction sites in the 2018 photos are high-rise estates on the 2023 map; no matcher can recognise that ground. Raptor's documentation and the UASTHN paper name the same limit: a map older than the change on the ground.
+- **The sun sensor helps here** where the compass is the weak part: median 177 instead of 306 m on flight 01, 90 percent below 1,206 instead of 1,723 m on flight 04.
 
 **How the plan changed this morning**
 
