@@ -51,8 +51,13 @@ def recorded(name: str) -> bool:
     return meta.is_file() and json.loads(meta.read_text()).get("duration_s") is not None
 
 
-def flight_cfg(cfg: dict, name: str, route: str, camera: str, overrides: dict) -> dict:
-    out = {**cfg, "recording": f"recordings/{name}", "route": route, "camera": cfg.get("cameras", {}).get(camera)}
+def flight_cfg(cfg: dict, name: str, route: str, camera: str, overrides: dict, camera_overrides: dict | None = None) -> dict:
+    model = cfg.get("cameras", {}).get(camera)
+    if camera_overrides:
+        if model is None:
+            raise SystemExit("--camera-set needs a realistic camera, e.g. --camera realistic")
+        model = {**model, **camera_overrides}
+    out = {**cfg, "recording": f"recordings/{name}", "route": route, "camera": model}
     out["navigator"] = {**cfg["navigator"], **overrides}
     return out
 
@@ -61,6 +66,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--set", nargs="*", default=[], help="navigator settings to change, as name=value")
     p.add_argument("--camera", default="ideal")
+    p.add_argument("--camera-set", nargs="*", default=[], help="camera settings to change, as name=value (e.g. visibility_m=300)")
     p.add_argument("--seeds", nargs="+", type=int)
     p.add_argument("--runs", nargs="+", default=["camera_alone", "map_2018", "map_2020_fresh"])
     p.add_argument("--flights", nargs="+", help="development flights to use (default: all that are recorded)")
@@ -69,13 +75,14 @@ def main() -> int:
 
     cfg = yaml.safe_load((REPO / "baseline" / "configs" / "sim_navigator.yaml").read_text())
     overrides = {k: parse_value(v) for k, v in (s.split("=", 1) for s in args.set)}
+    camera_overrides = {k: parse_value(v) for k, v in (s.split("=", 1) for s in args.camera_set)}
     seeds = args.seeds or cfg["seeds"]
     flights = {n: r for n, r in cfg["flights"]["development"].items() if (not args.flights or n in args.flights) and recorded(n)}
-    print(f"development flights: {', '.join(flights)}; camera {args.camera}; changes {overrides or 'none'}")
+    print(f"development flights: {', '.join(flights)}; camera {args.camera} {camera_overrides or ''}; changes {overrides or 'none'}")
 
     jobs, flows = [], []
     for name, route in flights.items():
-        fc = flight_cfg(cfg, name, route, args.camera, overrides)
+        fc = flight_cfg(cfg, name, route, args.camera, overrides, camera_overrides)
         flows += [(fc, s) for s in seeds]
         jobs += [(fc, run, cfg["runs"][run], s, False) for run in args.runs for s in seeds]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:

@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 14:55.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. **Since 14:49 all team work is merged into `main`** ([pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2)); every team branch on GitHub is fully contained in it. Start new work from `main` and bring it back by pull request; ours goes through branch `integration`. Every number comes from a script in this repository; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 15:50.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. **Since 14:49 all team work is merged into `main`** ([pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2)); every team branch on GitHub is fully contained in it. Start new work from `main` and bring it back by pull request; ours goes through branch `integration`. Every number comes from a script in this repository; the details are in [findings.md](findings.md).
 
 ## Save points: how we build from here
 
@@ -21,7 +21,38 @@ Since Saturday 14:20 we build in steps that each leave something working, so tha
 
 ## Now, in short
 
-The system works on real data from two countries, and we now know how well. On the flights it was developed on, it holds about 30 m where the camera alone drifts 470 to 820 m. On flights it never saw, the fixes cut the drift by 40 percent (ALTO, 219 to 131 m, Ilhan's test at 13:00) to tenfold (UAV-VisLoc 04, 675 to 60 m); where the ground was rebuilt since the map (UAV-VisLoc 01) they do not help. Fielded systems claim 15 to 20 m. **Section 2 explains in detail what the system does and what it gives a user.** All team branches now sit in one branch, `integration` (297 tests pass), up for merging as pull request 2.
+**The simulation, this afternoon (15:00 to 16:00; the demo will be the simulation).**
+
+*The held-out test: flight 2* (80 m, 8 m/s, south first, 5.0 km; recorded after the settings were frozen at save point 1, run once at 15:05). The only change: the zooms tried at calibration were widened, because 80 m lies outside the range set for 100 m (the run stopped at our own check, before any result existed). Median over 3 compass seeds, in metres:
+
+| | Flight 1, 100 m (developed on) | Flight 2, 80 m (held out) |
+|---|---|---|
+| Camera alone | 76 / 181 / 234 | 71 / 146 / 194 |
+| 2018 map (the realistic case) | 26.5 / 75 / 92, 12 fixes | **20.7 / 47 / 79**, 13 fixes |
+| 2020 map (the ground itself: an ideal bound) | 17.3 / 36 / 68, 17 fixes | 22.2 / 58 / 90, 15 fixes |
+
+Median / 90 percent / worst. No wrong fix used in any run. With the 2018 map the stated bound held 99.4 to 100 percent of the time and the navigator never said "within 50 m" while being further off. With the ideal 2020 map it did, 0.2 to 1.1 percent of the time. The bound is wide: with the 2018 map it commits to "within 50 m" only 23 to 30 percent of the time.
+
+*From here on: development, held-out and sealed flights* (fixed at 15:20 in `baseline/configs/sim_navigator.yaml`, before the new flights were recorded). Four more flights, all along the same corridor, differing in height, speed and direction: two for development (120 m and 65 m), two sealed (90 m and 110 m) that are neither run nor looked at until the end, then run once; those are the numbers we quote. A change is kept only if it works on every development flight and passes `scripts/check_save_point.py` (the real data). "Works", for the 2018 map on every flight and seed: no wrong fix used, the true error within the stated 3 sigma at least 99 percent of the time, never "within 50 m" while further off. Check: `python scripts/sim_dev_check.py [--camera realistic] [--set name=value]`.
+
+*The first change found this way: keep the camera's scale.* After each fix the navigator re-read the height from the fix's zoom, in steps of 0.05, so one step changed the distance flown by 6 to 13 percent until the next fix. Our drone holds its height, so the scale learned before the jam is kept (`scale_from_fixes: false`). 2018 map, median / 90% / worst in m:
+
+| | Flight 1, 100 m | Flight 3, 120 m |
+|---|---|---|
+| As before | 26.5 / 75 / 92: fails (bound 98.3%) | 30.9 / 65 / 112: fails (3 wrong fixes, 5.3% "within 50 m" while further off) |
+| Scale kept | **18.5 / 44 / 66: works** | **28.6 / 63 / 113: works** |
+| Scale kept, realistic camera | **18.0 / 40 / 68: works** | **27.4 / 53 / 79: works** |
+
+Kept once the third development flight (65 m) agrees.
+
+*More realism.*
+- **A realistic camera** (`baseline/src/data/camera_model.py`, `--camera realistic`): cloud shadows drifting with the wind, haze, vignetting, a small lens distortion, vibration blur, auto-exposure, sensor noise, JPEG. It costs little (table above): the matcher compares patterns after removing brightness and contrast. The limits test of this morning found the real blind spot: blur of about 4 m and more.
+- **Wind** (`wind:=6,20` in the simulator launch: 6 m/s from north-north-east, the October monsoon direction, with gusts): the drone leans into it, so the camera's view moves sideways by about h tan(lean), differently on every leg. Test at 16:30, then a windy set of flights.
+- **A 3D world from real drone photos.** Two flights of the same stretch of the Tuniu River in Toufeng, Miaoli, by Yu-Huang Wang (OpenDroneMap's example data; DJI Phantom 4 RTK, 100 m, camera tilted 60 degrees; no licence stated, so used for testing and not redistributed): 11 April and 16 September 2019. OpenDroneMap turns the September photos into a textured 3D model, the simulated world (hills, forest, buildings with real height), and the April photos into an orthophoto, the navigator's map, five months older across a typhoon season. Processing since 15:47; the world in about an hour.
+
+*The plan, each step a save point* (if a step is not measurably better by its time, we stay on the last save point): realism and the scale fix by 18:00; the fused navigator (Alessandro's filter with IMU, barometer, sun sensor and tilt-corrected fixes) by 21:30; closed loop (the drone steers by our estimate), spoofing detection and a live map by 01:00; overnight the sealed flights run once, README, figures, video; Sunday 09:00 to 10:00 the phone sun test and the freeze. Open with Dustin: the pitch story (GNSS spoofed, then jammed; the navigator runs from take-off and takes over), and whether Dan builds 3D trees and buildings for Wufeng.
+
+**Earlier today.** The system works on real data from two countries, and we now know how well. On the flights it was developed on, it holds about 30 m where the camera alone drifts 470 to 820 m. On flights it never saw, the fixes cut the drift by 40 percent (ALTO, 219 to 131 m, Ilhan's test at 13:00) to tenfold (UAV-VisLoc 04, 675 to 60 m); where the ground was rebuilt since the map (UAV-VisLoc 01) they do not help. Fielded systems claim 15 to 20 m. **Section 2 explains in detail what the system does and what it gives a user.** All team branches now sit in one branch, `integration` (297 tests pass), up for merging as pull request 2.
 
 **The simulated flight over Wufeng (new, 14:00).** Dan's simulator with Ilhan's patch; the real Wufeng 2020 aerial photo as the ground, the 2018 photo of the same place as the navigator's map; a 4.8 km route along the motorway corridor at 100 m and 10 m/s, with a 180-degree turn; GNSS lost after 450 m; camera motion is real optical flow on the simulated images, the heading a simulated compass (median over three compass error draws; `python baseline/scripts/run_sim_navigator.py`):
 

@@ -9,7 +9,20 @@ turns a recorded frame into such a recording, in the order the light travels:
    ones. The shadows are drawn in ground coordinates, so a field stays in the same shadow in
    consecutive frames, as in reality. Example: a shadow that removes 35 percent of the light turns a
    field of brightness 120 into 78.
-2. **Haze.** Bright air between the drone and the ground leaves only a share of the contrast (see degrade.py).
+2. **Haze and fog.** Bright air between the drone and the ground leaves only a share of the contrast (see
+   degrade.py). Haze takes the same share everywhere (``haze_contrast``). Fog is given by its visibility V,
+   the distance at which a black object can just be told from the sky: a share t = exp(-3.9 d / V) of the
+   ground's light comes through a path of d metres, the rest is replaced by the bright fog. Looking
+   straight down from 100 m with V = 500 m: t = exp(-3.9 * 100 / 500) = 0.46. The corner of the image
+   looks along a path 1.7 times longer (54.7 degrees off the vertical for a 90-degree camera), so t =
+   0.26 there: the corners fog first.
+   **Rain** (set by eye, not fitted to measurements; ``rain`` 1 light, 2 moderate, 3 heavy): less light
+   under the rain clouds (60, 35 and 20 percent), so more sensor noise; wet ground a little darker;
+   heavy rain shortens the visibility like fog (3 km moderate, 1 km heavy); drops falling between the
+   camera and the ground show as faint short streaks along the direction of flight. Drops sitting on
+   the lens window (``lens_drops``) are the real danger: each blurs a round patch of the image for about
+   10 seconds, then the drops change. A down camera under the body is sheltered from falling rain, not
+   from the spray of the propellers.
 3. **The lens.** Vignetting: the corners of the image receive less light; here the corner of the full frame
    loses ``vignetting`` of it, and points in between lose in proportion to their squared distance from the
    centre. A small distortion stays after calibration: a point at the image edge (256 pixels from the
@@ -22,7 +35,8 @@ turns a recorded frame into such a recording, in the order the light travels:
 5. **Sensor noise**, as in degrade.py: the count of light particles wobbles by its square root.
 6. **Compression.** The frame is stored as JPEG at ``jpeg_quality``, as a small on-board camera would.
 
-Left out: rolling shutter (rows read one after another while the drone moves), raindrops and glare.
+Left out: rolling shutter (rows read one after another while the drone moves), glare, puddles and the shine
+of wet roads, and fog that thickens towards the ground (here it is even at every height).
 
 Everything is drawn from ``seed`` and the frame index, so a frame read twice is identical and a
 different seed is another flight under other clouds.
@@ -39,6 +53,12 @@ from src.data.degrade import AIRLIGHT, less_light
 
 CLOUD_GRID_M = 10.0  # resolution of the cloud shadow field
 CLOUD_FIELD_M = 12_000.0  # side of the (repeating) cloud field: covers a flight and the drift of the clouds
+FOG_BRIGHTNESS = 200.0  # brightness of the fog veil on the scale of the ideal frame
+RAIN_LIGHT = {0: 1.0, 1: 0.6, 2: 0.35, 3: 0.2}  # light under the rain clouds
+RAIN_WET = {0: 1.0, 1: 0.95, 2: 0.9, 3: 0.85}  # wet ground is darker
+RAIN_VISIBILITY_M = {0: None, 1: None, 2: 3000.0, 3: 1000.0}
+RAIN_STREAKS = {0: 0, 1: 60, 2: 200, 3: 500}  # falling drops seen in one frame
+DROP_LIFETIME_S = 10.0  # drops on the lens change about this often
 
 
 @dataclass(frozen=True)
@@ -49,6 +69,9 @@ class CameraModel:
     wind_east_mps: float = 4.0  # the clouds drift with the wind
     wind_north_mps: float = 2.0
     haze_contrast: float = 0.9  # share of the contrast left by the haze
+    visibility_m: float | None = None  # fog: the meteorological visibility; None is clear air
+    rain: int = 0  # 0 dry, 1 light, 2 moderate, 3 heavy rain (set by eye)
+    lens_drops: int = 0  # water drops sitting on the lens window
     vignetting: float = 0.4  # share of the light lost in the corners of the full frame
     distortion_k1: float = 0.004  # radial distortion left after calibration
     blur_px: float = 0.6  # vibration and focus, Gaussian sigma in pixels
@@ -93,6 +116,12 @@ class RealisticCamera:
         self.forward_px, self.right_px = c - v, u - c  # image top points forward, right is the body's right
         r2 = (self.forward_px**2 + self.right_px**2) / (c * c)  # 1 at the middle of an edge, 2 in a corner
         self.vignette = (1.0 - model.vignetting * r2 / 2.0).astype(np.float32)
+        # how much longer the path through the air is than straight down: 1 / cos(angle off the vertical)
+        self.path_factor = (np.sqrt(focal_px**2 + self.forward_px**2 + self.right_px**2) / focal_px).astype(np.float32)
+        fog_m = model.visibility_m
+        rain_m = RAIN_VISIBILITY_M[model.rain]
+        # fog and rain together: their losses add, 1 / V = 1 / V_fog + 1 / V_rain
+        self.visibility_m = None if fog_m is None and rain_m is None else 1.0 / sum(1.0 / v for v in (fog_m, rain_m) if v)
         # distortion: the recorded pixel at radius r shows what the ideal camera saw at r * (1 + k1 r^2) / ... inverted
         # to first order: sample the ideal image at r / (1 + k1 r^2)
         scale = 1.0 / (1.0 + model.distortion_k1 * r2)
@@ -116,14 +145,47 @@ class RealisticCamera:
         """Frame ``i`` as the realistic camera records it, from the simulator's ideal grey frame."""
         m = self.model
         rng = np.random.default_rng((m.seed, 2, i))
-        light = ideal.astype(np.float32) * (1.0 - self.shadow(i))
+        light = ideal.astype(np.float32) * (1.0 - self.shadow(i)) * RAIN_WET[m.rain]
         light = m.haze_contrast * light + (1.0 - m.haze_contrast) * AIRLIGHT
+        if self.visibility_m is not None:
+            through = np.exp(-3.912 * float(self.height[i]) * self.path_factor / self.visibility_m)
+            light = through * light + (1.0 - through) * FOG_BRIGHTNESS
+        if m.rain:
+            light = self._streaks(light, rng, RAIN_STREAKS[m.rain])
         light = cv2.remap(light, self.map_x, self.map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+        if m.lens_drops:
+            light = self._lens_drops(light, i)
         light *= self.vignette
         if m.blur_px > 0:
             light = cv2.GaussianBlur(light, (0, 0), m.blur_px)
         gain = 115.0 / max(float(np.mean(light)), 1.0) * float(np.exp(rng.normal(0.0, m.gain_wobble)))
         exposed = np.clip(light * gain, 0, 255).astype(np.uint8)
-        noisy = less_light(exposed, m.light, rng)
+        noisy = less_light(exposed, m.light * RAIN_LIGHT[m.rain], rng)
         _, jpeg = cv2.imencode(".jpg", noisy, [cv2.IMWRITE_JPEG_QUALITY, m.jpeg_quality])
         return cv2.imdecode(jpeg, cv2.IMREAD_GRAYSCALE)
+
+    def _streaks(self, light: np.ndarray, rng: np.random.Generator, count: int) -> np.ndarray:
+        """Falling drops between the camera and the ground: faint, out-of-focus streaks along the direction of
+        flight (the top of the image), where the drone's own motion stretches them."""
+        layer = np.zeros_like(light)
+        for _ in range(count):
+            x, y = rng.uniform(0, self.size, 2)
+            length = rng.uniform(15, 60)
+            cv2.line(layer, (int(x), int(y)), (int(x), int(y + length)), float(rng.uniform(20, 50)), 1)
+        return light + cv2.GaussianBlur(layer, (0, 0), 1.5)
+
+    def _lens_drops(self, light: np.ndarray, i: int) -> np.ndarray:
+        """Drops sitting on the lens window: each shows a strongly blurred, slightly darker round patch.
+
+        The set of drops changes every DROP_LIFETIME_S seconds of flight; in between, consecutive frames
+        have the same drops, as on a real wet lens."""
+        epoch = int(self.t[i] // DROP_LIFETIME_S)
+        rng = np.random.default_rng((self.model.seed, 3, epoch))
+        blurred = cv2.GaussianBlur(light, (0, 0), 6.0) * 0.85
+        weight = np.zeros_like(light)
+        for _ in range(self.model.lens_drops):
+            cx, cy = rng.uniform(0, self.size, 2)
+            radius = rng.uniform(12, 45)
+            d = np.hypot(self.right_px + (self.size - 1) / 2.0 - cx, (self.size - 1) / 2.0 - self.forward_px - cy)
+            weight = np.maximum(weight, np.clip((radius - d) / 4.0, 0.0, 1.0))  # soft rim, 4 px wide
+        return light * (1.0 - weight) + blurred * weight

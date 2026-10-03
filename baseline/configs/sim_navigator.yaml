@@ -52,6 +52,11 @@ navigator:                # the settings frozen for the UAV-VisLoc held-out test
   # 0.45 to 1.05 covers about 58 to 134 m. Widened when flight 2 (80 m) stopped at the zoom check in
   # calibrate(), before any of its navigation results existed.
   calibration_zooms: [0.45, 1.05]
+  # Keep the scale learned before the jam: our drone holds its height over flat ground, and re-reading the
+  # height from each fix's zoom (in steps of 0.05) changed the distance flown by 6 to 13 percent until the
+  # next fix. Kept at 16:00 on the development flights: 2018 map, flight 1 26.5 -> 18.5 m median (now works),
+  # 120 m 30.9 -> 28.6 m and its 3 wrong fixes gone (now works), 65 m 39.8 -> 26.6 m (still fails: 1 wrong fix).
+  scale_from_fixes: false
 
 heading:                  # src/sensors/heading.py
   compass: {offset_sd_deg: 4.0, noise_sd_deg: 1.0}
