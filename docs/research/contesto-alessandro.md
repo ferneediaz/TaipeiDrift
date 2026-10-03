@@ -1,6 +1,6 @@
 # Contesto per Alessandro: cosa c'è in questo branch e come usarlo per il VIO
 
-Branch `research/offline-nav-evidence`, scritto la notte tra il 2 e il 3 ottobre 2026 a partire da `main` 1286d5c. Questo file è in italiano; il resto della ricerca notturna in `docs/research/` è in francese. Le sezioni che ti servono sono riassunte qui, con i numeri.
+Branch `research/offline-nav-evidence`, scritto la notte tra il 2 e il 3 ottobre 2026 a partire da `main` 1286d5c. Questo file è in italiano; il resto della ricerca notturna in `docs/research/` è in inglese. Le sezioni che ti servono sono riassunte qui, con i numeri.
 
 Etichette usate ovunque:
 - **MISURATO**: girato su dati reali;
@@ -189,15 +189,15 @@ Attenzioni lette nel `meta.json` di INSANE :
 | 4 | Con Dustin : decidere quale baseline va su `main` | Un merge e una frase nel README | 30 min |
 | 5 | Facoltativo : MUN-FRL senza barometro, per vedere il VIO su IMU a 400 Hz e camera nadir reale | Stessi grafici | 3 h |
 
-Consiglio di consulenti esterni che abbiamo interpellato, Grok 4.7 e GPT-6 Astra (`docs/research/avis-externes.md`, in francese) : **congelare le funzionalità entro circa 12 ore** e dedicare il resto a figure, video e verifica. Per te vuol dire puntare prima sui compiti 1 e 2.
+Consiglio di consulenti esterni che abbiamo interpellato, Grok 4.7 e GPT-6 Astra (`docs/research/outside-reviews.md`) : **congelare le funzionalità entro circa 12 ore** e dedicare il resto a figure, video e verifica. Per te vuol dire puntare prima sui compiti 1 e 2.
 
 ## 8. Mappa dei file di questo branch
 
-- `docs/research/overnight-synthesis.md` : sintesi della notte e proposta classificata (francese).
-- `docs/research/sensor-fusion.md` : barometro, IMU, stereo, sensore solare, budget di deriva (francese).
-- `docs/research/datasets-replay-sim.md` e `docs/research/data-manifest.md` : tutti i dataset valutati, con licenze, dimensioni e stato ; formato di replay ; patch proposta per il simulatore Gazebo (francese).
-- `docs/research/map-localization.md` : matching camera → mappa (francese).
-- `docs/research/avis-externes.md` : pareri di Grok 4.7 e GPT-6 Astra (francese).
+- `docs/research/overnight-synthesis.md` : sintesi della notte e proposta classificata.
+- `docs/research/sensor-fusion.md` : barometro, IMU, stereo, sensore solare, budget di deriva.
+- `docs/research/datasets-replay-sim.md` e `docs/research/data-manifest.md` : tutti i dataset valutati, con licenze, dimensioni e stato ; formato di replay ; patch proposta per il simulatore Gazebo.
+- `docs/research/map-localization.md` : matching camera → mappa.
+- `docs/research/outside-reviews.md` : pareri di Grok 4.7 e GPT-6 Astra.
 - `questions.md` : domande aperte per il team.
 - `experiments/` : script con i prefissi `n_` a `v`. Per te :
   - `n_sensor_fusion.py` : simulazione verticale e direzione ;

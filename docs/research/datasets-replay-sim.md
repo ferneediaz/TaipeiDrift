@@ -1,178 +1,178 @@
-# Piste C : données, rejeu et simulation (rapport de nuit, 2026-10-03)
+# Track C: data, replay, and simulation (overnight report, 2026-10-03)
 
-Étiquettes : MEASURED (exécuté sur données réelles), SIMULATED (générateur déclaré), PUBLISHED (source citée), INFERENCE. Inventaire détaillé : `docs/research/data-manifest.md`.
+Labels: MEASURED (run on real data), SIMULATED (declared generator), PUBLISHED (cited source), INFERENCE. Detailed inventory: `docs/research/data-manifest.md`.
 
-## Recommandation : la démo honnête la plus solide
+## Recommendation: the strongest honest demo
 
-1. **Preuve chiffrée sur vol réel : ALTO Round 2 Train** (MEASURED). Ce vol réel de 37,4 km, horodaté, n'a jamais servi au réglage. Commande : `AltoConfig(data_root="data/raw/alto/round2", section="Train")`.
-   - **La réplication avec paramètres gelés (section suivante) montre que les 26–31 m de Val ne se transfèrent pas** : médiane de 94–177 m selon l'espacement des recalages, avec de fortes variations d'une section à l'autre.
-   - Pour la démo : montrer la variance (3 sections bonnes sur 8) et le mécanisme, pas le meilleur chiffre de Val.
-2. **Histoire visuelle à Taïwan : `wufeng_sim_base`** (SIMULATED, imagerie réelle). La caméra est rendue depuis l'orthophoto 2020 et la carte est l'orthophoto 2018. L'IMU, le baro et le GNSS sont synthétiques, avec leurs bruits déclarés. C'est la seule séquence nadir sur Taïwan avec carte d'une autre année. À l'écran, l'étiqueter « capteurs simulés, images réelles ».
-3. **Hauteur sur données réelles** : baro brut avec vérité indépendante. Zurich fournit une vérité photogrammétrique, INSANE une vérité RTK, PX4 deux journaux RTK. Les mesures elles-mêmes reviennent à la piste B.
-4. **Gazebo** : seulement pour un plan « le système tourne en boucle avec coupure GNSS », avec le correctif ci-dessous. Il n'apporte pas de preuve chiffrée, car le terrain est procédural.
-5. **À éviter** :
-   - Zurich pour la localisation sur carte : sa caméra regarde vers l'avant, à hauteur de rue.
-   - La 2ᵉ vidéo PX4 (`aa0ae4df`) : le décalage vidéo/journal y est ambigu.
-   - Les vidéos YouTube dans la vidéo du jury, tant que leur licence n'est pas connue.
+1. **Quantitative evidence from a real flight: ALTO Round 2 Train** (MEASURED). This real, timestamped 37.4 km flight was never used for tuning. Command: `AltoConfig(data_root="data/raw/alto/round2", section="Train")`.
+   - **The frozen-parameter replication (next section) shows that Val's 26–31 m does not transfer**: median error of 94–177 m depending on the fix spacing, with large variation across sections.
+   - For the demo: show the variance (3 good sections out of 8) and the mechanism, not Val's best figure.
+2. **Visual story in Taiwan: `wufeng_sim_base`** (SIMULATED, real imagery). The camera is rendered from the 2020 orthophoto and the map is the 2018 orthophoto. The IMU, barometer, and GNSS are synthetic, with declared noise. This is the only nadir sequence in Taiwan with a map from a different year. Label it on screen “simulated sensors, real images.”
+3. **Altitude on real data**: raw barometer with independent ground truth. Zurich provides photogrammetric ground truth, INSANE provides RTK ground truth, and PX4 provides two RTK logs. The measurements themselves belong to Track B.
+4. **Gazebo**: only for a shot of “the system running in a loop with GNSS cut off,” with the patch below. It provides no quantitative evidence because the terrain is procedural.
+5. **Avoid**:
+   - Zurich for map localization: its camera faces forward at street height.
+   - The 2nd PX4 video (`aa0ae4df`): its video/log offset is ambiguous.
+   - YouTube videos in the jury video until their license is known.
 
-## Réplication tenue à l'écart : ALTO Round 2 Train (résultat négatif, MEASURED)
+## Held-out replication: ALTO Round 2 Train (negative result, MEASURED)
 
-- **Protocole pré-enregistré avant tout calcul** : `data/processed/t_alto_heldout/preregistration.md`. Tous les paramètres de `h_alto_end_to_end.py` sont gelés tels que réglés sur Val. Script : `experiments/t_alto_heldout.py`.
-- **Fidélité** : le code refactoré reproduit les 14 lignes du tableau de findings 3.4 sur Val à moins de 1 m près, avec les mêmes comptes de recalages (`val_reproduction.csv`).
-- **Fuite** : aucune. Le point du Round 2 Train le plus proche de Val est à 37,75 km.
-- **Données** : 8 sections d'environ 4,6 km et un vol complet de 37,4 km. Les nombres ci-dessous ont été relus dans `results.csv`.
+- **Protocol preregistered before any computation**: `data/processed/t_alto_heldout/preregistration.md`. All `h_alto_end_to_end.py` parameters are frozen at the values tuned on Val. Script: `experiments/t_alto_heldout.py`.
+- **Fidelity**: the refactored code reproduces the 14 rows of findings table 3.4 on Val to within 1 m, with the same number of fixes (`val_reproduction.csv`).
+- **Leakage**: none. The closest Round 2 Train point is 37.75 km from Val.
+- **Data**: 8 sections of about 4.6 km and one complete 37.4 km flight. The numbers below were rechecked in `results.csv`.
 
-  | Configuration | Val (findings) | Médiane des 8 sections | Min–max |
+  | Configuration | Val (findings) | Median across 8 sections | Min–max |
   |---|---|---|---|
-  | caméra seule | 472 m | 219 m | 68–420 m |
-  | recalage tous les 100 m, 7 voisines | 26 m | 177 m | 17–725 m |
-  | 300 m, 7 voisines | 31 m | 94 m | 20–339 m |
-  | 300 m, recherche dimensionnée + seuil | 31 m | 128 m | 26–1142 m |
-  | 1000 m, recherche dimensionnée + seuil | 56 m | 160 m | 50–980 m |
-  | 2000 m, recherche dimensionnée + seuil | 116 m | 191 m | 51–401 m |
+  | camera only | 472 m | 219 m | 68–420 m |
+  | fix every 100 m, 7 neighbors | 26 m | 177 m | 17–725 m |
+  | 300 m, 7 neighbors | 31 m | 94 m | 20–339 m |
+  | 300 m, sized search + threshold | 31 m | 128 m | 26–1142 m |
+  | 1000 m, sized search + threshold | 56 m | 160 m | 50–980 m |
+  | 2000 m, sized search + threshold | 116 m | 191 m | 51–401 m |
 
-- **Vol complet de 37 km** (médiane / fin ; recalages utilisés / rejetés / faux de plus de 50 m) :
-  - sans recalage : 1120 / 2392 m ;
-  - recalage tous les 300 m : 1091 / 6421 m (43 / 56 / 2) ;
-  - tous les 1000 m : 1490 / 7240 m (14 / 15 / 2) ;
-  - tous les 2000 m : 593 / 751 m (7 / 10 / 1).
-- **Prédictions** :
-  - P1 fausse : médiane sous 60 m dans seulement 1, 3 et 3 sections sur 8 pour 100, 200 et 300 m.
-  - P2 fausse : aucun recalage faux dans seulement 6 sections sur 8.
-  - P3 fausse.
-  - P4 vraie : le seuil 0,33 rejette davantage de recalages corrects.
-- **Conséquence (règle pré-enregistrée)** : les chiffres de Val (26–31 m) doivent être présentés comme **réglés sur le jeu de test**. Ils se reproduisent dans 3 sections sur 8 (1, 4 et 8 : 17–33 m) et échouent ailleurs.
-- **Mécanisme probable (INFERENCE, à tester)** : la calibration avant brouillage, faite avec 3 recalages et une grille de zoom de 0,60 à 1,00, est instable.
-  - Zoom calibré : 1,00 ; 0,65 ; 0,60 ; 0,95 ; 0,80 ; 0,65 ; 0,65 ; 1,00. Trois sections butent sur un bord de la grille.
-  - Le zoom n'est pas monotone avec l'altitude : 1,00 et 0,65 tous deux à 528 m.
-  - Décalages calibrés jusqu'à 37 m, contre 7,6 m sur Val.
-  - Les scores des recalages acceptés sont plus bas (médiane par section 0,19–0,55).
-  - L'altitude est plus haute que sur Val : 437–548 m au-dessus de l'ellipsoïde contre 432 m.
-- Fichiers : `data/processed/t_alto_heldout/{results,summary,calibration,fix_scores,leak_check}.csv` et `sections.png`.
-- Le Round 2 n'a pas servi à régler quoi que ce soit.
+- **Complete 37 km flight** (median / final; fixes used / rejected / false by more than 50 m):
+  - no fixes: 1120 / 2392 m;
+  - fix every 300 m: 1091 / 6421 m (43 / 56 / 2);
+  - every 1000 m: 1490 / 7240 m (14 / 15 / 2);
+  - every 2000 m: 593 / 751 m (7 / 10 / 1).
+- **Predictions**:
+  - P1 false: median under 60 m in only 1, 3, and 3 of 8 sections for 100, 200, and 300 m.
+  - P2 false: only 6 of 8 sections have no false fixes.
+  - P3 false.
+  - P4 true: threshold 0.33 rejects more correct fixes.
+- **Implication (preregistered rule)**: Val's figures (26–31 m) must be presented as **tuned on the test set**. They reproduce in 3 of 8 sections (1, 4, and 8: 17–33 m) and fail elsewhere.
+- **Probable mechanism (INFERENCE, to test)**: the calibration before the jam, done with 3 fixes and a zoom grid from 0.60 to 1.00, is unstable.
+  - Calibrated zoom: 1.00; 0.65; 0.60; 0.95; 0.80; 0.65; 0.65; 1.00. Three sections hit a grid edge.
+  - Zoom is not monotonic with altitude: both 1.00 and 0.65 at 528 m.
+  - Calibrated offsets reach 37 m, versus 7.6 m on Val.
+  - Scores for accepted fixes are lower (median by section 0.19–0.55).
+  - Altitude is higher than on Val: 437–548 m above the ellipsoid versus 432 m.
+- Files: `data/processed/t_alto_heldout/{results,summary,calibration,fix_scores,leak_check}.csv` and `sections.png`.
+- Round 2 was not used to tune anything.
 
-### Diagnostic de l'échec (MEASURED, la vérité sert uniquement à l'évaluation)
+### Failure diagnosis (MEASURED; ground truth used only for evaluation)
 
-Script : `experiments/t_alto_diag.py`. Sorties : `data/processed/t_alto_heldout/diag/`.
+Script: `experiments/t_alto_diag.py`. Outputs: `data/processed/t_alto_heldout/diag/`.
 
-**Méthode.** Recalages pris seuls tous les 300 m, avec une recherche centrée sur la vraie position. On compare deux zooms : le zoom calibré par la chaîne, et le zoom qui maximise le score sur une grille large de 0,40 à 1,40.
+**Method.** Fixes are taken alone every 300 m, with a search centered on the true position. We compare two zooms: the zoom calibrated by the pipeline, and the zoom that maximizes the score over a broad 0.40–1.40 grid.
 
-**Part des recalages à moins de 30 m de la vérité :**
+**Share of fixes within 30 m of ground truth:**
 
-| Section | Zoom calibré | Zoom au meilleur score |
+| Section | Calibrated zoom | Best-scoring zoom |
 |---|---|---|
-| Val | 71 % | – |
-| S1 | 86 % | 86 % |
-| S2 | 43 % | 100 % |
-| S3 | 21 % | 93 % |
-| S4 | 57 % | 7 % (zoom 0,40) |
-| S5 | 86 % | 21 % (zoom 0,40) |
-| S6 | 21 % | 14 % (zoom 0,40) |
-| S7 | 43 % | 86 % |
-| S8 | 94 % | 69 % |
+| Val | 71% | – |
+| S1 | 86% | 86% |
+| S2 | 43% | 100% |
+| S3 | 21% | 93% |
+| S4 | 57% | 7% (zoom 0.40) |
+| S5 | 86% | 21% (zoom 0.40) |
+| S6 | 21% | 14% (zoom 0.40) |
+| S7 | 43% | 86% |
+| S8 | 94% | 69% |
 
-**Ce que j'en conclus** (je ne reprends pas le verdict « terrain » du sous-agent) :
-1. **La calibration du zoom est le premier mécanisme.** Avec un meilleur zoom, S2, S3 et S7 passent de 21–43 % à 86–100 % de recalages justes. La calibration à 3 recalages choisit un mauvais zoom.
-2. **Le score n'est pas un oracle fiable.** En S4–S6, le meilleur score tombe au bord inférieur de la grille (0,40), où les recalages sont faux (86 m). Le score ZNCC monte quand on dézoome fortement. Toute calibration automatique du zoom doit donc être bornée ou validée autrement que par le score (INFERENCE).
-3. **L'appariement échoue vraiment dans une section seulement** : S6 reste à 14–21 % de recalages justes, quel que soit le zoom.
-4. **Le recalage à l'estime par caméra est beaucoup plus variable que sur Val.** Sans aucun recalage, l'erreur d'échelle implicite va de −34 % à +19 % et l'erreur de cap de −9,5° à +6,1°, contre −13 % et −2,6° sur Val. Une recherche de 40 m est donc dépassée bien avant 300 m dans plusieurs sections.
+**My conclusions** (I do not use the sub-agent's “terrain” verdict):
+1. **Zoom calibration is the first mechanism.** With a better zoom, S2, S3, and S7 improve from 21–43% to 86–100% correct fixes. Calibration with 3 fixes selects the wrong zoom.
+2. **The score is not a reliable oracle.** In S4–S6, the best score falls at the lower edge of the grid (0.40), where the fixes are wrong (86 m). ZNCC score rises when zooming out strongly. Any automatic zoom calibration must be bounded or validated by something other than the score (INFERENCE).
+3. **Matching really fails in only one section**: S6 stays at 14–21% correct fixes regardless of zoom.
+4. **Camera-only dead reckoning is much more variable than on Val.** Without any fixes, implied scale error ranges from −34% to +19%, and heading error from −9.5° to +6.1%, versus −13% and −2.6% on Val. A 40 m search is therefore exceeded well before 300 m in several sections.
 
-**Rejeu complet avec le zoom au meilleur score** (étiqueté « diagnostic, utilise la vérité ») : résultats mitigés. Exemples : S2 en recalage tous les 300 m passe de 120 à 46 m ; S3 en recherche dimensionnée tous les 1000 m passe de 704 à 23 m ; S4 se dégrade de 33 à 301 m. Les sections qui se dégradent sont celles où le zoom tombe au bord 0,40. Cela confirme les points 1 et 2.
+**Full replay with the best-scoring zoom** (labeled “diagnostic, uses ground truth”): mixed results. Examples: in S2, fixing every 300 m reduces error from 120 to 46 m; in S3, sized search every 1000 m reduces it from 704 to 23 m; S4 worsens from 33 to 301 m. The sections that worsen are those where zoom hits the 0.40 edge. This confirms points 1 and 2.
 
-## Résultats
+## Results
 
 ### Q2. ALTO
-- **MEASURED** : `dl=1` sur le dossier Round 1 renvoie du HTML. L'archive zip de tout le Round 2 (16,6 Go) a calé à 491 Mo et ne peut pas reprendre ; abandonnée.
-- **Solution trouvée** : lister le dossier partagé par `POST https://www.dropbox.com/list_shared_link_folder_entries`. Il faut le cookie `__Host-js_csrf` passé dans `t` et dans `X-CSRF-Token`, plus `link_key`, `secure_hash`, `sub_path`, `rlkey` et `link_type=c`. Chaque fichier a alors un lien `…/<fichier>?rlkey=…&dl=1` qui accepte les requêtes Range (réponse 206).
-- **Inventaire** : le dossier `6gwa0swtzj7pg1itk89hn` contient les deux tours.
+- **MEASURED**: `dl=1` on the Round 1 folder returns HTML. The full Round 2 zip archive (16.6 GB) stalled at 491 MB and cannot resume; abandoned.
+- **Solution found**: list the shared folder using `POST https://www.dropbox.com/list_shared_link_folder_entries`. The `__Host-js_csrf` cookie must be passed in `t` and `X-CSRF-Token`, along with `link_key`, `secure_hash`, `sub_path`, `rlkey`, and `link_type=c`. Each file then has a link `…/<file>?rlkey=…&dl=1` that accepts Range requests (206 response).
+- **Inventory**: folder `6gwa0swtzj7pg1itk89hn` contains both rounds.
 
-  | Tour | Fichier | Taille |
+  | Round | File | Size |
   |---|---|---|
   | Round 1 (`UAV/`) | readme | – |
-  | Round 1 | Train.zip | 10,66 Go |
-  | Round 1 | Val.zip | 1,86 Go |
-  | Round 1 | Test.zip | 2,04 Go |
+  | Round 1 | Train.zip | 10.66 GB |
+  | Round 1 | Val.zip | 1.86 GB |
+  | Round 1 | Test.zip | 2.04 GB |
   | Round 2 (`UAV_Round2/`) | gt_matches.csv | – |
-  | Round 2 | Train.zip | 11,26 Go |
-  | Round 2 | Val.zip | 1,86 Go |
-  | Round 2 | Test.zip | 3,51 Go |
+  | Round 2 | Train.zip | 11.26 GB |
+  | Round 2 | Val.zip | 1.86 GB |
+  | Round 2 | Test.zip | 3.51 GB |
 
-  Les inventaires des zips sont dans `data/processed/t_inventory/alto_*.csv`.
-- **MEASURED, Val** : le Val du Round 2 est identique à celui du Round 1 (mêmes noms de fichiers, mêmes CRC). **`data/raw/alto/Val.zip` est en place** : `unzip -t` ne signale aucune erreur, sha256 `e468050d…`, et le chargeur de l'équipe lit 1684 images.
-- **MEASURED, Round 2 Train** : il reprend le Round 1 Train, qui compte 10 436 images sur 28,5 km sans horodatage. Il ajoute environ 9 km vers l'est (E jusqu'à 534 877 m contre 526 084 m) ; 75,8 % de ses points sont à moins de 20 m du Round 1. Pas temporel 0,050 s, aucun trou de plus de 1 s, vitesse médiane 54,6 m/s, altitude 437–548 m au-dessus de l'ellipsoïde. Les références sont décalées de 0, +40 m et −40 m vers le nord, 3744 images chacune.
-- `gt_matches.csv` à la racine du Round 2 compte 13 783 lignes : c'est la vérité du Train. **Les deux Test n'ont aucune vérité** et ne servent donc pas à évaluer.
-- **PUBLISHED** (https://arxiv.org/abs/2207.12317) : le jeu ALTO complet contient une IMU LCI-1 à 200 Hz, la solution NovAtel SPAN (1,5 m RMS) et un altimètre laser à 20 Hz. Il n'est pas publié : le README de https://github.com/MetaSLAM/ALTO dit « Full Dataset: Coming soon! ». ALTO n'a aucun baromètre.
+  Zip inventories are in `data/processed/t_inventory/alto_*.csv`.
+- **MEASURED, Val**: Round 2 Val is identical to Round 1 Val (same filenames, same CRCs). **`data/raw/alto/Val.zip` is in place**: `unzip -t` reports no errors, sha256 `e468050d…`, and the team's loader reads 1684 images.
+- **MEASURED, Round 2 Train**: it reuses Round 1 Train, which has 10,436 images over 28.5 km without timestamps. It adds about 9 km to the east (E to 534,877 m versus 526,084 m); 75.8% of its points are within 20 m of Round 1. Time step 0.050 s, no gap over 1 s, median speed 54.6 m/s, altitude 437–548 m above the ellipsoid. The references are offset by 0, +40 m, and −40 m north, 3744 images each.
+- `gt_matches.csv` at the Round 2 root has 13,783 rows: this is Train ground truth. **Neither Test has ground truth**, so they cannot be used for evaluation.
+- **PUBLISHED** (https://arxiv.org/abs/2207.12317): the full ALTO dataset includes an LCI-1 IMU at 200 Hz, NovAtel SPAN solution (1.5 m RMS), and a laser altimeter at 20 Hz. It is not published: the README at https://github.com/MetaSLAM/ALTO says “Full Dataset: Coming soon!” ALTO has no barometer.
 
 ### Q3. Zurich Urban MAV
-- **MEASURED, accès** : le serveur accepte les requêtes Range. `experiments/t_remote_zip.py` lit le répertoire central (ZIP64) : 81 331 fichiers, 29,8 Go. Il extrait ensuite des fichiers choisis en regroupant les voisins dans une seule requête.
-  - Débit : 6,6 Mo/s mesurés seuls, environ 1–3 Mo/s pendant les téléchargements Dropbox.
-  - Fenêtre extraite : horloge PX4 1795–2405 s, 18 221 images, 6,5 Go, en environ 40 min.
-- **Décision : pas de téléchargement complet** (28 Go). La caméra est une GoPro 1920×1080 qui regarde **vers l'avant et sur le côté, à hauteur de rue** (image vérifiée). Le drone est captif et lent (vitesse médiane 0,7 m/s, 1869 m de trajet de vérité en 45 min). Cela ne sert ni la localisation par orthophoto ni le scénario.
-- **MEASURED, IMU** : `RawGyro` et `RawAccel` ne sont qu'à 10 Hz et replient les vibrations (le signe de la corrélation s'inverse à ±50 ms). Le gyro à 50 Hz d'`OnboardPose` est le gyro brut tourné, ajusté par moindres carrés : P ≈ A·brut, avec A ≈ [[−0,64, −0,64, 0], [−0,66, 0,67, 0], [0, 0, −0,99]]. Cela correspond à une rotation de 45° avec l'axe z vers le haut, et à une amplitude d'environ 0,65× sur x et y, donc un signal filtré.
-- **MEASURED, horodatage des images (nouveau)** : `experiments/t_zurich_sync_check.py` corrèle la vitesse de lacet tirée des images (corrélation de phase) avec le gyro z.
-  - Sur toute la fenêtre : meilleur décalage −1,10 s (r = 0,62), contre r = 0,16 à 0 s.
-  - Par fenêtres de 20 s : environ +0,2 s jusqu'à 100 s, environ +0,13 s jusqu'à 160 s, puis un saut à −1,24 s qui dérive linéairement jusqu'à −0,90 s à 540 s (+0,95 ms/s, résidu max 0,020 s sur 18 fenêtres), puis un nouveau saut à −1,86 s vers 563 s.
-  - INFERENCE : les sauts viennent d'images perdues ou dupliquées dans l'association imgid → horodatage.
-  - **Conséquence** : toute fusion caméra/IMU sur AGZ doit corriger ce décalage. La correction du segment stable (183–563 s) est dans `meta.json`.
-- La séquence au format commun est `data/processed/t_replay/zurich_agz_1800_2400`. Le validateur répond OK :
+- **MEASURED, access**: the server accepts Range requests. `experiments/t_remote_zip.py` reads the central directory (ZIP64): 81,331 files, 29.8 GB. It then extracts selected files by grouping adjacent entries in a single request.
+  - Throughput: 6.6 MB/s when measured alone, about 1–3 MB/s during Dropbox downloads.
+  - Extracted window: PX4 clock 1795–2405 s, 18,221 images, 6.5 GB, in about 40 min.
+- **Decision: do not download the full dataset** (28 GB). The camera is a GoPro 1920×1080 that looks **forward and to the side, at street height** (image verified). The drone is tethered and slow (median speed 0.7 m/s, 1869 m of ground-truth path in 45 min). This is useful neither for orthophoto localization nor for the scenario.
+- **MEASURED, IMU**: `RawGyro` and `RawAccel` are only 10 Hz and alias vibrations (the correlation sign flips at ±50 ms). The 50 Hz gyro from `OnboardPose` is the rotated raw gyro, fitted by least squares: P ≈ A·raw, with A ≈ [[−0.64, −0.64, 0], [−0.66, 0.67, 0], [0, 0, −0.99]]. This corresponds to a 45° rotation with z pointing up, and about 0.65× amplitude on x and y, so it is a filtered signal.
+- **MEASURED, image timestamps (new)**: `experiments/t_zurich_sync_check.py` correlates yaw rate from images (phase correlation) with gyro z.
+  - Across the full window: best offset −1.10 s (r = 0.62), versus r = 0.16 at 0 s.
+  - Across 20 s windows: about +0.2 s through 100 s, about +0.13 s through 160 s, then a jump to −1.24 s that drifts linearly to −0.90 s at 540 s (+0.95 ms/s, max residual 0.020 s across 18 windows), then another jump to −1.86 s around 563 s.
+  - INFERENCE: the jumps come from dropped or duplicated images in the imgid → timestamp association.
+  - **Implication**: any camera/IMU fusion on AGZ must correct this offset. The correction for the stable segment (183–563 s) is in `meta.json`.
+- The sequence in the common format is `data/processed/t_replay/zurich_agz_1800_2400`. The validator reports OK:
 
-  | Fichier | Lignes | Fréquence |
+  | File | Rows | Frequency |
   |---|---|---|
-  | IMU | 29 840 | 50 Hz |
+  | IMU | 29,840 | 50 Hz |
   | baro | 5975 | 10 Hz |
-  | GNSS dédoublonné | 2988 | 5 Hz |
-  | images | 17 921 | 30 Hz |
-  | vérité | 597 | 1 Hz |
+  | deduplicated GNSS | 2988 | 5 Hz |
+  | images | 17,921 | 30 Hz |
+  | ground truth | 597 | 1 Hz |
 
-### Q4. Autres vols réels avec baro brut, caméra et vérité
-- **INSANE (AAU Klagenfurt)** : c'est le seul jeu réel trouvé qui réunit une caméra vers le bas, un baro brut et une vérité RTK.
-  - Licence « Data: INSANE Dataset; License: BSD-2-Clause », sans droit de vente : https://cns-data.aau.at/insane-dataset/LICENSE.txt.
-  - Les capteurs de outdoor_1, mars_1 et mars_2 ont été téléchargés par la piste B. La piste C a ajouté les images de Mars1 (2,4 Go).
-  - **Séquence `data/processed/t_replay/insane_mars_1`**, validée (MEASURED) : 100 s, 87 m, 0–5 m de hauteur. IMU 196 Hz, baro 18 Hz, GPS PX4 5 Hz, 1454 images vers le bas à 15 Hz, vérité RTK à 8 Hz, intrinsèques et extrinsèques incluses.
-  - **Séquence `data/processed/t_replay/insane_outdoor_1`**, validée (MEASURED, aérodrome de Klagenfurt) : capteurs sur 260 s, images sur 199 s, 3983 images vers le bas à 20 Hz (sol texturé et ombre du drone), 187 m, 0–24 m au-dessus du départ.
-  - Limite d'outdoor_1 : **RTK fixe 21,9 % du temps seulement**, avec un trou de vérité fixe allant jusqu'à 98,6 s.
-  - Décalage images/gyro global d'outdoor_1 : −0,04 s (axe gy, r = −0,69). Par fenêtre, l'estimation est instable, car la caméra vers le bas donne un signal de lacet faible.
-  - Inventaire des 20 séquences (0,01–12,6 Go) dans `data/processed/t_insane/listing.csv`.
-- **PX4 Flight Review** (journaux « CC-BY PX4 », https://review.px4.io/browse) : 471 956 journaux listés, 26 téléchargés (2,9 Go), 25 avec `sensor_baro`. Un seul déclenchement caméra et aucune capture ; aucune image dans les journaux.
-  - Exports `data/processed/t_px4/<id>/` avec un schéma voisin du format commun.
-  - Journaux RTK fixe : `53736001…` (94 %, 2334 s, mais IMU journalisée à environ 4 Hz) et `036fb3a7…` (84 %, 1393 s, IMU 200 Hz). Transmis à la piste B.
-- **Vidéos liées aux journaux PX4 (nouveau)** : le champ `video_url` de `dbinfo.json` contient 114 URL vidéo distinctes, triées dans `data/processed/t_px4_video/candidates.csv`.
-  - Deux vols EasyStar (voilure fixe, caméra FPV avant) sont devenus des séquences : `px4video_d4cc6eb1` (820 s, montée de 296 m au baro) et `px4video_aa0ae4df` (1262 s).
-  - **MEASURED, contre-vérification indépendante sur `d4cc6eb1`** : décalage 0,02 s, r = −0,79. Par fenêtres de 100 s, de −0,10 à +0,10 s, avec |r| entre 0,75 et 0,89. Commande : `.venv/bin/python experiments/t_zurich_sync_check.py data/processed/t_replay/px4video_d4cc6eb1 100`.
-  - `aa0ae4df` : r = 0,43 avec un second pic à 0,33, donc ambigu.
-  - Limites : baro journalisé à 1 Hz seulement ; licence des vidéos inconnue.
-- **Autres jeux (PUBLISHED, recherche par sous-agent, citations dans le manifeste)** : MARS-LVIG, MUN-FRL, VPAIR, UAV-VisLoc, AerialVL, AnyVisLoc, UAVD4L et AerialExtreMatch ont une caméra nadir mais aucun baromètre listé. NTU VIRAL, Blackbird, FusionPortable et GND ne conviennent pas.
-  - Les jeux de photos DJI `tuniu_tw_1/2` (Taïwan, RTK) existent dans l'index ODM. Leur `RelativeAltitude` est une altitude **fusionnée** d'après la documentation DJI (https://developer.dji.com/onboard-sdk/documentation/guides/component-guide-altitude.html). Ils serviraient donc à la piste A, pas pour le baro.
-  - Requêtes en chinois simplifié et traditionnel : aucun jeu taïwanais avec baro brut trouvé dans ce budget de recherche (8 requêtes). Ce n'est pas une preuve d'absence.
+### Q4. Other real flights with raw barometer, camera, and ground truth
+- **INSANE (AAU Klagenfurt)**: this is the only real dataset found with a downward-facing camera, raw barometer, and RTK ground truth.
+  - License “Data: INSANE Dataset; License: BSD-2-Clause,” with no resale rights: https://cns-data.aau.at/insane-dataset/LICENSE.txt.
+  - Sensors for outdoor_1, mars_1, and mars_2 were downloaded by Track B. Track C added the Mars1 images (2.4 GB).
+  - **Sequence `data/processed/t_replay/insane_mars_1`**, validated (MEASURED): 100 s, 87 m, 0–5 m altitude. IMU 196 Hz, barometer 18 Hz, PX4 GPS 5 Hz, 1454 downward-facing images at 15 Hz, RTK ground truth at 8 Hz, intrinsics and extrinsics included.
+  - **Sequence `data/processed/t_replay/insane_outdoor_1`**, validated (MEASURED, Klagenfurt airfield): sensors for 260 s, images for 199 s, 3983 downward-facing images at 20 Hz (textured ground and drone shadow), 187 m, 0–24 m above takeoff.
+  - Limit for outdoor_1: **RTK fixed only 21.9% of the time**, with a fixed-ground-truth gap up to 98.6 s.
+  - Global outdoor_1 image/gyro offset: −0.04 s (gy axis, r = −0.69). Per-window estimates are unstable because the downward-facing camera provides a weak yaw signal.
+  - Inventory of 20 sequences (0.01–12.6 GB) in `data/processed/t_insane/listing.csv`.
+- **PX4 Flight Review** (logs “CC-BY PX4,” https://review.px4.io/browse): 471,956 logs listed, 26 downloaded (2.9 GB), 25 with `sensor_baro`. One camera trigger and no captures; no images in the logs.
+  - Exports in `data/processed/t_px4/<id>/` with a schema close to the common format.
+  - RTK fixed logs: `53736001…` (94%, 2334 s, but IMU logged at about 4 Hz) and `036fb3a7…` (84%, 1393 s, IMU 200 Hz). Sent to Track B.
+- **Videos linked to PX4 logs (new)**: the `video_url` field in `dbinfo.json` contains 114 distinct video URLs, sorted in `data/processed/t_px4_video/candidates.csv`.
+  - Two EasyStar flights (fixed-wing, forward-facing FPV camera) became sequences: `px4video_d4cc6eb1` (820 s, 296 m barometric climb) and `px4video_aa0ae4df` (1262 s).
+  - **MEASURED, independent cross-check on `d4cc6eb1`**: offset 0.02 s, r = −0.79. Across 100 s windows, from −0.10 to +0.10 s, with |r| between 0.75 and 0.89. Command: `.venv/bin/python experiments/t_zurich_sync_check.py data/processed/t_replay/px4video_d4cc6eb1 100`.
+  - `aa0ae4df`: r = 0.43 with a second peak at 0.33, so ambiguous.
+  - Limits: barometer logged at only 1 Hz; video license unknown.
+- **Other datasets (PUBLISHED, sub-agent research, citations in manifest)**: MARS-LVIG, MUN-FRL, VPAIR, UAV-VisLoc, AerialVL, AnyVisLoc, UAVD4L, and AerialExtreMatch have nadir cameras but no listed barometer. NTU VIRAL, Blackbird, FusionPortable, and GND are unsuitable.
+  - DJI photo sets `tuniu_tw_1/2` (Taiwan, RTK) are in the ODM index. Their `RelativeAltitude` is a **fused** altitude according to DJI documentation (https://developer.dji.com/onboard-sdk/documentation/guides/component-guide-altitude.html). They would therefore serve Track A, not barometer evaluation.
+  - Simplified and Traditional Chinese searches found no Taiwan dataset with a raw barometer within this search budget (8 queries). This is not proof that none exist.
 
-### Q5. Simulation : correctif proposé (pas appliqué à la branche de l'équipe)
-Le diff `data/processed/t_sim_rec/sim_patch.diff` (706 lignes) porte sur une copie de travail, `data/raw/t_sim_work/sim`. L'instantané de l'équipe n'a pas été modifié. Contenu :
-1. **Fuite d'orientation corrigée** : `sensor_noise.py` remet le quaternion à zéro, en plus de la covariance −1. Vérifié avec `ros2 topic echo` : orientation 0/0/0/0.
-2. **Coupure GNSS** : nouveau nœud `gnss_gate.py`. Le bridge envoie `/sim/gps_raw`, qui est republié sur `/gps/fix` tant que le temps simulé est inférieur à `gnss_cut_s`.
-3. **Stéréo optionnelle** : `stereo:=true` ajoute une 2ᵉ caméra bas décalée de 0,30 m, via une variante temporaire du SDF.
-   - À 60 m, la disparité attendue est de 256 × 0,30 / 60 = **1,28 px**, sous le bruit d'appariement (INFERENCE). Une stéréo sur le drone n'apporte pas l'échelle à cette altitude ; seule une base multi-vues le peut (cohérent avec Song et al. 2017).
-4. **Enregistreur** `recorder.py`, qui écrit directement au format commun.
-5. **Scénario** `t_scenario.py` : montée à 60 m, 120 s à 8 m/s, virage de 90°, 60 s, avec correction d'altitude et de cap. Le premier essai en boucle ouverte avait touché le sol à 156 s.
+### Q5. Simulation: proposed patch (not applied to the team branch)
+The diff `data/processed/t_sim_rec/sim_patch.diff` (706 lines) is against a working copy, `data/raw/t_sim_work/sim`. The team's snapshot was not modified. Contents:
+1. **Orientation leak fixed**: `sensor_noise.py` zeros the quaternion in addition to setting the covariance to −1. Checked with `ros2 topic echo`: orientation 0/0/0/0.
+2. **GNSS cutoff**: new node `gnss_gate.py`. The bridge sends `/sim/gps_raw`, which is republished on `/gps/fix` while simulated time is less than `gnss_cut_s`.
+3. **Optional stereo**: `stereo:=true` adds a 2nd camera offset downward by 0.30 m, using a temporary SDF variant.
+   - At 60 m, expected disparity is 256 × 0.30 / 60 = **1.28 px**, below matching noise (INFERENCE). Stereo on the drone does not provide scale at that altitude; only a multi-view baseline can (consistent with Song et al. 2017).
+4. **Recorder** `recorder.py`, which writes directly to the common format.
+5. **Scenario** `t_scenario.py`: climb to 60 m, 120 s at 8 m/s, 90° turn, 60 s, with altitude and heading correction. The first open-loop attempt hit the ground at 156 s.
 
-Résultat SIMULATED : `data/processed/t_sim_rec/t_sim_terrain_cut60`, 255 s, 1,36 km, 467 Mo, validé.
-- Dernière mesure GNSS à t_s 53,27.
-- Facteur temps réel 0,57–0,95 avec 2 caméras de 512 px.
-- Écart baro − vérité : écart-type 0,98 m, 1,45 m en fin de vol (bruit de 10 Pa et dérive du modèle de l'équipe).
-- **Défaut corrigé à la main** : `meta.gnss_cut_s` valait 60 (temps simulé) alors que l'origine t_s est à 5,73 s. Je l'ai corrigé à 54,27. Le correctif doit écrire la coupure dans le repère t_s.
+SIMULATED result: `data/processed/t_sim_rec/t_sim_terrain_cut60`, 255 s, 1.36 km, 467 MB, validated.
+- Last GNSS measurement at t_s 53.27.
+- Real-time factor 0.57–0.95 with 2 cameras, each at 512 px.
+- Barometer–ground-truth difference: standard deviation 0.98 m, 1.45 m at end (10 Pa noise and the team's model drift).
+- **Manually fixed defect**: `meta.gnss_cut_s` was 60 (simulated time), while the t_s origin is at 5.73 s. I changed it to 54.27. The patch must write the cutoff in the t_s reference frame.
 
-**Comparaison avec le rejeu Python** (`experiments/t_gen_wufeng_replay.py`) : Python produit l'imagerie réelle de Taïwan, en déterministe, en quelques minutes, sans Docker. Ses limites : sol plat, pas de parallaxe, pas de dynamique de vol. Gazebo apporte la dynamique, le relief 3D (arbres) et la boucle fermée, mais son terrain est procédural ou plaqué et son facteur temps réel est inférieur à 1. Aucun autre simulateur n'apparaît clairement utile cette nuit.
+**Comparison with Python replay** (`experiments/t_gen_wufeng_replay.py`): Python generates real Taiwan imagery deterministically in a few minutes, without Docker. Its limits: flat ground, no parallax, no flight dynamics. Gazebo adds flight dynamics, 3D terrain (trees), and a closed loop, but its terrain is procedural or draped and its real-time factor is below 1. No other simulator seems clearly useful tonight.
 
-### Q6. Format commun et chargeurs
-- Format `taipeidrift-replay/1`, défini dans `experiments/t_replay.py` :
-  - Fichiers : `meta.json`, `imu.csv`, `baro.csv`, `gnss.csv`, `images.csv`, `truth.csv` (évaluation seulement).
-  - Une seule horloge ; la provenance de chaque capteur et le sens de l'altitude baro sont obligatoires.
-  - `load(seq, cut_s)` retire le GNSS après la coupure ; `load_truth` est séparé.
-  - Contrôle : `validate`.
-- Exporteurs et générateurs : `t_export_zurich.py`, `t_export_insane.py`, `t_px4_export.py`, `t_gen_wufeng_replay.py`, plus le `recorder.py` de Gazebo.
-- Neuf séquences valident OK : Zurich, INSANE Mars1 et outdoor_1, 2 vidéos PX4, 2 Wufeng, Gazebo.
-- **SIMULATED, contrôles Wufeng** : sans bruit, l'IMU intégrée en navigation inertielle donne 0,05 m d'erreur à 60 s, ce qui confirme des repères cohérents. Bruit blanc baro 0,67 m. Pixels noirs dans les images : 0,001 %.
+### Q6. Common format and loaders
+- Format `taipeidrift-replay/1`, defined in `experiments/t_replay.py`:
+  - Files: `meta.json`, `imu.csv`, `baro.csv`, `gnss.csv`, `images.csv`, `truth.csv` (evaluation only).
+  - One clock; each sensor's provenance and the direction of barometric altitude are required.
+  - `load(seq, cut_s)` removes GNSS after the cutoff; `load_truth` is separate.
+  - Check: `validate`.
+- Exporters and generators: `t_export_zurich.py`, `t_export_insane.py`, `t_px4_export.py`, `t_gen_wufeng_replay.py`, plus Gazebo's `recorder.py`.
+- Nine sequences validate OK: Zurich, INSANE Mars1 and outdoor_1, 2 PX4 videos, 2 Wufeng, Gazebo.
+- **SIMULATED, Wufeng checks**: without noise, the IMU integrated in inertial navigation has 0.05 m error at 60 s, confirming consistent coordinate frames. White barometer noise 0.67 m. Black pixels in images: 0.001%.
 
-## Commandes de vérification
+## Verification commands
 ```
 .venv/bin/python experiments/t_replay.py validate data/processed/t_replay/* data/processed/t_sim_rec/t_sim_terrain_cut60
 .venv/bin/python experiments/t_remote_zip.py list https://download.ifi.uzh.ch/rpg/AGZ_data/AGZ.zip
@@ -180,16 +180,16 @@ Résultat SIMULATED : `data/processed/t_sim_rec/t_sim_terrain_cut60`, 255 s, 1,3
 .venv/bin/python experiments/t_export_zurich.py --t0 1800 --t1 2400 --images "data/raw/zurich_mav/AGZ_window/AGZ/MAV Images" --out data/processed/t_replay/zurich_agz_1800_2400
 ```
 
-## Questions ouvertes (aussi dans `questions.md`)
-- Licence des vidéos YouTube liées aux journaux PX4.
-- Usage des images AGZ dans la vidéo du jury.
-- Application du correctif du simulateur par son auteur.
+## Open questions (also in `questions.md`)
+- License for YouTube videos linked to PX4 logs.
+- Use of AGZ images in the jury video.
+- Applying the simulator patch by its author.
 
-## Prochaines expériences
-1. Piste A : brancher d'autres appariements (XFeat + RANSAC) dans `experiments/t_alto_heldout.py`, en gardant le même protocole gelé et les mêmes 8 sections du Round 2.
-2. INSANE outdoor_1 : baro brut contre RTK, mais seulement sur les périodes en RTK fixe. Tester aussi le flux optique de la caméra bas au-dessus de l'herbe et de la piste.
-3. Corriger le recorder (coupure en t_s) et ajouter le relief Copernicus au monde Gazebo.
-4. Télécharger un jeu ODM `tuniu_tw` pour tester la piste A sur de vraies photos de drone à Taïwan contre NLSC/OAM.
-5. Rendre la calibration du zoom robuste : plus de recalages pendant la phase GNSS, zoom borné, et validation par la cohérence entre recalages successifs plutôt que par le score.
-   - Attention : le diagnostic a déjà regardé les 8 sections. Il n'y a donc plus de données ALTO jamais vues avec vérité ; le Round 1 Train est inclus dans le Round 2 et les Test n'ont pas de vérité.
-   - Un test propre demande un autre vol nadir avec vérité : MUN-FRL (CC BY 4.0, RTK/PPK) ou MARS-LVIG (CC BY-NC-SA, RTK).
+## Next experiments
+1. Track A: plug other matchers (XFeat + RANSAC) into `experiments/t_alto_heldout.py`, keeping the same frozen protocol and the same 8 Round 2 sections.
+2. INSANE outdoor_1: raw barometer versus RTK, but only during fixed-RTK periods. Also test optical flow from the downward-facing camera over grass and the runway.
+3. Fix the recorder (cutoff in t_s) and add Copernicus terrain to the Gazebo world.
+4. Download an ODM `tuniu_tw` dataset to test Track A on real Taiwan drone photos against NLSC/OAM.
+5. Make zoom calibration robust: more fixes during the GNSS phase, bounded zoom, and validation using consistency between successive fixes rather than the score.
+   - Note: the diagnostic has already looked at all 8 sections. There is no longer any unseen ALTO data with ground truth; Round 1 Train is included in Round 2 and Test has no ground truth.
+   - A clean test requires another nadir flight with ground truth: MUN-FRL (CC BY 4.0, RTK/PPK) or MARS-LVIG (CC BY-NC-SA, RTK).
