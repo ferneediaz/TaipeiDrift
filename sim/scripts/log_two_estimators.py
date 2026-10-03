@@ -37,7 +37,7 @@ def stamp(msg):
 
 
 class Logger(Node):
-    def __init__(self, out):
+    def __init__(self, out, topics):
         super().__init__("ctrl_logger", parameter_overrides=[rclpy.parameter.Parameter("use_sim_time", value=True)])
         self.file = open(out, "w", newline="", encoding="utf-8")
         self.writer = csv.writer(self.file)
@@ -50,7 +50,7 @@ class Logger(Node):
         self.rows = 0
         self.create_subscription(Odometry, "/ground_truth/odom", self.on_truth, qos_profile_sensor_data)
         self.create_subscription(Bool, "/nav/gnss_available", lambda m: setattr(self, "gnss", m.data), 10)
-        for name, topic in (("flow", "/nav/odom"), ("control", "/nav_ctrl/odom")):
+        for name, topic in topics:
             self.create_subscription(Odometry, topic, lambda m, n=name: self.on_estimate(n, m), qos_profile_sensor_data)
         self.create_timer(1.0, self.flush)
 
@@ -90,9 +90,11 @@ class Logger(Node):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
+    ap.add_argument("--topics", nargs="+", default=["flow=/nav/odom", "control=/nav_ctrl/odom"],
+                    help="NAME=TOPIC for each estimator to log (nav_msgs/Odometry); in the strait world for example eskf=/nav/odom eskf_rf=/nav_rf/odom rf=/rf_nav/odom")
     args = ap.parse_args()
     rclpy.init()
-    node = Logger(args.out)
+    node = Logger(args.out, [tuple(s.split("=", 1)) for s in args.topics])
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
