@@ -1,0 +1,21 @@
+pulse_rate_hz: 10
+range_sigma_m: 0.3
+range_quant_m: 0.1
+max_range_m: 5000.0
+divergence_mrad: 0.5
+footprint_rays: 5            # centre + 4 rays on the divergence cone edge (averaged)
+beam_set: nadir              # key of beam_sets
+beam_sets:
+  nadir: [[0.0, 0.0]]        # [off-nadir deg, body azimuth deg (0 = forward, + = right)]
+  slant3: [[25.0, 0.0], [25.0, 120.0], [25.0, 240.0]]
+detect_r50_m: 6500.0         # clear-air logistic detection curve: P=0.5 at r50
+detect_width_m: 700.0        #   -> P(1 km)=0.9999, P(5 km)=0.89
+detect_pmax: 1.0
+sea_detect_factor: 0.5       # weaker returns from water
+canopy_threshold_m: 2.0      # DSM - ground above this -> canopy/building top surface
+canopy_gap_prob: 0.3         # P(ground echo through canopy gap)
+min_echo_separation_m: 3.0
+max_echoes: 3                # first / intermediate / last
+false_alarm_prob: 0.005      # per beam per pulse, uniform in [0, max_range]
+raycast_min_step_m: 0.5
+raycast_tol_m: 0.02

@@ -1,0 +1,22 @@
+# Approved routes (PLAN.md §2). Waypoints in WGS84 [lon, lat].
+A_mountain_crossing:
+  short: A
+  description: W->E across the Central Mountain Range near Yushan
+  terrain_class: mountain
+  altitude_msl_m: 4500
+  agl_m: 2000
+  waypoints_lonlat: [[120.62, 23.72], [120.80, 23.60], [120.96, 23.47], [121.13, 23.40], [121.32, 23.33]]
+B_coastal_plain:
+  short: B
+  description: Western coastal plain N->S, Changhua -> Yunlin -> Chiayi -> Xinying
+  terrain_class: plain
+  altitude_msl_m: 1500
+  agl_m: 1500
+  waypoints_lonlat: [[120.50, 24.05], [120.42, 23.85], [120.33, 23.65], [120.28, 23.45], [120.30, 23.25]]
+C_foothills:
+  short: C
+  description: Taichung foothills -> Puli -> Sun Moon Lake -> Zhushan
+  terrain_class: foothills
+  altitude_msl_m: 2000
+  agl_m: 1500
+  waypoints_lonlat: [[120.62, 24.17], [120.78, 24.13], [120.88, 24.03], [120.98, 23.96], [120.92, 23.85], [120.83, 23.78], [120.66, 23.74]]

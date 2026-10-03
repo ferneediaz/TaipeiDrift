@@ -1,0 +1,49 @@
+common:
+  n_particles: 2000
+  init_sigma_horiz_m: 500.0
+  init_sigma_vert_m: 30.0
+  init_proposal_inflation: 1.5  # sample initial particles from an inflated prior (importance-weighted)
+  decorrelation_length_m: 100.0 # map errors are correlated along track: likelihood exponent = v*dt/L (<=1)
+  resample_neff_frac: 0.5
+  roughening_K: 0.2
+  linear_roughening_h: 0.3       # after resampling jitter linear-state means by h*chol(P) (keeps diversity)
+  tempering:                    # progressive correction: never let one update collapse N_eff
+    enabled: true
+    min_neff_frac: 0.2
+  pos_process_noise_mps: 2.0    # random-walk on particle position (model mismatch)
+  map_sigma_m: 8.0              # onboard-map vs top-surface sigma incl. canopy (M1 report); baselines
+  map_slope_coeff: 0.3          # extra sigma = coeff * slope * map_res (interpolation error)
+  baro_rate_hz: 1.0
+  divergence:
+    enabled: true
+    window: 50                  # ground-echo updates in the test window
+    nis_threshold: 9.0          # mean normalized innovation squared above this -> reinit
+    reinit_sigma_m: 800.0
+    cooldown_s: 60.0
+tercom:
+  profile_length_m: 6000.0
+  min_valid_frac: 0.7
+  metric: msd                   # msd | mad
+  search_sigma_mult: 3.0
+  min_search_radius_m: 300.0
+  max_search_radius_m: 3000.0
+  corr_length_m: 150.0          # for effective number of independent samples
+  sigma_growth_mps: 1.0
+  min_sigma_m: 15.0
+mpf_baseline:
+  gate: null                    # null = Gaussian on last echo, no gating (Carroll & Canciani style)
+mpf_gated:
+  gate: 4.0                     # skip echo if |innovation| > gate * sigma (robust reference)
+mpf_proposed:
+  map_sigma_m: 3.0              # bare-earth map error only: canopy is modelled explicitly (M1 report)
+  adapt: true                   # online adaptation of P_visible and short-echo rate
+  adapt_alpha: 0.01
+  adapt_max_spread_m: 150.0     # adapt only when converged (avoids a lose-lock feedback loop)
+  p_visible: 0.8                # initial / fixed P(ground echo not obscured)
+  p_visible_bounds: [0.2, 0.99]
+  short_rate: 0.5               # expected number of cloud/canopy echoes per beam & pulse
+  short_rate_bounds: [0.02, 3.0]
+  canopy_weight: 0.5            # share of short echoes that are near-ground (canopy)
+  canopy_length_m: 15.0         # e-folding length of canopy echoes above ground
+  clutter_rate: 0.005           # spurious echoes per beam & pulse (uniform in range)
+  min_range_m: 1.0
