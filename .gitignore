@@ -31,3 +31,6 @@ sim/models/islands/
 sim/bags/
 *.mcap
 *.db3
+
+# per-run bags and CSV logs written by sim/launch/sim.launch.py
+outputs/

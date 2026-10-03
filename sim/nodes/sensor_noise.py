@@ -77,6 +77,10 @@ class SensorNoise(Node):
         w, a = msg.angular_velocity, msg.linear_acceleration
         w.x, w.y, w.z = self.gyro.apply(np.array([w.x, w.y, w.z]), dt)
         a.x, a.y, a.z = self.accel.apply(np.array([a.x, a.y, a.z]), dt)
+        msg.orientation.x = 0.0
+        msg.orientation.y = 0.0
+        msg.orientation.z = 0.0
+        msg.orientation.w = 0.0
         # The filter must not see the true orientation that Gazebo fills in.
         msg.orientation_covariance[0] = -1.0
         msg.angular_velocity_covariance = list(np.diag(self.gyro.n**2).ravel())

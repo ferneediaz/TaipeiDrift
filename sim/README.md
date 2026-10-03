@@ -228,12 +228,12 @@ docker compose exec sim bash -ic "python3 sim/nodes/record_midair.py --world isl
 How the position is worked out from the ships' radio, with the math and results: [RF_README.md](RF_README.md).
 
 ```bash
-sim/run.sh     # on the host: starts the container, launches this world without GPS, opens the browser
+sim/run.sh     # on the host: starts the container, launches this world (GNSS, then cut), opens the browser
 ```
 
-The same by hand: `docker compose exec -d sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=strait demo:=true gps:=false cam_res:=512 > /tmp/sim.log 2>&1"`. `sim/run.sh islands` starts another world, extra arguments go to the launch file, and `PORT=6081 sim/run.sh` moves the browser desktop to another port.
+The same by hand: `docker compose exec -d sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=strait demo:=true cam_res:=512 > /tmp/sim.log 2>&1"`. `sim/run.sh islands` starts another world, extra arguments go to the launch file, and `PORT=6081 sim/run.sh` moves the browser desktop to another port.
 
-`gps:=false` takes the drone's GNSS receiver away for the run; the drone then finds its position from the ships (below).
+GNSS is available at the start and is cut `gnss_cutoff_s` (20) seconds after its first fix; from then on the drone finds its position from the ships (below). `gps:=false` takes the GNSS receiver away for the whole run instead.
 
 The browser desktop shows:
 - **Gazebo window, main view:** the chase camera behind the drone.
@@ -297,6 +297,20 @@ docker compose exec sim bash -ic "python3 sim/scripts/check_rf_nav.py 300"
 
 A first run (one pass from pad A to pad B, 170 s of simulation, real-time factor about 0.5) gave a median error of 48 m and a 95th percentile of 113 m, with heading within 2° RMS. The filter's own 2σ ellipse held the truth 98 % of the time. That is what 3° bearings over 0.6 to 1 km give: about 40 m across each line of bearing. A single three-ship snapshot is good to about 70 m; the filter does better by combining bearings over time.
 
+### The ESKF with the ships' fix
+
+The strait world also runs the ESKF estimator (`nodes/eskf_ros_adapter.py`, from the integration branch: IMU, barometer, forward camera, and GNSS until the cutoff) twice on the same flight:
+
+| Topic | Estimator |
+|---|---|
+| `/rf_nav/odom` | the ships' bearings only (above) |
+| `/nav/odom` | the ESKF; after the GNSS cutoff it has IMU, barometer and camera only |
+| `/nav_rf/odom` | the same ESKF with `rf_fix:=true`: it also fuses `/rf_nav/odom` as a position fix |
+
+With `rf_fix`, each `/rf_nav/odom` message that carries a new bearing (its covariance shrank) becomes a horizontal position update and a heading update, with rf_nav's own covariance. Unlike GNSS, no velocity is taken from differences of fixes: the RF error wanders slowly, and differences 5 s apart were off by about 10 m/s. If the gate rejects several fixes in a row, the ESKF has drifted and its position is reset to the fix. The settings are under `eskf_rf_fix` in `config/rf.yaml`. Without GNSS at all (`gps:=false`) the ESKF starts from the first RF fix.
+
+`check_rf_nav.py` scores all three, over the whole run and after the cutoff, and draws them on one map. The sensor monitor's NAVIGATION table shows the same comparison live: each estimate's distance from the truth, its own 2σ, the RMS since the cutoff, height and heading errors, and which updates it fused.
+
 ## Frames
 
 Gazebo and ROS use ENU (x east, y north, z up) and a body frame that is forward, left, up. Mid-Air and `docs/PLAN.md` use NED. The live ROS topics are in ENU; `record_midair.py` converts to NED when it writes a recording.
@@ -318,7 +332,7 @@ worlds/strait.sdf           the islands with warships that transmit AIS
 config/bridge.yaml          Gazebo ↔ ROS topics
 config/sensor_noise.yaml    IMU noise bounds, barometer drift
 nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift
-nodes/sensor_monitor.py     live sensor values in the terminal
+nodes/sensor_monitor.py     live sensor values in the terminal, and the NAVIGATION comparison of the estimates
 nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
 nodes/record_midair.py      records a flight in the Mid-Air dataset format
 config/rf.yaml              ships, AIS radio, drone receiver and direction finder
@@ -326,7 +340,10 @@ nodes/rf_model.py           AIS (GMSK) link model and bearing noise, no ROS
 nodes/rf_sensor.py          ship transmissions as the drone's AIS receiver hears them
 nodes/ship_traffic.py       sails the ships in Gazebo, publishes their true positions (drawn by launch/sim.launch.py)
 nodes/rf_nav.py             the drone's position and heading from bearings to three ships, without GNSS
-scripts/check_rf_nav.py     scores rf_nav against ground truth, saves a map and an error plot
+nodes/eskf_ros_adapter.py   the ESKF estimator: /nav/odom, and with rf_fix:=true (the ships' fix) /nav_rf/odom
+nodes/gnss_gate.py          cuts GNSS gnss_cutoff_s after its first fix, publishes /nav/gnss_available
+nodes/run_logger.py         per-run CSV logs in outputs/sim_runs/<run>/
+scripts/check_rf_nav.py     scores rf_nav and both ESKFs against ground truth, saves a map and an error plot
 nodes/rssi_map.py           live map: where the drone could be from the ships' signal strength alone
 scripts/check_rf.py         link budget table and checks of the RF model
 scripts/record_islands_set.sh  records a set of flights over the islands world

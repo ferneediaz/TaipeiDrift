@@ -1,0 +1,47 @@
+# IMU-only dead-reckoning baseline on Mid-Air.
+# Relative paths are resolved from the repository root. Command-line flags override these values.
+
+gnss_cutoff_s: 5.0                  # GNSS lost at this time (s from the start of the flight)
+output_dir: outputs/midair_baseline # one subfolder per run, not committed
+error_horizons_s: [1, 5, 10, 20, 30, 60]   # report the error this long after GNSS loss
+error_thresholds_m: [1, 5, 10, 50, 100]    # report when the error first exceeds these
+
+midair:
+  data_root: null           # or set MID_AIR_ROOT, or pass --data-root (e.g. data/raw/midair/MidAir)
+  environment: Kite_training
+  condition: sunny
+  trajectory: trajectory_0000   # a bare number such as 3 becomes trajectory_0003
+  camera_stream: color_down     # recorded only; camera images are not loaded yet
+  sensor_file: sensor_records.hdf5
+  imu_rate_hz: 100.0            # used to build timestamps when keys.timestamp is null
+  gps_rate_hz: 1.0
+  # HDF5 dataset paths inside one flight group (verified on Kite_training sunny and cloudy).
+  keys:
+    accelerometer: imu/accelerometer
+    gyroscope: imu/gyroscope
+    position: groundtruth/position
+    velocity: groundtruth/velocity
+    attitude: groundtruth/attitude
+    gps_position: null          # GNSS is not used by the baseline
+    timestamp: null
+  # Conventions of the files (checked on the downloaded files; every run re-checks them).
+  conventions:
+    quaternion_order: wxyz      # wxyz or xyzw
+    world_frame: NED            # NED or ENU
+    gravity: 9.81               # m/s^2
+    accelerometer: specific_force
+    gyroscope_frame: world      # Mid-Air gyro is a world-frame rate, despite its 'body' attribute
+
+synthetic:
+  scenario: circle              # stationary, constant_velocity, circle, spinning_hover
+  duration_s: 60.0
+  rate_hz: 100.0
+  # Illustrative IMU errors so the synthetic run shows drift. Not fitted to Mid-Air:
+  # see experiments/e_midair_imu_noise.py for the measured values. Use --no-noise for ideal IMU.
+  noise:
+    enabled: true
+    accel_white_std: 0.05       # m/s^2 per sample
+    gyro_white_std: 0.005       # rad/s per sample
+    accel_bias: [0.02, -0.01, 0.03]     # m/s^2, body frame
+    gyro_bias: [0.0005, -0.0003, 0.0004] # rad/s, body frame
+    seed: 0
