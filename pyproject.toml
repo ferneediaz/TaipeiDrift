@@ -41,5 +41,5 @@ package = false
 romatch = { git = "https://github.com/Parskatt/RoMa" }
 
 [tool.pytest.ini_options]
-testpaths = ["baseline/tests"]
-pythonpath = ["baseline"]
+testpaths = ["baseline/tests", "vio/tests"]
+pythonpath = ["baseline", "."]

@@ -13,8 +13,17 @@ Assumptions and where they come from
 - One HDF5 group per flight, holding ``imu/accelerometer``, ``imu/gyroscope``
   and ``groundtruth/attitude``. Source: experiments/e_midair_imu_noise.py,
   which has been run on the real files.
-- ``groundtruth/position`` and ``groundtruth/velocity``: named after the
-  dataset documentation, NOT yet verified on the files.
+- Verified on the downloaded files (Kite_training sunny and cloudy, 60
+  flights): the keys below exist, the attitude attribute says
+  ``axis_ordering: 'wxyz'``, IMU and ground truth are 100 Hz with equal
+  lengths, GNSS is 1 Hz under ``gps/position``.
+- Gyroscope frame: WORLD, although ``groundtruth/angular_velocity`` carries
+  the attribute ``referential: 'body'``. On all 60 flights it equals the
+  world-frame rate of ``groundtruth/attitude`` (median difference 0.0000
+  rad/s, against 0.05 rad/s in the body frame), and ``imu/gyroscope`` is that
+  signal plus noise (median 0.024 rad/s). Read as a body rate it leaves a
+  36 deg attitude error and ~18 km drift on trajectory_0000 even with
+  perfect sensors.
 - Attitude quaternion order (w, x, y, z), world frame NED, gravity 9.81 m/s^2,
   accelerometer as specific force: taken from e_midair_imu_noise.py. The
   loader's consistency check (``imu_consistency``) verifies them per flight.
@@ -64,6 +73,7 @@ class MidAirConventions:
     world_frame: str = "NED"  # "NED" or "ENU"
     gravity: float = 9.81  # m/s^2
     accelerometer: str = "specific_force"  # only specific force is supported
+    gyroscope_frame: str = "world"  # Mid-Air records world-frame rates, see module docstring
 
 
 @dataclass
@@ -222,7 +232,7 @@ def load_midair_trajectory(cfg: MidAirConfig, data_root: str | None = None) -> T
         gyroscope=gyro,
         world_frame=conv.world_frame.upper(),
         gravity_world=gravity_vector(conv.world_frame, conv.gravity),
-        gyroscope_frame="world",  # measured: see docs/findings.md, section 2.2
+        gyroscope_frame=conv.gyroscope_frame,
         name=f"midair_{cfg.environment}_{cfg.condition}_{cfg.trajectory}",
         gps=gps,
         metadata={

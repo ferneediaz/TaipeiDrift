@@ -16,8 +16,10 @@ Conventions
 - accelerometer: specific force in the body frame, in m/s^2:
   ``f_body = R(q)^T (a_world - gravity_world)``. A level drone at rest in NED
   reads (0, 0, -g).
-- gyroscope: angular velocity of the body relative to the world frame,
-  expressed in the body frame, in rad/s. Earth rotation is ignored.
+- gyroscope: angular velocity of the body relative to the world frame, in
+  rad/s, expressed in the frame named by ``Trajectory.gyroscope_frame``:
+  "body" (what a real strapdown gyro measures, the default) or "world"
+  (what Mid-Air records, see src/data/midair.py). Earth rotation is ignored.
 """
 from __future__ import annotations
 
@@ -28,6 +30,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 STANDARD_GRAVITY = 9.81  # m/s^2, the value used in experiments/e_midair_imu_noise.py
+GYRO_FRAMES = ("body", "world")
 
 
 def gravity_vector(world_frame: str, g: float = STANDARD_GRAVITY) -> np.ndarray:
@@ -76,10 +79,10 @@ class Trajectory:
     velocity_gt: np.ndarray  # (N, 3) m/s, world frame
     attitude_gt: np.ndarray  # (N, 4) quaternion (w, x, y, z), body -> world
     accelerometer: np.ndarray  # (N, 3) m/s^2, specific force, body frame
-    gyroscope: np.ndarray  # (N, 3) rad/s, body frame
+    gyroscope: np.ndarray  # (N, 3) rad/s, in gyroscope_frame
     world_frame: str = "NED"
+    gyroscope_frame: str = "body"
     gravity_world: np.ndarray = field(default_factory=lambda: gravity_vector("NED"))
-    gyroscope_frame: str = "body"  # "body": rates around the drone's axes. "world": around the world axes, as Mid-Air stores them
     name: str = ""
     gps: TimedObservations | None = None  # never read by the dead-reckoning baseline
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -108,6 +111,8 @@ class Trajectory:
         if np.max(np.abs(norms - 1.0)) > 1e-3:
             raise ValueError("attitude_gt quaternions are not unit length")
         self.gravity_world = np.asarray(self.gravity_world, dtype=float)
+        if self.gyroscope_frame not in GYRO_FRAMES:
+            raise ValueError(f"gyroscope_frame must be one of {GYRO_FRAMES}, got {self.gyroscope_frame!r}")
 
     def __len__(self) -> int:
         return self.timestamp.shape[0]
@@ -140,6 +145,9 @@ def imu_consistency(traj: Trajectory) -> dict[str, float]:
     wrong gravity sign or quaternion order gives accelerometer residuals of
     order g (about 10 to 20 m/s^2).
 
+    The gyroscope is also compared in the other frame (body vs world); if that
+    fits better, ``gyroscope_frame`` is probably wrong.
+
     Returns the median norm of each residual.
     """
     t = traj.timestamp
@@ -148,11 +156,15 @@ def imu_consistency(traj: Trajectory) -> dict[str, float]:
     expected_f = r[1:-1].inv().apply(accel_world - traj.gravity_world)
     accel_res = np.linalg.norm(traj.accelerometer[1:-1] - expected_f, axis=1)
 
-    step = r[1:] * r[:-1].inv() if traj.gyroscope_frame == "world" else r[:-1].inv() * r[1:]
-    rel = step.as_rotvec() / np.diff(t)[:, None]
+    dt = np.diff(t)[:, None]
+    rate = {
+        "body": (r[:-1].inv() * r[1:]).as_rotvec() / dt,
+        "world": (r[1:] * r[:-1].inv()).as_rotvec() / dt,
+    }
+    other = "world" if traj.gyroscope_frame == "body" else "body"
     gyro_mid = 0.5 * (traj.gyroscope[:-1] + traj.gyroscope[1:])
-    gyro_res = np.linalg.norm(gyro_mid - rel, axis=1)
     return {
         "accel_residual_median": float(np.median(accel_res)),
-        "gyro_residual_median": float(np.median(gyro_res)),
+        "gyro_residual_median": float(np.median(np.linalg.norm(gyro_mid - rate[traj.gyroscope_frame], axis=1))),
+        "gyro_residual_median_other_frame": float(np.median(np.linalg.norm(gyro_mid - rate[other], axis=1))),
     }

@@ -6,6 +6,7 @@ data/raw.nosync/
 data/processed
 data/processed/
 data/processed.nosync/
+/data/
 
 # python
 .venv

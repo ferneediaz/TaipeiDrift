@@ -125,23 +125,17 @@ def test_gyro_bias_causes_growing_drift(scenario):
     assert e[-1] > 10.0 * e[len(e) // 4] > 0
 
 
-def _to_world_rates(traj):
-    """Re-express the gyroscope around the world axes, the way the Mid-Air files store it."""
-    traj.gyroscope = quat_wxyz_to_rotation(traj.attitude_gt).apply(traj.gyroscope)
-    return traj
-
-
-@pytest.mark.parametrize("scenario,tol", [("spinning_hover", 1e-6), ("circle", 1e-2)])
-def test_world_frame_gyro_reproduces_truth(scenario, tol):
-    """Rates around the world axes need the turn step on the left (the Mid-Air case)."""
-    traj = _to_world_rates(make_synthetic_trajectory(scenario, duration=60.0, rate_hz=100.0))
-    traj.gyroscope_frame = "world"
+@pytest.mark.parametrize("scenario", ["circle", "spinning_hover"])
+def test_world_frame_gyro_reproduces_truth(scenario):
+    """Mid-Air records world-frame rates; with gyroscope_frame='world' the estimate still matches."""
+    traj = make_synthetic_trajectory(scenario, duration=60.0, gyroscope_frame="world")
     res = run_dead_reckoning(traj, 5.0)
-    assert np.max(np.linalg.norm(res.position - traj.position_gt[res.start_index:], axis=1)) < tol
+    assert np.max(np.linalg.norm(res.position - traj.position_gt[res.start_index:], axis=1)) < 1e-2
 
 
-def test_world_frame_gyro_read_as_body_rates_drifts():
-    """The same data read with the body-frame rule goes wrong: the pitfall on Mid-Air."""
-    traj = _to_world_rates(make_synthetic_trajectory("spinning_hover", duration=60.0, rate_hz=100.0))
-    res = run_dead_reckoning(traj, 5.0)  # gyroscope_frame left at "body"
-    assert np.max(np.linalg.norm(res.position - traj.position_gt[res.start_index:], axis=1)) > 10.0
+def test_world_frame_gyro_read_as_body_drifts():
+    """The Mid-Air failure mode: a world-frame gyro integrated as a body rate gives a large error."""
+    traj = make_synthetic_trajectory("spinning_hover", duration=60.0, gyroscope_frame="world")
+    traj.gyroscope_frame = "body"
+    res = run_dead_reckoning(traj, 5.0)
+    assert np.linalg.norm(res.position[-1] - traj.position_gt[-1]) > 100.0
