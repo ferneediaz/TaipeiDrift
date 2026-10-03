@@ -4,7 +4,7 @@
 
 ## Save points: how we build from here
 
-Since Saturday 15:00 we build in steps that each leave something working, so that nothing new can break what we already have.
+Since Saturday 14:20 we build in steps that each leave something working, so that nothing new can break what we already have.
 
 - **A save point** is a tagged commit where `python scripts/check_save_point.py --record <name>` passed: every test, plus the key numbers, stored in `scripts/save_points.json`.
 - **Everything new is built on the latest save point**, on branch `integration`.
