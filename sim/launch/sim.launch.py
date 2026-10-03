@@ -18,7 +18,7 @@ ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_tra
          beacon over the drone so the overview shows where it is;
          default (auto): in the strait world only
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
-         the down-camera view (with the ships: the AoA map, nodes/aoa_map.py; the down camera is then a panel
+         the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera is then a panel
          in the Gazebo window)
          and a terminal with the live sensor monitor (nodes/sensor_monitor.py) on the desktop
 gnss_cutoff_s     seconds after the first raw GPS fix when the GNSS gate closes (nodes/gnss_gate.py); negative: never
@@ -215,7 +215,7 @@ def overview_camera_sdf() -> Path:
 def views_gui_config() -> Path:
     """The Gazebo window for the strait world: the 3rd-person chase view of the drone, with two panels beside it:
     the overview of the ships and the drone's down camera (the desktop's top-right slot holds
-    the AoA map instead, nodes/aoa_map.py). The far clip is raised so ships kilometres away
+    the RF navigation display instead, nodes/aoa_map.py). The far clip is raised so ships kilometres away
     are drawn (the default cuts them off)."""
     text = (SIM / "config/gui.config").read_text()
     text = text.replace("<camera_pose>-6 0 6 0 0.5 0</camera_pose>",
@@ -495,12 +495,13 @@ def setup(context):
                                     *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else [])],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
-            # down camera is a panel in the Gazebo window and this slot shows the AoA map.
+            # down camera is a panel in the Gazebo window and this slot shows the RF navigation display.
             TimerAction(period=20.0, actions=[
                 ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem],
                                output="screen") if ships else
                 Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
-            ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "150x55", "-fa", "Monospace", "-fs", "9",
+            # the lower-right corner of the 1920 x 1080 desktop, under the RF navigation display (-0-0: right, bottom)
+            ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "118x42-0-0", "-fa", "Monospace", "-fs", "8",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
                                 str(SIM / "nodes/sensor_monitor.py"), "--world", world.stem]),
         ]

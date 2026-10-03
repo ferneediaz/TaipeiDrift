@@ -275,7 +275,7 @@ GNSS is available at the start and is cut `gnss_cutoff_s` (20) seconds after its
 The browser desktop shows:
 - **Gazebo window, main view:** the chase camera behind the drone.
 - **Gazebo window, right-hand panels:** an overview from a fixed camera high in the south, showing the islands and all three ships, and the drone's down camera. A red ball floats 30 m above the drone so it can be found in the overview. It is only a visual, and the down camera does not see it.
-- **Top right:** the AoA map (see [RF_README.md](RF_README.md)).
+- **Top right:** the RF navigation display (see [RF_README.md](RF_README.md), section 4).
 - **Bottom right:** the sensor monitor.
 
 `worlds/strait.sdf` is the islands world with three warships at full size. The scenery is the same, and the `islands` world itself has no ships. Each ship patrols a box at one corner of a triangle around the drone's route, so the drone always hears them from three well-separated directions:
@@ -324,7 +324,7 @@ The bearing is in the body frame because a direction finder measures it against 
 - **Then a Kalman filter** (state: position, velocity, heading, gyro bias). The noisy gyro carries the heading between bearings, a constant-velocity model carries the position, and each new bearing corrects both. A bearing arrives every 2 to 3 s.
 - **Inputs:** only `/rf/detections` and the noisy IMU; never ground truth.
 
-**Position from angle of arrival only.** The top-right window, `nodes/aoa_map.py`, solves a fresh snapshot fix from the last bearing of each ship heard within 12 s, with no filter and no memory. Older bearings are first turned by how far the gyro says the drone has rotated since. Each grid point is scored with the heading that fits it best, and the 68 % and 95 % regions are shaded red, with the most likely point (rf_nav's resection) marked ×. Each ship's line of position is drawn with its ±2σ band. The title shows the snapshot's error against the truth at the newest bearing's time, and its heading error. rf_nav's filtered estimate and the true position are drawn for comparison. RSSI is not used for the position, and the map is for watching only.
+**The RF navigation display.** The top-right window, `nodes/aoa_map.py`, shows rf_nav's estimate (angles of arrival, gyro and Kalman filter) with its 95 % confidence region, each ship's line of position, a close-up around the drone, and a readout: GNSS state, position error against the truth, the filter's own 2σ, whether the truth is within its 95 % bound, heading error, and the error of a snapshot fix from the last three bearings without the filter. RSSI is not used, and the display does not feed the navigation.
 
 To score it against ground truth, with a map and an error plot saved to `data/sim/rf_nav/`:
 
@@ -383,7 +383,7 @@ nodes/eskf_ros_adapter.py   the ESKF estimator: /nav/odom, and with rf_fix:=true
 nodes/gnss_gate.py          cuts GNSS gnss_cutoff_s after its first fix, publishes /nav/gnss_available
 nodes/run_logger.py         per-run CSV logs in outputs/sim_runs/<run>/
 scripts/check_rf_nav.py     scores rf_nav and both ESKFs against ground truth, saves a map and an error plot
-nodes/aoa_map.py            live map: where the drone could be from the ships' angles of arrival alone
+nodes/aoa_map.py            live RF navigation display: rf_nav's estimate, lines of position, readout
 scripts/check_rf.py         link budget table and checks of the RF model
 scripts/record_islands_set.sh  records a set of flights over the islands world
 scripts/frame_info.py       prints the sensor values recorded with one picture
