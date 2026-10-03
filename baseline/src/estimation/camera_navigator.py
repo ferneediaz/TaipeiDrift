@@ -39,6 +39,7 @@ from src.estimation.navigator_core import (
     allowed_distance,
     blend,
     fit_motion_matrix,
+    fit_rotation_scale,
     fix_decision,
     predicted_variance,
     status,
@@ -68,6 +69,9 @@ class NavigatorConfig:
     # believed (the camera has lost track; a flying drone does not stop): the navigator then flies on at the
     # cruising speed learned with GNSS, along the last believable direction. None switches the check off.
     fallback_drift_rate: float = 0.30  # uncertainty growth while flying on like that, as a share of the distance
+    motion_fit: str = "least_squares"  # how image shift becomes ground motion, learned before the jam:
+    # "least_squares": a general 2 x 2 matrix (ALTO, a straight flight with a steady helicopter);
+    # "rotation_scale": one turn and one scale from medians, for a quadcopter whose fixed camera tilts in turns
     quad_check: bool = False  # area search: the four quarters of the frame, searched alone, must land with the whole
     quad_needed: int = 3  # this many of the four quarters (Ilhan's rule "quad >= 3")
     quad_tolerance_share: float = 4.0 / 56.0  # Ilhan's 4 pixels on 56-pixel quarters, as a share of the quarter
@@ -164,7 +168,8 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
     if jam < 3 or jam >= len(flight):
         raise ValueError(f"the jam falls on frame {jam} of {len(flight)}; the flight needs GNSS before it and frames after it")
     truth = flight.position_gt[: jam + 1]
-    matrix = fit_motion_matrix(shifts[1 : jam + 1], np.diff(truth, axis=0))
+    fit = {"least_squares": fit_motion_matrix, "rotation_scale": fit_rotation_scale}[cfg.motion_fit]
+    matrix = fit(shifts[1 : jam + 1], np.diff(truth, axis=0))
 
     zooms = np.arange(cfg.calibration_zooms[0], cfg.calibration_zooms[1] + 0.01, cfg.zoom_step)
     start, stop, step = cfg.calibration_angles_deg

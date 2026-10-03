@@ -131,10 +131,12 @@ def main() -> int:
         comp = "" if r["compass"] is None else f"{r['compass']:.0f}"
         print(f"{r['file']:24s} {r['time'][11:19]:8s} {r['sun_elevation']:9.1f} {r['measured_elevation']:9.1f} {r['heading']:8.1f} "
               f"{turn:7.1f} {off:11.2f} {comp:>8s}")
-    offsets = np.array(offsets[1:])
-    if len(offsets):
-        print(f"\nscatter of the turns around the 90-degree steps: {np.sqrt(np.mean(offsets**2)):.2f} degrees (root mean square), "
-              f"largest {np.abs(offsets).max():.2f}")
+    # Each offset is (error of this reading) minus (error of the first reading). The first reading's error is
+    # the same in all of them, so the spread of the offsets around their mean is the error of one reading.
+    offsets = np.array(offsets)
+    if len(offsets) > 2:
+        print(f"\nerror of one heading reading (standard deviation around the 90-degree steps): {np.std(offsets, ddof=1):.2f} degrees, "
+              f"from {len(offsets)} photos; largest distance from its step {np.abs(offsets - offsets.mean()).max():.2f}")
     print("elevation measured minus true (a level and calibration check): "
           f"median {np.median([r['measured_elevation'] - r['sun_elevation'] for r in rows]):+.2f} degrees")
     with open(args.output_dir / "headings.csv", "w", newline="") as fh:

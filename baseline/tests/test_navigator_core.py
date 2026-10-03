@@ -13,6 +13,7 @@ from src.estimation.navigator_core import (
     allowed_distance,
     blend,
     fit_motion_matrix,
+    fit_rotation_scale,
     fix_decision,
     fixes_agree,
     predicted_variance,
@@ -34,6 +35,38 @@ def test_motion_matrix_example_from_the_docstring():
     steps = np.array([[0.0, 2.5], [-2.5, 0.0], [0.0, 2.5], [-2.5, 0.0]])  # (north, east)
     matrix = fit_motion_matrix(shifts, steps)
     np.testing.assert_allclose(np.array([20.0, 0.0]) @ matrix, [0.0, 5.0], atol=1e-9)
+
+
+def test_rotation_scale_example_from_the_docstring():
+    # the image slides 5 px down while the drone flies 2 m north: 0.4 m per pixel, turned by -90 degrees
+    shifts = np.tile([0.0, 5.0], (10, 1))
+    steps = np.tile([2.0, 0.0], (10, 1))
+    matrix = fit_rotation_scale(shifts, steps)
+    np.testing.assert_allclose(matrix, [[0.0, -0.4], [0.4, 0.0]], atol=1e-12)
+    np.testing.assert_allclose(np.array([0.0, 10.0]) @ matrix, [4.0, 0.0], atol=1e-12)
+
+
+def test_rotation_scale_learns_sideways_motion_from_flight_in_one_direction():
+    # before the jam the drone flies north-west only, yet after a turn its sideways steps must come out right
+    rng = np.random.default_rng(1)
+    true = np.array([[0.0, -0.4], [0.4, 0.0]])
+    shifts = np.array([3.5, 3.5]) + rng.normal(0.0, 0.2, (120, 2))  # always the same direction
+    steps = shifts @ true
+    after_turn = np.array([5.0, -5.0])  # a shift at right angles to everything seen before
+    np.testing.assert_allclose(after_turn @ fit_rotation_scale(shifts, steps), after_turn @ true, atol=0.05)
+
+
+def test_rotation_scale_ignores_tilt_jumps_that_shrink_least_squares():
+    # 20 percent of the frames jump by 15 px without the drone moving more than usual (a quadcopter banking)
+    rng = np.random.default_rng(2)
+    true = np.array([[0.0, -0.4], [0.4, 0.0]])
+    shifts = np.tile([0.0, 5.0], (100, 1)) + rng.normal(0.0, 0.2, (100, 2))
+    steps = shifts @ true
+    shifts[::5] += rng.normal(0.0, 15.0, (20, 2))
+    robust = np.hypot(*fit_rotation_scale(shifts, steps)[0])
+    plain = np.hypot(*fit_motion_matrix(shifts, steps)[0])
+    assert abs(robust - 0.4) < 0.02
+    assert plain < 0.3  # least squares is pulled down by the jumps
 
 
 def test_predicted_variance_adds_drift_as_variance():
