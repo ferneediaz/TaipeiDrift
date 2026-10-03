@@ -280,7 +280,7 @@ class Monitor(Node):
             out.append(f"\n{BOLD}RF NAVIGATION{RESET} {DIM}waiting for bearings to three ships...{RESET}")
 
         if self.rf:
-            out.append(f"\n{BOLD}AIS RECEIVER{RESET} {DIM}(GMSK 9600 bit/s, 162 MHz; bearing error against truth){RESET}")
+            out.append(f"\n{BOLD}AIS RECEIVER{RESET} {DIM}(GMSK 9600 bit/s, 162 MHz; angle of arrival, error against truth){RESET}")
             for mmsi, r in sorted(self.rf.items()):
                 t, d = r["truth"], r["det"]
                 line = f"  {r['ship']:<20} {mmsi}  range {t['range_m'] / 1e3:6.2f} km  decoded {r['decoded']:3d}/{r['sent']}"
@@ -289,7 +289,7 @@ class Monitor(Node):
                     err = math.degrees((d["azimuth_body_rad"] - t["azimuth_body_rad"] + math.pi) % (2 * math.pi) - math.pi) \
                         if abs(d["t"] - t["t"]) < 1e-6 else None
                     e = f"{err:+5.1f} deg" if err is not None else "  (old)  "
-                    line += (f"\n    RSSI {d['rssi_dbm']:5.0f} dBm  bearing {math.degrees(d['azimuth_body_rad']):+6.1f} deg"
+                    line += (f"\n    AoA {math.degrees(d['azimuth_body_rad']):+6.1f} deg from the nose"
                              f"  error {e} (sigma {math.degrees(d['azimuth_std_rad']):.1f})")
                 out.append(line)
         print("\033[H\033[J" + "\n".join(out), flush=True)

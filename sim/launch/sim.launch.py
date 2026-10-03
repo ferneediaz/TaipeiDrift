@@ -15,7 +15,7 @@ ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_tra
          beacon over the drone so the overview shows where it is;
          default (auto): in the strait world only
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
-         the down-camera view (with the ships: the RSSI map, nodes/rssi_map.py; the down camera is then a panel
+         the down-camera view (with the ships: the AoA map, nodes/aoa_map.py; the down camera is then a panel
          in the Gazebo window)
          and a terminal with the live sensor monitor (nodes/sensor_monitor.py) on the desktop
 gnss_cutoff_s     seconds after the first raw GPS fix when the GNSS gate closes (nodes/gnss_gate.py); negative: never
@@ -31,6 +31,7 @@ compared on the same flight after the GNSS cutoff; sim/scripts/check_rf_nav.py s
 """
 import datetime as dt
 import json
+import math
 import os
 import socket
 import subprocess
@@ -63,7 +64,81 @@ OVERVIEW_TOPIC = "/views/overview"
 OVERVIEW_POSE = (425.0, -1700.0, 1100.0, 0.0, 0.53, 1.5708)
 
 
-def drone_sdf(cam_res: int, gps: bool, views: bool = False) -> Path:
+def df_antenna_sdf(rf_cfg: dict) -> list:
+    """The AIS antennas, from config/rf.yaml, built like real VHF direction-finding hardware (aircraft ADF loops sat
+    in a fairing; DF antennas today sit in fibreglass radomes):
+    - fixed on the body: a radome on a mounting flange over the whole spinning assembly (half see-through, so the loop
+      can be watched), the spin motor and angle encoder inside it, and on the forward boom the quarter-wave whip,
+      which decodes the packets and is the loop's sense antenna;
+    - spinning on the motor, inside the radome: a short fibreglass mast, the balun box at the loop's feed point, and
+      the shielded loop, a ring of coax whose shield is broken at the top so it screens out the electric field but
+      not the magnetic one. The loop must stay open: its signal is the magnetic flux through it.
+    Returns SDF elements: the fixed parts (visuals of base_link), the loop's link, its joint, the spin plugin."""
+    df = rf_cfg["direction_finder"]
+    wavelength = 299792458.0 / (sum(rf_cfg["ais"]["channels_hz"]) / len(rf_cfg["ais"]["channels_hz"]))
+    whip, r = wavelength / 4, df["loop_diameter_m"] / 2
+    top, tube = 0.02, 0.005                       # top of the body box; the loop's coax radius
+    pod_r, pod_h = 0.022, 0.035                   # spin motor and encoder housing
+    box = (0.026, 0.018, 0.022)                   # balun box at the feed point (x, y, z)
+    z_loop = top + df["loop_height_m"]            # loop centre, in base_link
+    mast_bottom, mast_top = top + pod_h, z_loop - r - box[2]
+    whip_x = 0.17                                 # on the forward boom: outside the radome, clear of the rotor discs
+    dome_r = r + tube + 0.015                     # radome radius: the loop's swept circle plus clearance
+    wall_top = z_loop + r + tube + 0.004
+    def colour(rgb):
+        return f"<material><ambient>{rgb} 1</ambient><diffuse>{rgb} 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>"
+    black, white, grey, copper, silver = (colour(c) for c in ("0.05 0.05 0.05", "0.92 0.92 0.88", "0.3 0.3 0.32",
+                                                               "0.80 0.45 0.20", "0.75 0.75 0.78"))
+    def cyl(name, pose, radius, length, mat):
+        return (f'<visual name="{name}"><pose>{pose}</pose><geometry><cylinder><radius>{radius}</radius>'
+                f"<length>{length}</length></cylinder></geometry>{mat}</visual>")
+    radome = ("<material><ambient>0.93 0.93 0.90 1</ambient><diffuse>0.93 0.93 0.90 1</diffuse>"
+              "<specular>0.6 0.6 0.6 1</specular></material><transparency>0.55</transparency>")
+    fixed = [
+        cyl("radome_flange", f"0 0 {top + 0.005} 0 0 0", dome_r + 0.006, 0.01, grey),
+        cyl("radome_wall", f"0 0 {(top + 0.01 + wall_top) / 2} 0 0 0", dome_r, wall_top - top - 0.01, radome),
+        f'<visual name="radome_lid"><pose>0 0 {wall_top} 0 0 0</pose><geometry><ellipsoid><radii>{dome_r} {dome_r} '
+        f"0.035</radii></ellipsoid></geometry>{radome}</visual>",
+        cyl("ais_whip_mount", f"{whip_x} 0 0.012 0 0 0", 0.012, 0.009, grey),
+        cyl("df_motor", f"0 0 {top + pod_h / 2} 0 0 0", pod_r, pod_h, black),
+        cyl("df_encoder_ring", f"0 0 {top + pod_h - 0.004} 0 0 0", pod_r + 0.002, 0.006, silver),
+        cyl("ais_whip_base", f"{whip_x} 0 {0.016 + 0.012} 0 0 0", 0.008, 0.024, silver),
+        cyl("ais_whip_spring", f"{whip_x} 0 {0.016 + 0.034} 0 0 0", 0.005, 0.02, black),
+        cyl("ais_whip", f"{whip_x} 0 {0.016 + 0.044 + whip / 2} 0 0 0", 0.0025, whip, black),
+        f'<visual name="ais_whip_tip"><pose>{whip_x} 0 {0.016 + 0.044 + whip} 0 0 0</pose><geometry><sphere>'
+        f"<radius>0.004</radius></sphere></geometry>{black}</visual>",
+    ]
+    # the spinning parts, in the loop link's frame: origin at the loop centre, the loop in the x-z plane
+    n = 32
+    seg = 2 * r * math.sin(math.pi / n) * 1.08
+    ring = "".join(cyl(f"loop_{k}", f"{r * math.cos(th)} 0 {r * math.sin(th)} 0 {-th} 0", tube, seg, copper)
+                   for k in range(n) for th in [2 * math.pi * k / n]
+                   if abs(math.sin(th) - 1) > 1e-9)  # the shield gap: no segment at the top
+    gap_caps = "".join(cyl(f"gap_{side}", f"{side * r * math.sin(math.pi / n)} 0 {r * math.cos(math.pi / n)} 0 1.5708 0",
+                           tube * 1.3, 0.004, white) for side in (-1, 1))
+    spinning = (ring + gap_caps
+                + f'<visual name="balun_box"><pose>0 0 {-r - box[2] / 2 + tube} 0 0 0</pose><geometry><box>'
+                  f"<size>{box[0]} {box[1]} {box[2]}</size></box></geometry>{grey}</visual>"
+                + cyl("mast", f"0 0 {(mast_bottom + mast_top) / 2 - z_loop} 0 0 0", 0.006, mast_top - mast_bottom, white)
+                + cyl("hub", f"0 0 {mast_bottom - z_loop + 0.004} 0 0 0", 0.012, 0.008, silver))
+    m = 0.03                                       # ring, balun and mast, kg; the ring dominates the inertia
+    izz = ixx = m * r ** 2 / 2                     # ring about a diameter: the spin axis is a vertical diameter
+    iyy = m * r ** 2                               # about the loop's normal
+    x0 = -0.5                                      # base_link's x in the model
+    return [
+        *(ET.fromstring(v) for v in fixed),
+        ET.fromstring(f'<link name="df_loop"><pose>{x0} 0 {z_loop} 0 0 0</pose><inertial><mass>{m}</mass>'
+                      f"<inertia><ixx>{ixx}</ixx><iyy>{iyy}</iyy><izz>{izz}</izz><ixy>0</ixy><ixz>0</ixz>"
+                      f"<iyz>0</iyz></inertia></inertial>{spinning}</link>"),
+        ET.fromstring('<joint name="df_loop_joint" type="revolute"><parent>base_link</parent><child>df_loop</child>'
+                      "<axis><xyz>0 0 1</xyz><limit><lower>-1e16</lower><upper>1e16</upper></limit></axis></joint>"),
+        ET.fromstring('<plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">'
+                      f"<joint_name>df_loop_joint</joint_name>"
+                      f"<initial_velocity>{2 * math.pi * df['spin_rate_hz']}</initial_velocity></plugin>"),
+    ]
+
+
+def drone_sdf(cam_res: int, gps: bool, views: bool = False, rf_cfg: dict = None) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
     link = tree.find(".//link[@name='sensor_link']")
     image = link.find("sensor[@name='camera_down']/camera/image")
@@ -79,6 +154,10 @@ def drone_sdf(cam_res: int, gps: bool, views: bool = False) -> Path:
             '<visual name="beacon"><pose>0 0 30 0 0 0</pose><geometry><sphere><radius>15</radius></sphere>'
             '</geometry><material><ambient>1 0.1 0.1 1</ambient><diffuse>1 0.1 0.1 1</diffuse>'
             '<emissive>0.6 0 0 1</emissive></material></visual>'))
+    if rf_cfg:
+        base, model = tree.find(".//link[@name='base_link']"), tree.find(".//model")
+        for element in df_antenna_sdf(rf_cfg):
+            (base if element.tag == "visual" else model).append(element)
     tree.write(GENERATED_MODEL, xml_declaration=True, encoding="utf-8")
     return GENERATED_MODEL
 
@@ -119,7 +198,7 @@ def overview_camera_sdf() -> Path:
 def views_gui_config() -> Path:
     """The Gazebo window for the strait world: the 3rd-person chase view of the drone, with two panels beside it:
     the overview of the ships and the drone's down camera (the desktop's top-right slot holds
-    the RSSI map instead, nodes/rssi_map.py). The far clip is raised so ships kilometres away
+    the AoA map instead, nodes/aoa_map.py). The far clip is raised so ships kilometres away
     are drawn (the default cuts them off)."""
     text = (SIM / "config/gui.config").read_text()
     text = text.replace("<camera_pose>-6 0 6 0 0.5 0</camera_pose>",
@@ -252,7 +331,7 @@ def setup(context):
 
     for script in WORLD_ASSETS.get(world.stem, []):
         subprocess.run([sys.executable, str(SIM / "scripts" / script), "--if-missing"], check=True)
-    model = drone_sdf(cam_res, gps, views=ships)
+    model = drone_sdf(cam_res, gps, views=ships, rf_cfg=yaml.safe_load(RF_CONFIG.read_text()) if ships else None)
     gui_config = views_gui_config() if ships else SIM / "config/gui.config"
     sim_time = {"use_sim_time": True}
 
@@ -379,9 +458,9 @@ def setup(context):
                 ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
-            # down camera is a panel in the Gazebo window and this slot shows the RSSI map.
+            # down camera is a panel in the Gazebo window and this slot shows the AoA map.
             TimerAction(period=20.0, actions=[
-                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/rssi_map.py"), "--world", world.stem],
+                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem],
                                output="screen") if ships else
                 Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
             ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "150x55", "-fa", "Monospace", "-fs", "9",
