@@ -1,8 +1,8 @@
 # Questions the demo video may raise
 
 For whoever stands in front of the jury. Each answer is short enough to say aloud, and every number comes from
-eleven logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
-of the video, tested on eleven flights"). State: Sunday 4 October, 02:50.
+twelve logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
+of the video, tested on twelve flights"). State: Sunday 4 October, 02:50.
 
 ## If there are only twenty seconds
 
@@ -68,8 +68,8 @@ tested.
 **11. The sea in the video looks like a still picture. Real waves move.**
 Right. In the simulation the deep sea has almost no texture, so the camera gets nothing there, as over real water.
 Near the shore the seabed shows through and the simulated camera tracks it; real waves and glare would make that
-harder. We flew the hard case, a sea without any texture: then the estimate over water is at the radio's level,
-about 30 m.
+harder. We flew the hard case twice, a sea without any texture: then the estimate over water is at the radio's
+level, about 30 m off in the median and up to 120 m at worst.
 
 **12. How long can it go without GNSS?**
 The video shows 53 s and 470 m. The longest flight was 289 s, about 2 km: 11 m off in the median, 44 m at worst,
@@ -77,8 +77,8 @@ and the error did not keep growing.
 
 **13. Were the settings tuned on this very flight?**
 They were chosen on Saturday evening on five test flights on this route. After that the filter's settings stayed
-as they were, and we flew ten more: the two takes for the video, four repeats, wind, an earlier loss of GNSS, a
-sea without texture and the five-minute flight. All of them in the same world with the same three ships. Another
+as they were, and we flew eleven more: the two takes for the video, four repeats, wind, an earlier loss of GNSS,
+two with a sea without texture and the five-minute flight. All of them in the same world with the same three ships. Another
 coast or other ship positions are not tested.
 
 **14. How does the video fit the numbers on the slides?**
@@ -138,5 +138,6 @@ arrival.
 | Repeat 4 | 59 | 24.3 | 64 | 33.7 | 350 |
 | Wind 6 m/s, gusts | 62 | 5.0 | 23 | 54.4 | 379 |
 | GNSS lost at 11 s | 75 | 8.2 | 34 | 39.6 | 308 |
-| Sea without texture | 57 | 28.4 | 69 | 37.0 | 201 |
+| Sea without texture, matte | 57 | 28.4 | 69 | 37.0 | 201 |
+| Sea without texture, glossy (Alessandro's sea) | 58 | 22.2 | 119 | 27.5 | 507 |
 | To the island and back | 289 | 10.6 | 44 | 94.9 | 3,477 |

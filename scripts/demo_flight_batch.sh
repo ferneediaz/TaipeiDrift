@@ -8,7 +8,9 @@
 #   scripts/demo_flight_batch.sh wind "wind:=6,20"               with wind: extra arguments win over the demo's own
 #   scripts/demo_flight_batch.sh long "route:=pads land:=false" 600   to island B and back, until the time limit
 #   PLAIN_SEA=1 scripts/demo_flight_batch.sh plainsea            the sea without any texture for this flight: real
-#                                                                waves give a camera nothing to track
+#                                                                waves give a camera nothing to track (only for a
+#                                                                world built before commit 18bbbdd, whose sea has a
+#                                                                texture; since then the generator builds it plain)
 #   DAN_CHECK_S=230 scripts/demo_flight_batch.sh r1              also run sim/scripts/check_rf_nav.py that long
 #
 # Logs go to outputs/demo/batch/NAME (estimators.csv, status.jsonl, sim.log); score them with

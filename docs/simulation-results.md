@@ -422,9 +422,9 @@ eskf=/nav/odom eskf_rf=/nav_rf/odom rf=/rf_nav/odom`. The run folder is not in g
   the flat-ground run above, where the flow speed removed it; over open water the downward camera has nothing to
   track, so that remedy was not tried here.
 
-## The demo flight of the video, tested on eleven flights
+## The demo flight of the video, tested on twelve flights
 
-Sunday 4 October, 00:30 to 02:35. The question: are the numbers in the demo video typical, do they hold when the
+Sunday 4 October, 00:30 to 03:05. The question: are the numbers in the demo video typical, do they hold when the
 conditions change, and is the scoring right?
 
 **The flight.** The strait world with the islands 236 m apart. Take-off on island A, GNSS switched off 26 s after
@@ -455,7 +455,8 @@ part, and the autopilot flies on the truth in every flight):
 | Repeat 4 | 59 s | 24.3 m | 64 m | 24 m | 33.7 m | 35 m | 350 m |
 | Wind, 6 m/s with gusts (`wind:=6,20`) | 62 s | 5.0 m | 23 m | 3 m | 54.4 m | 50 m | 379 m |
 | GNSS lost at 11 s, during the climb (`gnss_cutoff_s:=10`) | 75 s | 8.2 m | 34 m | 12 m | 39.6 m | 37 m | 308 m |
-| The sea without any texture | 57 s | 28.4 m | 69 m | 32 m | 37.0 m | 20 m | 201 m |
+| The sea without any texture, matte (our test) | 57 s | 28.4 m | 69 m | 32 m | 37.0 m | 20 m | 201 m |
+| The sea without any texture, glossy (Alessandro's sea, commit 18bbbdd) | 58 s | 22.2 m | 119 m | 24 m | 27.5 m | 29 m | 507 m |
 | To island B and back, no landing (`route:=pads land:=false`) | 289 s | 10.6 m | 44 m | 23 m | 94.9 m | 47 m | 3,477 m |
 
 Every flight draws new random sensor noise. The two takes were flown with the simulator slowed to 0.12 of real
@@ -477,9 +478,16 @@ How to read it:
   the two slow takes the camera-only filter did about as well as ours, so the video understates what the ships add.
 - **Over open water the camera has nothing.** In take 2 every picture pair failed over the 90 m in the middle of
   the strait (too few points to track); the readings it did get over water came from the shallows near both
-  coasts, where the seabed shows through, and from the coast still in the picture. With a sea without any texture
-  (the hard case: real waves give nothing stable) our estimate over the water is at the ships' level, 31 m in the
-  median.
+  coasts, where the seabed shows through, and from the coast still in the picture.
+- **With a sea without any texture the result is three times worse.** This is the hard and the realistic case:
+  real waves give a camera nothing stable. Two flights, one with a plain matte sea and one with the plain glossy
+  sea of Alessandro's commit 18bbbdd (Sunday 02:43): our estimate over the water was 31 m and 28 m off in the
+  median and 69 m and 119 m at worst, the level of the ships alone. In neither flight was a camera reading used
+  over open water, and the filter's speed error over the water rose from about 1 m/s (old sea) to 2 and 4 m/s:
+  the ships' fixes hold the position roughly and the speed hardly at all.
+- **Which sea the simulator shows now depends on the machine.** Since commit 18bbbdd the generator builds the plain
+  glossy sea, but the world's version number was not raised: a copy of the islands generated before keeps the old
+  sea with its texture, a fresh checkout gets the new one. The video and the ten other flights used the old sea.
 - **It stays bounded over five minutes.** In the 289 s flight our estimate was 6 to 22 m off in every window of
   30 s (44 m at worst), while the camera-only filter reached 95 m in the median and 341 m at worst, and the
   inertial sensors alone 3.5 km.
@@ -494,7 +502,8 @@ How to read it:
 What this does not show: another coast, other ship positions or fewer than three ships, AIS switched off or
 falsified, real waves, night, a flight steered by the estimate, and sensors other than the assumed ones (the IMU's
 noise bounds are our assumption, `sim/config/sensor_noise.yaml`). The settings were chosen on five test flights on
-this same route on Saturday evening; the eight flights after take 1 used them unchanged.
+this same route on Saturday evening; every flight after that (the two takes and the nine flights of the batch)
+used them unchanged.
 
 Run again: `scripts/demo_flight_batch.sh NAME ["EXTRA ARGS"]` flies one flight and logs it,
 `scripts/score_demo_flights.py RUN ...` prints the table. The simulator's window crashed at the start in 2 of
