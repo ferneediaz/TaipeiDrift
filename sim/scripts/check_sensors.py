@@ -20,7 +20,9 @@ EXPECTED = {  # topic: (type, Hz)
     "/gps/fix": (NavSatFix, 1),
     "/ground_truth/odom": (Odometry, 100),
     "/camera/down/image_raw": (Image, 25),
+    "/camera/forward/image_raw": (Image, 25),
     "/camera/down/camera_info": (CameraInfo, 25),
+    "/camera/forward/camera_info": (CameraInfo, 25),
 }
 
 
@@ -30,11 +32,11 @@ class Check(Node):
         self.stamps = {t: [] for t in EXPECTED}
         self.last = {}
         self.sim_now = None
-        self.raw_images = []  # sim time at arrival; images are counted raw, Python is too slow to decode them all
+        self.raw_images = {topic: [] for topic, (msg_type, _) in EXPECTED.items() if msg_type is Image}
         self.create_subscription(Clock, "/clock", self.on_clock, 10)
         for topic, (msg_type, _) in EXPECTED.items():
             if msg_type is Image:
-                self.create_subscription(msg_type, topic, lambda _: self.raw_images.append(self.sim_now), 50, raw=True)
+                self.create_subscription(msg_type, topic, lambda _, t=topic: self.raw_images[t].append(self.sim_now), 50, raw=True)
             else:
                 self.create_subscription(msg_type, topic, lambda m, t=topic: self.on_msg(t, m), qos_profile_sensor_data)
 
@@ -62,7 +64,7 @@ def main():
 
     ok = True
     for topic, (_, hz) in EXPECTED.items():
-        s = node.stamps[topic] if EXPECTED[topic][0] is not Image else [t for t in node.raw_images if t is not None]
+        s = node.stamps[topic] if EXPECTED[topic][0] is not Image else [t for t in node.raw_images[topic] if t is not None]
         rate = (len(s) - 1) / (s[-1] - s[0]) if len(s) > 1 and s[-1] > s[0] else 0.0
         good = abs(rate - hz) <= 0.1 * hz
         ok &= good

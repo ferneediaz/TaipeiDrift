@@ -63,6 +63,10 @@ def route_for(world, kind="pads", spacing=60.0):
     """
     layout = Path(str(LAYOUT).format(world=SCENERY.get(world, world)))
     if not layout.exists():
+        if world == "city":
+            # A varied loop through the city, across several intersections, then back to the plaza.
+            return [(175.0, 0.0), (175.0, 150.0), (70.0, 150.0), (70.0, -150.0),
+                    (-70.0, -150.0), (-70.0, 70.0), (0.0, 70.0), (0.0, 0.0)]
         return None
     layout = json.loads(layout.read_text())
     pads = layout["pads"]
@@ -129,8 +133,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--world", default="terrain", help="the world that runs; islands and strait fly between the islands")
     ap.add_argument("--camera-only", action="store_true", help="only point the Gazebo window at the drone")
-    ap.add_argument("--route", choices=["pads", "survey"], default="pads",
-                    help="islands world: pads flies between the helipads, survey covers each island in lines")
+    ap.add_argument("--route", choices=["pads", "survey", "city_loop"], default="pads",
+                    help="islands: pads/survey; city: city_loop")
     ap.add_argument("--spacing", type=float, default=60.0, help="m between survey lines")
     ap.add_argument("--height", type=float, default=HEIGHT, help="flight height above the start point, m")
     ap.add_argument("--once", action="store_true", help="fly the route once, then hover")

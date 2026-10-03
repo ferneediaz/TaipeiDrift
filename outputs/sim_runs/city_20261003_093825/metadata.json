@@ -1,0 +1,45 @@
+{
+  "run_id": "city_20261003_093825",
+  "world": "city",
+  "gnss_cutoff_s_since_first_fix": -1.0,
+  "camera_resolution": 512,
+  "demo_trajectory": "city_loop",
+  "estimator_config": "vio/configs/midair_eskf.yaml; simulated GNSS + IMU + barometer; vision flags recorded below",
+  "git_commit": "7fa9f7dbdd3f3bec87bf65bdff6acfee02b99145",
+  "ros_distro": "jazzy",
+  "run_created_local": "2026-10-03T09:38:25.339675+00:00",
+  "record_mode": "light",
+  "topics": {
+    "gt": "/ground_truth/odom",
+    "raw_gps": "/sim/gps_raw",
+    "gated_gps": "/gps/fix",
+    "gnss_status": "/nav/gnss_available",
+    "imu": "/imu/data",
+    "barometer": "/air_pressure",
+    "camera_forward": "/camera/forward/image_raw",
+    "camera_down": "/camera/down/image_raw",
+    "estimator": "/nav/odom",
+    "estimator_status": "/nav/estimator_status",
+    "tf": "/tf",
+    "tf_static": "/tf_static"
+  },
+  "frames": {
+    "gazebo_world": "ENU",
+    "body": "FLU",
+    "camera_forward": "optical frame (+Z forward)",
+    "camera_down": "optical frame (+Z down)",
+    "gps": "WGS84 latitude/longitude/altitude",
+    "estimator": "local ENU position/velocity; FLU body orientation from IMU gravity and yaw=0; GNSS position updates"
+  },
+  "vision_rotation": true,
+  "vision_direction": false,
+  "sim_tracker_min_tracks": 30,
+  "pose_min_correspondences": 30,
+  "pose_min_inliers": 30,
+  "gnss_local_enu_origin": {
+    "latitude_deg": 25.033,
+    "longitude_deg": 121.5654,
+    "elevation_m": 10.0
+  },
+  "simulation_start_time_s": 0.1
+}

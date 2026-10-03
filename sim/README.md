@@ -90,16 +90,37 @@ The Gazebo window appears in the browser tab. Launch options:
 |---|---|---|
 | `cam_res` | `1024` | Down-camera width and height in pixels. 1024 matches Mid-Air; use 512 if the simulation runs slowly |
 | `gps` | `true` | `false` removes the GNSS receiver |
-| `gnss_cut_s` | `-1` | Absolute simulation time in seconds when GNSS stops; negative means never |
+| `gnss_cutoff_s` | `20.0` | Seconds since the first raw GPS fix when the gate closes; negative means never |
+| `record_mode` | `light` | `light` records sensor/pose topics but no images; `full` also records down and forward images |
+| `run_label` | empty | Optional run folder under `outputs/sim_runs/velocity_phase/` |
 | `stereo` | `false` | `true` adds a second down camera at `/camera/down_right/image_raw` |
 | `stereo_baseline_m` | `0.30` | Stereo camera offset along body -Y (right), used when `stereo:=true` |
 | `gui` | `true` | `false` runs Gazebo without its window |
-| `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods), `islands` (two islands and open sea) or `strait` (the islands with warships that transmit AIS) |
-| `demo` | `false` | `true` flies circles (in `islands`: from island to island) and opens the camera view and the sensor monitor |
+| `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods), `islands` (two islands and open sea), `strait` (the islands with warships that transmit AIS) or `city` (roads and buildings) |
+| `demo` | `false` | `true` flies circles (in `islands` and `strait`: from island to island; in `city`: a loop through the streets) and opens the camera view and the sensor monitor |
 | `ships` | `auto` | `true` sails AIS-transmitting ships and runs the drone's AIS receiver (see below); `auto` means on in `strait` only |
 | `wind` | `none` | `SPEED,FROM` in m/s and degrees, e.g. `6,20`: wind from the north-north-east with gusts; the drone leans into it |
 
-Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=terrain gnss_cut_s:=60 stereo:=true`.
+Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=terrain gnss_cutoff_s:=60 stereo:=true`.
+
+### City GNSS-denial run
+
+The `city` world is generated on first launch and contains roads, irregular building footprints and heights, a plaza and simple vegetation. `demo:=true` flies a loop across the city at 80 m. GNSS begins available and the gate closes 20 simulation seconds after its first fix by default. The cutoff is logged by the gate and published on `/nav/gnss_available`; raw GPS remains visible on `/sim/gps_raw`, while `/gps/fix` stops publishing after denial.
+
+Every launch creates `outputs/sim_runs/<world>_YYYYMMDD_HHMMSS/` with the rosbag, `metadata.json`, `config.json`, `sim.log`, `trajectory.csv`, `estimator_debug.csv`, `gnss_debug.csv` and `velocity_debug.csv`. Supplying `run_label:=V1_gnss_velocity_fit_open` places it under `outputs/sim_runs/velocity_phase/V1_gnss_velocity_fit_open/`. Light mode records ground truth (evaluation only), raw and gated GPS, status, IMU, barometer, camera calibration, TF/TF-static, and estimator output. Full mode also records both image streams.
+
+The live adapter does not subscribe to ground truth. It converts `/gps/fix` WGS84 coordinates into local ENU using the world's declared spherical-coordinate origin, initializes position from GNSS, initializes tilt and IMU biases from a settled stationary IMU window (yaw is unobservable and starts at 0), then fuses GNSS position updates and a robust generalized least-squares velocity fit from GNSS positions. The fit uses an 8 s window, at least six fixes spanning six seconds, the per-fix position covariance, and one normalized-residual outlier rejection pass. Velocity covariance is the slope block of the GLS parameter covariance. Fits use non-overlapping fix windows before being passed to the existing ESKF velocity update. After cutoff the estimator propagates IMU, barometer, and enabled visual updates only. Ground truth stays in the logger for evaluation. `velocity_debug.csv` records estimate and fit errors in ENU; the logger rotates Gazebo odometry's body-frame GT velocity into ENU before scoring it. `/nav/estimator_status`, `estimator_debug.csv`, and `gnss_debug.csv` contain update decisions and diagnostics. `vision_rotation:=false` and `vision_direction:=false` independently disable those updates without removing the code.
+
+PowerShell commands from `sim/`:
+
+```powershell
+docker compose up -d --build
+docker compose exec sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=city demo:=true gui:=false cam_res:=512 gnss_cutoff_s:=-1 record_mode:=light vision_rotation:=true vision_direction:=true run_label:=V1_gnss_velocity_fit_open"
+# Stop V1 with Ctrl+C, then run V2:
+docker compose exec sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=city demo:=true gui:=false cam_res:=512 gnss_cut_s:=20 record_mode:=light vision_rotation:=true vision_direction:=true run_label:=V2_gnss_velocity_fit_denial"
+```
+
+Watch Gazebo at http://localhost:6080. In a second terminal, inspect the launch and gate logs with `docker compose exec sim bash -ic "tail -f /tmp/sim.log"`. End the launch with Ctrl+C in its attached terminal, or restart the container; stop the container with `docker compose down`.
 
 ### Record a common replay
 
@@ -150,6 +171,7 @@ Its sensors match Mid-Air (Fonder and Van Droogenbroeck, CVPRW 2019, section 3.1
 | Sensor | Mid-Air | Here | ROS topic |
 |---|---|---|---|
 | Down camera | 1024×1024, 90° FOV, 25 Hz, ideal pinhole, global shutter | Same (`cam_res` can lower it); optional right camera uses the same intrinsics | `/camera/down/image_raw`, `/camera/down/camera_info`, optional `/camera/down_right/image_raw` |
+| Forward camera | Forward camera for relative rotation and translation direction | 1024×1024, 90° FOV, 25 Hz, ideal pinhole | `/camera/forward/image_raw`, `/camera/forward/camera_info` |
 | IMU | 100 Hz, eq. 1 noise: white noise + random-walk bias, drawn per flight | Same model; published orientation is zeroed and marked unavailable | `/imu/data`; the draw is on `/imu/params` |
 | Barometer | none | Gazebo Air Pressure sensor, 50 Hz, 10 Pa noise + slow drift | `/air_pressure` (Pa) |
 | GNSS | 1 Hz | 1 Hz, σ 1.5 m horizontal, 3 m vertical; optional simulation-time cutoff | `/gps/fix` (gated from `/sim/gps_raw`) |
@@ -213,7 +235,7 @@ data/sim/<world>/sunny/
   sensor_records.hdf5                         per trajectory: camera_data, groundtruth, imu, gps (as Mid-Air)
 ```
 
-- **Camera:** JPEG, as Mid-Air's colour images; Mid-Air uses PNG only for depth, disparity, segmentation and normals, which we do not record.
+- **Camera:** `color_down` remains the Mid-Air downward stream. `color_left` is the forward stream used by the visual rotation and velocity-direction experiments; both are JPEG at 25 Hz. Mid-Air uses PNG only for depth, disparity, segmentation and normals, which we do not record.
 - **Rates and rows:** frame j goes with row 4j of the 100 Hz ground truth and IMU, and row j // 25 of the 1 Hz GPS. Quaternions are w, x, y, z; axes are north, east, down.
 - **Turn rates follow the Mid-Air files, not their documentation:** the gyroscope and the true angular velocity are around the world axes, the accelerometer is in the drone's axes (forward, right, down). See `docs/findings.md`, section 2.2. Code written for Mid-Air therefore works on these recordings unchanged.
 - **Look up one picture:** `python3 sim/scripts/frame_info.py data/sim/islands/sunny/color_down/trajectory_0000/000123.JPEG` prints every sensor value recorded with it.
@@ -243,12 +265,12 @@ docker compose exec sim bash -ic "python3 sim/nodes/record_midair.py --world isl
 How the position is worked out from the ships' radio, with the math and results: [RF_README.md](RF_README.md).
 
 ```bash
-sim/run.sh     # on the host: starts the container, launches this world without GPS, opens the browser
+sim/run.sh     # on the host: starts the container, launches this world (GNSS, then cut), opens the browser
 ```
 
-The same by hand: `docker compose exec -d sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=strait demo:=true gps:=false cam_res:=512 > /tmp/sim.log 2>&1"`. `sim/run.sh islands` starts another world, extra arguments go to the launch file, and `PORT=6081 sim/run.sh` moves the browser desktop to another port.
+The same by hand: `docker compose exec -d sim bash -ic "ros2 launch sim/launch/sim.launch.py world:=strait demo:=true cam_res:=512 > /tmp/sim.log 2>&1"`. `sim/run.sh islands` starts another world, extra arguments go to the launch file, and `PORT=6081 sim/run.sh` moves the browser desktop to another port.
 
-`gps:=false` takes the drone's GNSS receiver away for the run; the drone then finds its position from the ships (below).
+GNSS is available at the start and is cut `gnss_cutoff_s` (20) seconds after its first fix; from then on the drone finds its position from the ships (below). `gps:=false` takes the GNSS receiver away for the whole run instead.
 
 The browser desktop shows:
 - **Gazebo window, main view:** the chase camera behind the drone.
@@ -312,6 +334,20 @@ docker compose exec sim bash -ic "python3 sim/scripts/check_rf_nav.py 300"
 
 A first run (one pass from pad A to pad B, 170 s of simulation, real-time factor about 0.5) gave a median error of 48 m and a 95th percentile of 113 m, with heading within 2° RMS. The filter's own 2σ ellipse held the truth 98 % of the time. That is what 3° bearings over 0.6 to 1 km give: about 40 m across each line of bearing. A single three-ship snapshot is good to about 70 m; the filter does better by combining bearings over time.
 
+### The ESKF with the ships' fix
+
+The strait world also runs the ESKF estimator (`nodes/eskf_ros_adapter.py`, from the integration branch: IMU, barometer, forward camera, and GNSS until the cutoff) twice on the same flight:
+
+| Topic | Estimator |
+|---|---|
+| `/rf_nav/odom` | the ships' bearings only (above) |
+| `/nav/odom` | the ESKF; after the GNSS cutoff it has IMU, barometer and camera only |
+| `/nav_rf/odom` | the same ESKF with `rf_fix:=true`: it also fuses `/rf_nav/odom` as a position fix |
+
+While GNSS is available, both get a velocity update from a robust least-squares line through the last 8 s of fixes (`nodes/gnss_velocity_fit.py`, settings `velocity_*` under `sim_gnss` in `vio/configs/midair_eskf.yaml`), on non-overlapping windows. With `rf_fix`, each `/rf_nav/odom` message that carries a new bearing (its covariance shrank) becomes a horizontal position update and a heading update, with rf_nav's own covariance. Unlike GNSS, no velocity is taken from the RF fixes: the RF error wanders slowly, and differences 5 s apart were off by about 10 m/s. If the gate rejects several fixes in a row, the ESKF has drifted and its position is reset to the fix. The settings are under `eskf_rf_fix` in `config/rf.yaml`. Without GNSS at all (`gps:=false`) the ESKF starts from the first RF fix.
+
+`check_rf_nav.py` scores all three, over the whole run and after the cutoff, and draws them on one map. The sensor monitor's NAVIGATION table shows the same comparison live: each estimate's distance from the truth, its own 2σ, the RMS since the cutoff, height and heading errors, and which updates it fused.
+
 ## Frames
 
 Gazebo and ROS use ENU (x east, y north, z up) and a body frame that is forward, left, up. Mid-Air and `docs/PLAN.md` use NED. The live ROS topics are in ENU; `record_midair.py` converts to NED when it writes a recording.
@@ -333,9 +369,9 @@ worlds/strait.sdf           the islands with warships that transmit AIS
 config/bridge.yaml          Gazebo ↔ ROS topics
 config/sensor_noise.yaml    IMU noise bounds, barometer drift
 nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift and attitude zeroing
-nodes/gnss_gate.py          simulation-time GNSS cutoff
+nodes/gnss_gate.py          GNSS cutoff, counted from the first fix
 nodes/recorder.py           common replay-format recorder
-nodes/sensor_monitor.py     live sensor values in the terminal
+nodes/sensor_monitor.py     live sensor values in the terminal, and the NAVIGATION comparison of the estimates
 nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
 nodes/record_midair.py      records a flight in the Mid-Air dataset format
 config/rf.yaml              ships, AIS radio, drone receiver and direction finder
@@ -343,7 +379,10 @@ nodes/rf_model.py           AIS (GMSK) link model and bearing noise, no ROS
 nodes/rf_sensor.py          ship transmissions as the drone's AIS receiver hears them
 nodes/ship_traffic.py       sails the ships in Gazebo, publishes their true positions (drawn by launch/sim.launch.py)
 nodes/rf_nav.py             the drone's position and heading from bearings to three ships, without GNSS
-scripts/check_rf_nav.py     scores rf_nav against ground truth, saves a map and an error plot
+nodes/eskf_ros_adapter.py   the ESKF estimator: /nav/odom, and with rf_fix:=true (the ships' fix) /nav_rf/odom
+nodes/gnss_gate.py          cuts GNSS gnss_cutoff_s after its first fix, publishes /nav/gnss_available
+nodes/run_logger.py         per-run CSV logs in outputs/sim_runs/<run>/
+scripts/check_rf_nav.py     scores rf_nav and both ESKFs against ground truth, saves a map and an error plot
 nodes/rssi_map.py           live map: where the drone could be from the ships' signal strength alone
 scripts/check_rf.py         link budget table and checks of the RF model
 scripts/record_islands_set.sh  records a set of flights over the islands world

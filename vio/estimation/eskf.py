@@ -210,6 +210,22 @@ class ESKF:
         H[0, P_] = up
         return self.update(np.array([z_up - up @ self.p]), H, np.array([[sigma_m**2]]), gate_prob)
 
+    def update_position(self, position_world: np.ndarray, covariance: np.ndarray,
+                        gate_prob: float | None = 0.99) -> UpdateResult:
+        """Fuse a Cartesian position observation in the estimator's world frame."""
+        H = np.zeros((3, self.n))
+        H[:, P_] = np.eye(3)
+        return self.update(np.asarray(position_world, dtype=float) - self.p, H,
+                           np.asarray(covariance, dtype=float), gate_prob)
+
+    def update_velocity(self, velocity_world: np.ndarray, covariance: np.ndarray,
+                        gate_prob: float | None = 0.99) -> UpdateResult:
+        """Fuse a Cartesian velocity observation in the estimator's world frame."""
+        H = np.zeros((3, self.n))
+        H[:, V_] = np.eye(3)
+        return self.update(np.asarray(velocity_world, dtype=float) - self.v, H,
+                           np.asarray(covariance, dtype=float), gate_prob)
+
     def update_camera_velocity_xy(self, z: np.ndarray, R_bc: np.ndarray, Rm: np.ndarray,
                                   gate_prob: float | None = 0.99) -> UpdateResult:
         """Lateral velocity of the camera in its own x, y axes: z = S R_bc^T R^T v + noise."""

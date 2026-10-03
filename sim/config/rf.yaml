@@ -84,3 +84,11 @@ ships:
     antenna_gain_db: 2.15
     speed_kn: 10.0
     waypoints: [[1100.0, -350.0], [1500.0, -350.0], [1500.0, -550.0], [1100.0, -550.0]]   # south-east corner
+
+# The ESKF's use of the RF fix (sim/nodes/eskf_ros_adapter.py with rf_fix:=true, the /nav_rf/odom instance)
+eskf_rf_fix:
+  gate_prob: 0.999             # Mahalanobis gate for the RF position and heading updates, as for GNSS
+  reanchor_after: 3            # RF fixes rejected in a row before the ESKF's horizontal position is reset to the fix
+  reanchor_velocity_sigma_mps: 2.0   # velocity uncertainty added at a reset: the drift came with a wrong velocity
+  start_height_m: 0.0          # height of the take-off pad when starting without GNSS (world origin: helipad A)
+  start_height_sigma_m: 1.0    # also the height uncertainty kept at a reset; the barometer carries the height

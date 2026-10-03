@@ -1,0 +1,116 @@
+{
+  "run_id": "V2_gnss_velocity_fit_denial",
+  "cutoff_sim_time_s": 20.3,
+  "position_error": {
+    "final_3d_m": 259.4103233023402,
+    "max_3d_m": 284.1407699389692,
+    "final_horizontal_m": 259.3868547296485,
+    "final_vertical_m": 3.4893307789452024
+  },
+  "velocity_milestones": {
+    "cutoff": {
+      "timestamp_sim_s": 20.3,
+      "position_3d_m": 3.9603708468860743,
+      "position_horizontal_m": 0.48378164158477105,
+      "position_vertical_m": 3.9307114582643514,
+      "velocity_vector_error_mps": 0.4276264660885575,
+      "horizontal_velocity_error_mps": 0.3495495337765158,
+      "speed_error_mps": 0.2712964523792625,
+      "direction_error_deg": 6.046272889398538,
+      "direction_only_equivalent_error_mps": 0.3165505407528099,
+      "gt_speed_mps": 3.001093176885643,
+      "est_speed_mps": 3.2723896292649055
+    },
+    "plus_5_s": {
+      "timestamp_sim_s": 25.3,
+      "position_3d_m": 4.280283499580027,
+      "position_horizontal_m": 2.905012396877887,
+      "position_vertical_m": 3.1435218801151734,
+      "velocity_vector_error_mps": 0.7234951041924575,
+      "horizontal_velocity_error_mps": 0.6762692812200931,
+      "speed_error_mps": 0.33825026145219317,
+      "direction_error_deg": 11.597640680023646,
+      "direction_only_equivalent_error_mps": 0.6062930973206601,
+      "gt_speed_mps": 3.0003870689450247,
+      "est_speed_mps": 3.338637330397218
+    },
+    "plus_10_s": {
+      "timestamp_sim_s": 30.3,
+      "position_3d_m": 7.993229134304866,
+      "position_horizontal_m": 7.383668989236529,
+      "position_vertical_m": 3.0615591209197532,
+      "velocity_vector_error_mps": 1.1559071149578417,
+      "horizontal_velocity_error_mps": 1.1479626811292474,
+      "speed_error_mps": 0.3577755646083185,
+      "direction_error_deg": 19.939553514439602,
+      "direction_only_equivalent_error_mps": 1.038946895327486,
+      "gt_speed_mps": 3.0005050050361355,
+      "est_speed_mps": 3.358280569644454
+    },
+    "plus_20_s": {
+      "timestamp_sim_s": 40.300000000000004,
+      "position_3d_m": 28.128337351670158,
+      "position_horizontal_m": 27.77981573656442,
+      "position_vertical_m": 4.414204323758739,
+      "velocity_vector_error_mps": 3.231855605846024,
+      "horizontal_velocity_error_mps": 3.2224489016628186,
+      "speed_error_mps": 2.48796628902023,
+      "direction_error_deg": 42.34399927672765,
+      "direction_only_equivalent_error_mps": 1.3513913528655346,
+      "gt_speed_mps": 1.8708578543288696,
+      "est_speed_mps": 4.3588241433491
+    },
+    "plus_30_s": {
+      "timestamp_sim_s": 50.300000000000004,
+      "position_3d_m": 31.659874270519882,
+      "position_horizontal_m": 31.469348724109445,
+      "position_vertical_m": 3.468101743824434,
+      "velocity_vector_error_mps": 2.034568088565964,
+      "horizontal_velocity_error_mps": 2.034522528541135,
+      "speed_error_mps": 1.9829636217547089,
+      "direction_error_deg": 3.0578134283553307,
+      "direction_only_equivalent_error_mps": 0.4054824634288808,
+      "gt_speed_mps": 7.598629459605692,
+      "est_speed_mps": 9.5815930813604
+    },
+    "final": {
+      "timestamp_sim_s": 124.80000000000001,
+      "position_3d_m": 259.4103233023402,
+      "position_horizontal_m": 259.3868547296485,
+      "position_vertical_m": 3.4893307789452024,
+      "velocity_vector_error_mps": 6.253243052072248,
+      "horizontal_velocity_error_mps": 6.253238713326983,
+      "speed_error_mps": 6.242108692007134,
+      "direction_error_deg": 2.0839334193286216,
+      "direction_only_equivalent_error_mps": 0.2763766745181979,
+      "gt_speed_mps": 7.599134278311835,
+      "est_speed_mps": 13.841242970318968
+    }
+  },
+  "gnss_velocity_fit": {
+    "measurement_count": 2,
+    "accepted": 2,
+    "rejected": 0,
+    "vector_error_median_mps": 0.1938830020526603,
+    "vector_error_p90_mps": 0.24511813097334065,
+    "speed_error_median_mps": 0.18438942015180096,
+    "speed_error_p90_mps": 0.2432194145931688,
+    "direction_error_median_deg": 1.2682818253990538,
+    "direction_error_p90_deg": 1.2682818253990538,
+    "fit_sample_count_median": 8.0,
+    "fit_residual_rms_m_median": 1.9238016435445013,
+    "low_speed_fit_count": 2,
+    "low_speed_gt_horizontal_median_mps": 0.028676531904227982,
+    "low_speed_fitted_horizontal_median_mps": 0.11490908370019762,
+    "low_speed_fitted_horizontal_p90_mps": 0.1919255753102208,
+    "low_speed_fitted_horizontal_max_mps": 0.2111796982127266,
+    "post_cutoff_error_decomposition": {
+      "samples": 1046,
+      "speed_error_median_mps": 3.7787864824169635,
+      "speed_error_p90_mps": 7.548401839694227,
+      "direction_only_equivalent_median_mps": 1.0604667653509632,
+      "direction_only_equivalent_p90_mps": 4.80029418380275,
+      "speed_error_larger_fraction": 0.7017208413001912
+    }
+  }
+}

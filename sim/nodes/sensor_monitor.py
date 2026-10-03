@@ -4,6 +4,11 @@
 
 Shows what the drone's sensors report, next to the ground truth, refreshed 5 times a second.
 Rates are measured in simulation time.
+
+At the top, NAVIGATION compares the position estimates that run on this flight, each against ground truth:
+    RF only    nodes/rf_nav.py: the ships' bearings (strait world)
+    ESKF       nodes/eskf_ros_adapter.py: IMU + barometer + forward camera, GNSS until the cutoff
+    ESKF + RF  the same ESKF, also fusing the RF position fix (strait world)
 """
 import argparse
 import json
@@ -19,12 +24,56 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, FluidPressure, Image, Imu, NavSatFix
-from std_msgs.msg import String
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
+from std_msgs.msg import Bool, String
 
 WORLDS = Path(__file__).resolve().parents[1] / "worlds"
 M_PER_DEG_LAT = 111_320.0
 
 BOLD, DIM, GREEN, RED, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[31m", "\033[0m"
+YELLOW, CYAN = "\033[33m", "\033[36m"
+# The estimates compared in NAVIGATION: key, odometry topic, status topic, name, what it uses, whose
+ESTIMATORS = [
+    ("rf", "/rf_nav/odom", None, "RF only", "ships' bearings + gyro", "rf_nav, Dan"),
+    ("eskf", "/nav/odom", "/nav/estimator_status", "ESKF", "IMU+baro+camera, GNSS", "Alessandro"),
+    ("eskf_rf", "/nav_rf/odom", "/nav_rf/estimator_status", "ESKF + RF", "the ESKF + the RF fix", "combined"),
+]
+
+
+def quat_yaw(q):
+    return math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y**2 + q.z**2))
+
+
+GOOD_M, FAIR_M = 20.0, 100.0   # error bar colours: green below GOOD_M, yellow below FAIR_M, red beyond
+BAR_DECADES = 3                 # the bar spans 1 m to 10^BAR_DECADES m
+
+
+def error_bar(err, width=12):
+    """Log scale, 1 m (empty) to 1 km (full): the eye sees 10 m against 100 m at once."""
+    n = round(width * min(max(math.log10(max(err, 1.0)) / BAR_DECADES, 0.0), 1.0))
+    col = GREEN if err < GOOD_M else YELLOW if err < FAIR_M else RED
+    return f"{col}{'█' * n}{RESET}{DIM}{'·' * (width - n)}{RESET}"
+
+
+class Estimate:
+    """One estimator's latest output, its update counts and its error since the GNSS cutoff."""
+
+    def __init__(self):
+        self.odom = None
+        self.counts = {}       # source: [accepted, rejected]
+        self.sq, self.n, self.max = 0.0, 0, 0.0
+
+    def on_status(self, m):
+        d = json.loads(m.data)
+        ev = d.get("event")
+        if ev in ("gnss_update", "rf_update"):
+            c = self.counts.setdefault(ev.split("_")[0], [0, 0])
+            c[0 if d["accepted"] else 1] += 1
+            if d.get("reanchored"):
+                self.counts.setdefault("reset to RF", [0, 0])[0] += 1
+        elif ev == "visual_span":
+            c = self.counts.setdefault("vision", [0, 0])
+            c[0 if d.get("rotation_accepted") or d.get("direction_accepted") else 1] += 1
 
 
 def stamp(msg):
@@ -75,6 +124,16 @@ class Monitor(Node):
         self.create_subscription(String, "/rf/detections", self.on_rf_detection, 50)
         self.rf_nav = None  # drone position from the ships' bearings (nodes/rf_nav.py)
         self.create_subscription(Odometry, "/rf_nav/odom", lambda m: setattr(self, "rf_nav", m), 10)
+        self.est = {key: Estimate() for key, *_ in ESTIMATORS}
+        for key, odom, status, *_ in ESTIMATORS:
+            self.create_subscription(Odometry, odom, lambda m, k=key: setattr(self.est[k], "odom", m), sd)
+            if status:
+                self.create_subscription(String, status, self.est[key].on_status, 50)
+        self.gnss_on = None    # the GNSS gate's state (nodes/gnss_gate.py)
+        self.cut_t = None      # sim time when it closed
+        latched = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+                             reliability=QoSReliabilityPolicy.RELIABLE)
+        self.create_subscription(Bool, "/nav/gnss_available", self.on_gnss_available, latched)
         self.create_timer(0.2, self.draw, clock=rclpy.clock.Clock())  # wall-clock refresh
 
     def on_clock(self, m):
@@ -90,6 +149,63 @@ class Monitor(Node):
         if self.p0 is None:
             self.p0 = m.fluid_pressure
         self.keep("baro", m)
+
+    def on_gnss_available(self, m):
+        if self.gnss_on and not m.data and self.sim_t is not None:
+            self.cut_t = self.sim_t
+        self.gnss_on = m.data
+
+    def navigation(self):
+        """The comparison table: who knows best where the drone is, right now and since the GNSS cutoff."""
+        live = [(e, self.est[e[0]]) for e in ESTIMATORS if self.est[e[0]].odom is not None]
+        if not live or not self.truth:
+            return []
+        if self.gnss_on is None:
+            gnss = f"{DIM}GNSS gate not running{RESET}"
+        elif self.gnss_on:
+            gnss = f"{GREEN}GNSS ON{RESET}"
+        else:
+            since = (f" {self.sim_t - self.cut_t:.0f} s ago" if self.cut_t is not None
+                     else " before this monitor started (RMS counts from its start)")
+            gnss = f"{RED}GNSS CUT{since}{RESET}: the estimates are on their own"
+        tp = self.truth.pose.pose.position
+        tyaw = quat_yaw(self.truth.pose.pose.orientation)
+        out = [f"{BOLD}NAVIGATION{RESET}  {gnss}",
+               f"  {DIM}error = how far the estimate is from the true position; bar: log scale, "
+               f"green < {GOOD_M:.0f} m, yellow < {FAIR_M:.0f} m, red beyond{RESET}",
+               f"  {DIM}{'estimate':<11}{'uses':<23}{'error now':>10}  {f'error 1m…{10 ** BAR_DECADES / 1000:.0f}km':<12} {'its 2σ':>7}"
+               f" {'RMS since cut':>14} {'height':>7} {'heading':>8}  fused (✓ used / ✗ rejected){RESET}"]
+        errs = {}
+        for (key, _, _, name, uses, who), e in live:
+            o = e.odom
+            p, c = o.pose.pose.position, o.pose.covariance
+            err = math.hypot(p.x - tp.x, p.y - tp.y)
+            errs[key] = err
+            two_sigma = 2 * math.sqrt(max(c[0] + c[7], 0.0))
+            if self.gnss_on is False:
+                e.sq, e.n, e.max = e.sq + err * err, e.n + 1, max(e.max, err)
+            rms = f"{math.sqrt(e.sq / e.n):7.1f} m" if e.n else "       —"
+            inside = GREEN if err <= two_sigma else RED  # the estimate is honest when the truth is inside its 2σ
+            height = f"{p.z - tp.z:+6.1f}m" if key != "rf" else "     — "
+            heading = (math.degrees(quat_yaw(o.pose.pose.orientation) - tyaw) + 180) % 360 - 180
+            fused = "  ".join(f"{src} {a}✓" + (f" {r}✗" if r else "") for src, (a, r) in e.counts.items())
+            if key == "rf":  # rf_nav reports no status: count the bearings it was given
+                fused = f"bearings {sum(r['decoded'] for r in self.rf.values())}"
+            out.append(f"  {BOLD}{name:<11}{RESET}{uses:<23}{err:8.1f} m  {error_bar(err)} "
+                       f"{inside}{two_sigma:5.0f} m{RESET} {rms:>14} {height:>7} {heading:+7.1f}°  {DIM}{fused}{RESET}")
+            out.append(f"  {DIM}{'(' + who + ')':<11}{RESET}")
+        if self.gnss_on is False and "eskf_rf" in errs:
+            mine = max(errs["eskf_rf"], 0.1)  # m; keeps the ratio finite when the error is near zero
+            parts = []
+            for k, n in (("eskf", "the ESKF alone"), ("rf", "RF alone")):
+                if k in errs:
+                    ratio = errs[k] / mine
+                    parts.append(f"{ratio:.1f}x closer than {n}" if ratio >= 1 else
+                                 f"{1 / ratio:.1f}x farther than {n}")
+            out.append(f"  {CYAN}→ ESKF + RF is {', '.join(parts)} right now{RESET}")
+        elif self.gnss_on:
+            out.append(f"  {DIM}→ with GNSS every estimate is near the truth; the difference shows after the cut{RESET}")
+        return out + [""]
 
     def on_rf_truth(self, m):
         t = json.loads(m.data)
@@ -111,6 +227,7 @@ class Monitor(Node):
             return
         rtf = (self.sim_t - self.sim0) / max(1e-6, time.time() - self.wall0)
         out.append(f"sim time {self.sim_t:8.1f} s    real-time factor {rtf:4.2f}\n")
+        out += self.navigation()
         r = {k: v.hz() for k, v in self.rates.items()}
 
         tz = None
@@ -159,22 +276,7 @@ class Monitor(Node):
             out.append(f"  {self.info.width}x{self.info.height}  fx {self.info.k[0]:.0f}  "
                        f"{ok}{r['cam']:5.1f} fps{RESET} (want 25){fp}")
 
-        if self.rf_nav:
-            n = self.rf_nav
-            p, c = n.pose.pose.position, n.pose.covariance
-            yaw = math.degrees(2 * math.atan2(n.pose.pose.orientation.z, n.pose.pose.orientation.w))
-            sig = math.sqrt(max(c[0] + c[7], 0.0))
-            out.append(f"\n{BOLD}RF NAVIGATION{RESET} {DIM}(position from the ships' bearings, no GNSS){RESET}")
-            line = f"  estimate  E {p.x:8.1f}   N {p.y:8.1f}  m   heading {yaw:6.1f} deg   sigma {sig:6.1f} m"
-            if self.truth:
-                tp, q = self.truth.pose.pose.position, self.truth.pose.pose.orientation
-                tyaw = math.degrees(math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y**2 + q.z**2)))
-                err = math.hypot(p.x - tp.x, p.y - tp.y)
-                col = GREEN if err < 3 * max(sig, 1.0) else RED
-                line += (f"\n  error     {col}{err:6.1f} m{RESET}   heading {(yaw - tyaw + 180) % 360 - 180:+5.1f} deg"
-                         f"   {DIM}(against ground truth){RESET}")
-            out.append(line)
-        elif self.rf:
+        if self.rf and not self.rf_nav:
             out.append(f"\n{BOLD}RF NAVIGATION{RESET} {DIM}waiting for bearings to three ships...{RESET}")
 
         if self.rf:
