@@ -289,3 +289,190 @@ needs the fix check to improve, not the filter.
 
 **This version has not been run on the sealed flights.** Their result above is the declared one, and it stays.
 For a live integration use the start uncertainty of 3 m.
+
+## Live in the city world: Alessandro's speed from the downward camera and a range finder
+
+Saturday 3 October 2026, 20:48. His commit c24118c (20:25) and his note [`VERY IMPORTANT.md`](../VERY%20IMPORTANT.md).
+It is a second way to measure ground speed with the downward camera, live in the simulator, and it is switched
+off by default (`metric_flow:=true` turns it on).
+
+**What it does.** A range finder points down (one beam, up to 100 m). Corner points are tracked between two
+pictures 0.04 s apart; assuming flat ground at the measured range, their motion in the picture becomes metres
+per second; the filter takes that speed behind its usual 99 percent gate.
+
+**His result** (one run, city world, 80 m above the street, 8 m/s, GNSS cut after 20 s):
+
+| Time without GNSS | 5 s | 10 s | 20 s | 30 s | 136 s (the end) |
+|---|---|---|---|---|---|
+| Position error | 1.6 m | 3.0 m | 4.7 m | 12.3 m | 426 m (644 m at worst) |
+
+The speed readings were 4.45 m/s off in the median (7.58 m/s at the 90th percentile) at a cruising speed of 8 m/s.
+Of 266 readings offered to the filter it took 88 and turned down 178. His conclusion: leave it off, and do not
+present the run as navigation without GNSS. His earlier run without this measurement was 28 m off after 20 s and
+259 m after 105 s; the two are single runs with different settings, so they do not show whether the new
+measurement helps or hurts, as he writes himself.
+
+**Why the readings are that far off: our check** (`python scripts/metric_flow_check.py`: his code on made-up
+points, no simulator; his run files are on his machine, so this is a check of the method and not of his run).
+The city's buildings are 16 to 63 m high and the drone flies at 80 m. A point on the street is 80 m below the
+camera, a point on a 58 m roof only 22 m. The one beam reads one of those depths; the tracked points lie at the
+other, or at both.
+
+| Case, at a true speed of 8 m/s | Speed error |
+|---|---|
+| Points on the street, beam on a 58 m roof (the speed comes out 22/80 of the truth) | 5.8 m/s |
+| Points on a 58 m roof, beam on the street (80/22 = 3.6 times too fast) | 21 m/s |
+| The same with an 18 m building | 1.8 to 2.3 m/s |
+| Half the points on roofs, beam on the street | 2.5 m/s; the fit's own check turns down 0 to 4 percent |
+| Flat ground and the right range, tracking noise only (25 points, half a pixel) | 1.25 m/s |
+| The same with pictures 0.2 s apart | 0.25 m/s |
+
+A wrong depth gives errors of the size he measured; tracking noise alone gives less than a third of it. The
+noise is that large only because the picture moves 1.0 pixel between two frames 0.04 s apart; with frames 0.2 s
+apart it moves 5.1 pixels and the same noise matters five times less. His `flow_velocity.csv` can settle it:
+a wrong depth leaves the direction right and the speed wrong.
+
+**What it means for our numbers.**
+
+- None of them change. Our camera speed is measured in another way: flow over the whole picture, pictures 0.2 s
+  apart, one scale learned against GNSS before the loss and kept, the heading from the sun sensor, and a reading
+  far from what the filter expects is weakened instead of turned down.
+- It rests on the same assumption, flat ground: one scale for the whole picture. Our simulated ground is a flat
+  photo, so our flights never tested that. Over buildings that are tall compared with the flight height it would
+  fail in the same way. His run is the first measurement of what happens when the assumption is broken.
+- Live in the simulator, without GNSS: the ships' radio fix holds the position in Dan's strait world; over the
+  city the live filter diverges with or without the new measurement; over flat ground the new measurement holds
+  it on a circle (the run below).
+
+### The same measurement over flat ground
+
+Saturday 3 October 2026, 21:00 to 21:04, one run. The terrain world (the flat Wufeng photo, no trees, no
+buildings), his settings unchanged (`metric_flow:=true`, GNSS cut 20 s after the first fix), the launch's own
+demo flight: a climb to 39 m, then circles with a radius of 38 m at 5.7 m/s. A second copy of his filter ran on
+the same sensor messages with the measurement switched off (`sim/scripts/log_two_estimators.py`), so the two
+differ in that one setting: the matched comparison his note asks for. Scored by
+`python scripts/metric_flow_flat_ground.py`; the run folder is
+`outputs/sim_runs/metric_velocity/OF_terrain_flat_1` (not in git). Said before the run: if the buildings are the
+cause, the readings should be less than about 1 m/s off here.
+
+**The readings are good over flat ground.**
+
+| Speed reading against the truth | City (his run) | Flat ground (this run) |
+|---|---|---|
+| Median | 4.45 m/s | **0.16 m/s** |
+| 90 percent below | 7.58 m/s | 0.77 m/s |
+| True speed | 8 m/s | 5.7 m/s |
+
+The error is the same for pairs of pictures 0.04 s and 0.2 s apart (0.15 to 0.17 m/s), so the tracking noise is
+far smaller than the half pixel assumed in the check above, and the spacing of the pictures does not matter here.
+What differs from the city is the ground: flat, and with a photo's detail on it (about 500 tracked points in
+every pair). The flight is also lower (39 m against 80 m); one run does not separate the three.
+
+**With the readings the filter holds; without them it does not** (same flight, same sensor data; horizontal
+error):
+
+| Time without GNSS | 5 s | 10 s | 20 s | 30 s | 60 s | 120 s | 164 s (end) | Median | Worst |
+|---|---|---|---|---|---|---|---|---|---|
+| With the flow speed | 6.7 m | 13.5 m | 39.8 m | 13.5 m | 17.2 m | 5.4 m | 7.8 m | 14.5 m | 54 m |
+| Without it | 27 m | 59 m | 165 m | 210 m | 372 m | 482 m | 689 m | 322 m | 689 m |
+
+**What limits this result.**
+
+- **One run, on a circle.** The drone flew 932 m without GNSS and was never more than 76 m from where it lost it.
+  On a circle the errors of one half of a lap partly cancel on the other. It does not show navigation over a
+  distance.
+- **The first 25 s after the loss.** The filter turned down every reading, 18 in a row, and its error grew to
+  54 m while it stated 1 to 7 m. GNSS is lost just as the drone ends its climb and speeds up; the filter's own
+  speed is wrong and it is too sure of it. Then a forward-camera reading turned its direction of travel by
+  30 degrees, the flow readings passed the gate again, and one second later the error was 20 m. The readings it
+  turned down were as good as the ones it took (0.18 against 0.15 m/s). The same lock-out appeared in our
+  replay, where weakening a far-off reading instead of turning it down removed it (`soft_update` in
+  `scripts/fused_replay.py`).
+- **Most readings are thrown away.** The filter received 5.5 pictures per simulated second of the camera's 25.
+  Of 1,007 pairs, 318 were more than 0.2 s apart and dropped, 488 were skipped by the rule that offers every
+  fifth, 135 were offered, 86 taken and 49 turned down.
+- **The heading drifts 4.5 degrees per minute** (2 degrees off at the loss, 16 at the end), in both filters:
+  nothing measures it. On a circle of 38 m that hardly shows; on a straight leg 15 degrees are a quarter of the
+  distance flown, across the track. In our replay the sun sensor holds the heading to 1.3 degrees.
+
+**What follows.** His measurement works where its assumption holds, so the buildings and the bare city ground
+explain the city result. The live filter now has a ground speed that works over our Wufeng ground. Against our
+replay it still lacks the sun heading, the weakened update in place of the gate, and the map fixes.
+
+## Live in the strait world: 3.5 minutes on the current version
+
+Saturday 3 October 2026, 21:46 to 21:53, one run. `sim/run.sh` with its defaults (strait world, the ships, the
+drone with the four-antenna direction finder, Dan's dashboard of 21:33), GNSS cut 20 s after the first fix, flown to
+227 s. All three estimators logged against the truth by `sim/scripts/log_two_estimators.py --topics
+eskf=/nav/odom eskf_rf=/nav_rf/odom rf=/rf_nav/odom`. The run folder is not in git.
+
+| Estimator, after the GNSS loss | Median | 90 percent below | Worst | Inside its own 2 sigma | First over 100 m |
+|---|---|---|---|---|---|
+| Ships' bearings only (`/rf_nav/odom`) | 55 m | 96 m | 211 m | 96 percent of the time | 28 s, briefly |
+| ESKF with the ships' fix (`/nav_rf/odom`, the dashboard's headline) | 83 m | 119 m | 170 m | 26 percent | 51 s |
+| ESKF alone (`/nav/odom`) | 374 m | 1.4 km | 1.56 km | 66 percent | 56 s |
+
+- **Nothing crashed:** every process and both windows ran from start to end, no error and no restart in the log,
+  memory steady. (The earlier RF display could be killed for asking a 17 GB canvas; Dan's commit c41f73f caps it.)
+- **About one minute in, both ESKF estimators pass 100 m** (30 s after the loss). The headline estimator then stays
+  at 80 to 110 m, outside its own stated bound three quarters of the time, and is worse than the ships' bearings
+  alone.
+- **Why:** its own speed is wrong by 7.4 m/s in the median at a flight speed of 7.6 m/s (17 m/s at 60 s, pointing
+  sideways at 100 s). The ships' fixes drag the position back; nothing corrects the speed. The same weakness as in
+  the flat-ground run above, where the flow speed removed it; over open water the downward camera has nothing to
+  track, so that remedy was not tried here.
+
+## A second navigator on the same flights: Ilhan's matcher, checked by us
+
+Saturday 3 October 2026, 21:35 to 22:08. Ilhan's branch `ilhan/sim-demo` (commits 629af5c and ff83733; **not
+merged**) is a second navigator for the same simulated flights and the same 2018 map: every second the picture is
+flattened with the camera's tilt, matched against the map by correlation and by XFeat feature points, and a fix is
+kept only if the two agree within 4 m; between fixes the motion comes from matching consecutive pictures. He reports
+1.7 m median on his own flight and asks that nobody trusts it before testing it on a flight he has not seen.
+
+**What we checked.** His code, unchanged, in a separate checkout (`~/Projects/TaipeiDrift-ilhan-check`, his locked
+environment with torch and XFeat), on our three development flights, which he never had. One draw (seed 0), clean
+pictures, about 4.3 to 4.5 km without GNSS. The sealed flights were not touched. Scripts and logs:
+`outputs/ilhan_check/` (not in git).
+
+| Median / worst error | 100 m flight | 120 m flight | 65 m flight |
+|---|---|---|---|
+| His own filter, as he runs it (tilt from the truth) | 2.7 / 5.6 m | 2.6 / 5.6 m | 1.8 / 9.4 m |
+| The same, tilt from the recorded gyroscope and accelerometer (a textbook filter of ours) | 3.7 / 17.6 m | 5.2 / 25.9 m | 1.9 / 7.6 m |
+| His chain with Alessandro's ESKF, tilt from the truth (his "B") | 2.4 / 6.7 m | 2.2 / 7.3 m | lost: 1.07 km / 3.7 km |
+| His chain with Alessandro's ESKF, nothing from the truth after the cut (his "C") | 3.2 / 35 m | 9.2 / 63 m | lost: 1.01 km / 4.0 km |
+| Our frozen navigator (median of 3 draws) | 16.5 m | 32.3 m | 18.0 m |
+
+**What holds.**
+
+- **No truth leak in the position.** The pictures are the simulated camera's recorded frames, the map is our 2018
+  photo, the search window is centred on his own estimate. His three checks (truth file removed, map shifted 30 m,
+  wrong map) are sound.
+- **It is better than ours in the median on every flight it completes**, also with the truth removed: his fixes are
+  2 to 4 m from the truth and come every second; ours come every 300 m and our navigator knows no tilt at all.
+  In these flights the camera is tilted 6 to 11 degrees in cruise and up to 20 in turns, and each degree moves the
+  picture's centre by 1.1 to 2.1 m on the ground.
+
+**What does not hold yet.**
+
+- **His headline uses the true tilt** (and a heading and a height made from the truth plus his own simulated errors;
+  of the recorded sensors his own filter reads only the camera). His "truth removed" check keeps those inputs.
+  With the tilt from the recorded IMU the worst error is two to five times larger on two of three flights.
+- **The truth-free chain is lost on the 65 m flight.** Right after the cut the ground gives almost no fix for 225 m
+  (2 fixes in 37 attempts, for his own filter as well). His own filter crosses that with a heading made from the
+  truth; the ESKF has no heading sensor, its heading runs off (16 degrees after 300 m, 45 after 600 m; the
+  recorded gyroscope of that flight has a bias of 1.4 degrees per second), the estimate leaves the search window
+  (at most 120 m) and never finds the map again. This is what our sun sensor is for.
+- **His program stops with an error on that flight** (XFeat on a map window without any data); the numbers above
+  are with the guard he uses in his own Tuniu script.
+- **The filter turns down correct fixes.** On the 120 m flight, truth-free: 175 of 334 fixes refused, 174 of them
+  correct.
+- **The stated uncertainty cannot be used:** the true error is inside his 3 sigma 58 to 96 percent of the time
+  (ours: 100 percent). He says so himself.
+- **One draw per flight, clean pictures only, no sealed flight.** And the simulator flatters any matcher: the
+  camera sees a flat aerial photo, which is the same kind of picture as the map (83 percent of his attempts give a
+  fix here, about 30 percent on the real Tuniu photos).
+
+**Where this leaves us (Dustin, Saturday 22:08, in his words "maybe we won't use it at all for our main solution
+and he can try to integrate it as a 2nd option in parallel"):** our frozen navigator and the fused filter stay the
+main solution; Ilhan's navigator is a second option that he brings in himself, in parallel.

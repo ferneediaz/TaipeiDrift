@@ -34,6 +34,9 @@ from std_msgs.msg import String
 
 import rf_model as rf
 
+# A square pseudo-Doppler array is unambiguous while its side is under 0.35 wavelength (half a wavelength across
+# the diagonal); 0.22 works best (Gerhard and Tokekar, arXiv 2003.00386, section III)
+MAX_ARRAY_SIDE_WAVELENGTHS = 0.35
 CONFIG = Path(__file__).resolve().parents[1] / "config" / "rf.yaml"
 WORLDS = Path(__file__).resolve().parents[1] / "worlds"
 
@@ -66,10 +69,22 @@ class RfSensor(Node):
         self.impl_loss = rf.calibrate_impl_loss(rx["sensitivity_dbm"], rx["per_at_sensitivity"], ais["packet_bits"],
                                                 ais["bit_rate"], rx["noise_figure_db"], ais["ber_alpha"])
         self.noise_floor = rf.noise_floor_dbm(ais["bandwidth_hz"], rx["noise_figure_db"])
+        # The pseudo-Doppler array: unambiguous only if the square is small against the wavelength, and it must
+        # rotate electronically often enough within one packet to measure the Doppler tone's phase
+        wavelength = rf.wavelength(sum(ais["channels_hz"]) / len(ais["channels_hz"]))
+        side = 2 * df["array_radius_m"] * math.sin(math.pi / df["elements"])
+        rotations = df["rotation_hz"] * ais["packet_bits"] / ais["bit_rate"]
+        if side > MAX_ARRAY_SIDE_WAVELENGTHS * wavelength:
+            raise SystemExit(f"direction_finder: array side {side:.2f} m is over {MAX_ARRAY_SIDE_WAVELENGTHS} "
+                             f"wavelength ({MAX_ARRAY_SIDE_WAVELENGTHS * wavelength:.2f} m); the bearing would be ambiguous")
+        if rotations < df["min_rotations_per_packet"]:
+            raise SystemExit(f"direction_finder.rotation_hz {df['rotation_hz']} gives {rotations:.1f} rotations per "
+                             f"packet, under {df['min_rotations_per_packet']}")
         self.bias = {r["name"]: float(self.rng.normal(0.0, math.radians(df["bias_sigma_deg"])))
                      for r in cfg["receivers"]}
         params = {"seed": seed, "impl_loss_db": self.impl_loss, "noise_floor_dbm": self.noise_floor,
-                  "azimuth_bias_rad": self.bias}
+                  "azimuth_bias_rad": self.bias, "array_side_wavelengths": side / wavelength,
+                  "rotations_per_packet": rotations}
         self.get_logger().info(f"RF model: {json.dumps(params)}")
         if self.impl_loss < 0:
             self.get_logger().warn("Sensitivity is better than an ideal GMSK receiver allows; check receiver config")

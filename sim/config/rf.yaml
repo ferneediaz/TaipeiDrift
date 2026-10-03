@@ -24,17 +24,31 @@ propagation:
   shadowing_db: 3.0            # log-normal sigma per packet (RFComms default is 10 dB, an indoor value)
 
 receiver:                      # on the drone
-  antenna_gain_db: 0.0         # small vertical whip
+  antenna_gain_db: -5.0        # a helical VHF stub ("rubber duck", 17 cm) of the direction-finding array; the
+                               # packets are decoded through the array, as in the pseudo-Doppler UAS of Gerhard and
+                               # Tokekar (arXiv 2003.00386), so there is no separate whip
   noise_figure_db: 6.0
   sensitivity_dbm: -110.0      # at 20 % packet error rate; IEC 61993-2 minimum is -107 dBm
   per_at_sensitivity: 0.2
   rssi_noise_db: 1.0           # reported RSSI = true power + N(0, this), rounded to 1 dB
 
-direction_finder:              # bearing in the drone's body frame, from an antenna array
+direction_finder:              # bearing in the drone's body frame: a pseudo-Doppler array (RF_README section 2)
   sigma_floor_deg: 3.0         # calibration and multipath, at any SNR
   sigma_at_ref_deg: 8.0        # noise term at the reference SNR; halves for every 6 dB more
   snr_ref_db: 10.0
   bias_sigma_deg: 1.0          # mounting error, drawn once per run
+  # Four fixed stubs on the rotor arms, sampled one after another by an RF switch into one receiver: the phase of the
+  # received signal then moves like that of one antenna circling at the switching rate, and the phase of that
+  # Doppler tone against the switching is the bearing. No moving parts. Two rules, checked by rf_sensor.py:
+  # the square's side under 0.35 wavelength (above it the bearing is ambiguous; 0.22 works best, Gerhard and
+  # Tokekar), and enough
+  # electronic rotations within one AIS packet (packet_bits / bit_rate) to measure the tone's phase.
+  elements: 4
+  array_radius_m: 0.095        # from the drone's centre, along each rotor arm, inboard of the propeller discs:
+                               # side 0.13 m = 0.07 wavelength
+  rotation_hz: 1000.0          # electronic: the switch steps through the four stubs 1000 times a second
+  min_rotations_per_packet: 10 # 26.7 at 1000 Hz
+  element_length_m: 0.17       # helical stub
 
 receivers:                     # drones that listen
   - name: midair_quad

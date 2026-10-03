@@ -21,7 +21,7 @@ from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from scipy.spatial.transform import Rotation
-from sensor_msgs.msg import CameraInfo, FluidPressure, Image, Imu, NavSatFix
+from sensor_msgs.msg import CameraInfo, FluidPressure, Image, Imu, LaserScan, NavSatFix
 from std_msgs.msg import Bool, String
 from tf2_ros import StaticTransformBroadcaster, TransformBroadcaster
 
@@ -39,6 +39,8 @@ from gnss_projection import geodetic_to_enu, geodetic_covariance_to_enu
 from gnss_velocity_fit import fit_position_velocity
 from frame_conversions import gazebo_optical_to_flu, gazebo_down_optical_to_flu
 from visual_update_math import direction_update_terms
+from metric_flow import track_pair, estimate_metric_velocity, range_jump_detected, flow_update_due
+from vio.vision.optical_flow import FlowConfig
 
 
 def msg_time(msg):
@@ -67,6 +69,10 @@ class FrozenEskfAdapter(Node):
         if self.rf_fix:
             with rf_config.open(encoding="utf-8") as f:
                 self.rf_cfg = yaml.safe_load(f)["eskf_rf_fix"]
+        self.metric_flow_enabled = bool(self.declare_parameter("metric_flow", False).value)
+        self.flow_range_std_m = float(self.declare_parameter("flow_range_std_m", 0.02).value)
+        self.flow_max_range_jump_m = float(self.declare_parameter("flow_max_range_jump_m", 0.75).value)
+        self.flow_update_every_n = max(1, int(self.declare_parameter("flow_update_every_n", 5).value))
         camera = self.vio_cfg["cameras"][self.fc["camera"]]
         self.R_bc = gazebo_optical_to_flu()
         self.camera = CameraSetup.from_config(self.vio_cfg, self.fc["camera"])
@@ -98,6 +104,7 @@ class FrozenEskfAdapter(Node):
         self.accel_history = []
         self.gyro_history = []
         self.time_history = []
+        self.attitude_history = []
         self.vel_history = []
         self.clone_index = None
         self.clone_stamp = None
@@ -109,6 +116,16 @@ class FrozenEskfAdapter(Node):
         self.rf_rejections = 0
         self.camera_frames = 0
         self.camera_spans = 0
+        self.down_camera_K = None
+        self.down_prev_gray = None
+        self.down_prev_stamp = None
+        self.down_range = None
+        self.down_range_stamp = None
+        self.down_range_jump_until = -math.inf
+        self.down_prev_range = None
+        self.down_flow_frame = 0
+        self.down_flow_cfg = FlowConfig(min_tracks=20, min_inlier_ratio=0.50,
+                                        ransac_threshold_px=1.0, max_residual_px=2.0)
         self.last_direction_innovation_deg = None
         self.pub = self.create_publisher(Odometry, "/nav/odom", qos_profile_sensor_data)
         self.status_pub = self.create_publisher(String, "/nav/estimator_status", 10)
@@ -122,10 +139,13 @@ class FrozenEskfAdapter(Node):
         self.create_subscription(FluidPressure, "/air_pressure", self.on_baro, qos_profile_sensor_data)
         self.create_subscription(CameraInfo, "/camera/forward/camera_info", self.on_camera_info, qos_profile_sensor_data)
         self.create_subscription(Image, "/camera/forward/image_raw", self.on_image, qos_profile_sensor_data)
+        self.create_subscription(CameraInfo, "/camera/down/camera_info", self.on_down_camera_info, qos_profile_sensor_data)
+        self.create_subscription(Image, "/camera/down/image_raw", self.on_down_image, qos_profile_sensor_data)
+        self.create_subscription(LaserScan, "/range/down", self.on_down_range, qos_profile_sensor_data)
         self.get_logger().info(
             f"ESKF adapter ready; GNSS{' and RF' if self.rf_fix else ''} initialize/update position; vision rotation={self.vision_rotation}, "
             f"direction={self.vision_direction}; tracker reanchor floor={self.tracker_cfg.min_tracks} "
-            f"(pose minimum={self.pose_cfg.min_correspondences}); no ground-truth subscription")
+            f"(pose minimum={self.pose_cfg.min_correspondences}); metric flow={self.metric_flow_enabled}; no ground-truth subscription")
 
     def on_gnss(self, msg):
         t = msg_time(msg)
@@ -293,6 +313,7 @@ class FrozenEskfAdapter(Node):
         # Keep velocity and IMU history indices aligned for camera intervals that
         # reference startup frames preceding filter initialization.
         self.vel_history = [self.filter.v.copy() for _ in self.time_history]
+        self.attitude_history = [self.filter.R for _ in self.time_history]
         self.t0 = t
         self.last_gnss_update_stamp = t
         if source == "GNSS":
@@ -308,6 +329,96 @@ class FrozenEskfAdapter(Node):
     def on_camera_info(self, msg):
         if msg.width and msg.height:
             self.K = np.asarray(msg.k, dtype=float).reshape(3, 3)
+
+    def on_down_camera_info(self, msg):
+        if msg.width and msg.height:
+            self.down_camera_K = np.asarray(msg.k, dtype=float).reshape(3, 3)
+
+    def on_down_range(self, msg):
+        vals = np.asarray(msg.ranges, dtype=float)
+        finite = vals[np.isfinite(vals) & (vals >= msg.range_min) & (vals <= msg.range_max)]
+        t = msg_time(msg)
+        if len(finite):
+            value = float(np.median(finite))
+            if range_jump_detected(self.down_prev_range, value, self.flow_max_range_jump_m):
+                self.down_range_jump_until = t + 0.5
+            self.down_prev_range = value
+            self.down_range, self.down_range_stamp = value, t
+        else:
+            self.down_range, self.down_range_stamp = None, t
+
+    def on_down_image(self, msg):
+        if not self.metric_flow_enabled:
+            return
+        stamp = msg_time(msg)
+        h, w = msg.height, msg.width
+        data = np.frombuffer(msg.data, dtype=np.uint8)
+        enc = msg.encoding.lower()
+        if enc in ("rgb8", "bgr8"):
+            image = data.reshape(h, msg.step)[:, :w * 3].reshape(h, w, 3)
+            gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY if enc == "rgb8" else cv2.COLOR_BGR2GRAY)
+        elif enc == "mono8":
+            gray = data.reshape(h, msg.step)[:, :w]
+        else:
+            return
+        if self.down_prev_gray is None:
+            self.down_prev_gray, self.down_prev_stamp = gray, stamp
+            return
+        dt = stamp - self.down_prev_stamp
+        pair = None
+        diag = {"event": "metric_flow", "stamp": stamp, "dt": dt,
+                "range_m": self.down_range if self.down_range is not None else math.nan,
+                "tracked": 0, "inliers": 0, "inlier_ratio": 0.0,
+                "accepted": None, "update_attempted": False, "reason": "waiting for initialization"}
+        if self.filter is not None and self.down_camera_K is not None and self.time_history and dt > 0:
+            i0 = int(np.argmin(np.abs(np.asarray(self.time_history) - self.down_prev_stamp)))
+            i1 = int(np.argmin(np.abs(np.asarray(self.time_history) - stamp)))
+            if (i1 > i0 and len(self.attitude_history) == len(self.time_history)
+                    and abs(self.time_history[i0] - self.down_prev_stamp) < 0.08
+                    and abs(self.time_history[i1] - stamp) < 0.08):
+                pair = track_pair(self.down_prev_gray, gray, self.down_camera_K, self.down_flow_frame,
+                                  i0, i1, self.down_flow_cfg)
+                diag.update(tracked=pair.n_tracked, inlier_ratio=pair.inlier_ratio,
+                            reason=pair.reason or "", valid_flow_count=len(pair.xa),
+                            ransac_inliers=len(pair.xa))
+                if pair.valid:
+                    R0 = self.attitude_history[i0].as_matrix()
+                    R1 = self.attitude_history[i1].as_matrix()
+                    Rbc = gazebo_down_optical_to_flu()
+                    Rab = Rbc.T @ R0.T @ R1 @ Rbc
+                    # ENU world down; SDF's +90 degree camera pose points optical +Z down.
+                    ncam = (R0 @ Rbc).T @ np.array([0.0, 0.0, -1.0])
+                    beam_world = (R0 @ Rbc)[:, 2]
+                    vertical_cos = max(0.0, float(np.dot(beam_world, np.array([0.0, 0.0, -1.0]))))
+                    range_fresh = (self.down_range is not None and self.down_range_stamp is not None
+                                   and 0 <= stamp - self.down_range_stamp <= 0.15)
+                    flow = estimate_metric_velocity(pair, Rab, ncam,
+                        self.down_range * vertical_cos if range_fresh else math.nan, dt,
+                        float(self.down_camera_K[0, 0]), self.down_flow_cfg,
+                        self.flow_range_std_m * vertical_cos)
+                    diag.update({"range_m": self.down_range if range_fresh else math.nan,
+                                 "flow_u_px_s": flow["flow_u_px_s"], "flow_v_px_s": flow["flow_v_px_s"],
+                                 "flow_spread_px_s": flow["flow_spread_px_s"],
+                                 "fit_inliers": flow["inliers"], "quality": pair.inlier_ratio,
+                                 "measured_velocity_camera": flow["velocity"].tolist() if flow["valid"] else None,
+                                 "measurement_covariance": flow["covariance"].tolist() if flow["valid"] else None,
+                                 "reason": flow["reason"]})
+                    if stamp < self.down_range_jump_until:
+                        flow["valid"], flow["reason"] = False, "range discontinuity"
+                        diag["reason"] = flow["reason"]
+                    if flow["valid"]:
+                        if flow_update_due(self.down_flow_frame, self.flow_update_every_n):
+                            res = self.filter.update_camera_velocity_xy(flow["velocity"], Rbc,
+                                flow["covariance"], self.fc["gate_prob"])
+                            diag.update(accepted=res.accepted, update_attempted=True,
+                                        nis=res.nis, reason=res.reason)
+                        else:
+                            diag.update(accepted=None, reason="correlated image-pair update decimated")
+                self.down_flow_frame += 1
+            else:
+                diag["reason"] = "image/IMU timestamp not bracketed"
+        self.status_pub.publish(String(data=json.dumps(diag)))
+        self.down_prev_gray, self.down_prev_stamp = gray, stamp
 
     def publish_sensor_transforms(self):
         transforms = []
@@ -339,13 +450,17 @@ class FrozenEskfAdapter(Node):
             self.accel_history.append(a)
             self.gyro_history.append(w)
             self.time_history.append(t)
+            self.attitude_history.append(self.filter.R if self.filter is not None else None)
             self.try_initialize_from_measurements()
+            if self.filter is not None:
+                self.attitude_history = [self.filter.R for _ in self.time_history]
             return
         if self.last_imu is None:
             self.last_imu = (t, a, w)
             self.accel_history.append(a)
             self.gyro_history.append(w)
             self.time_history.append(t)
+            self.attitude_history.append(self.filter.R)
             self.vel_history.append(self.filter.v.copy())
             self.sample_index = 0
             self.publish_state(t)
@@ -359,6 +474,7 @@ class FrozenEskfAdapter(Node):
         self.accel_history.append(a)
         self.gyro_history.append(w)
         self.time_history.append(t)
+        self.attitude_history.append(self.filter.R)
         self.vel_history.append(self.filter.v.copy())
         if self.sample_index % 20 == 0:
             self.update_baro(t)

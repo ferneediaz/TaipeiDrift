@@ -133,7 +133,10 @@ def camera_velocity_from_flow(xa: np.ndarray, xb: np.ndarray, R_ab_cam: np.ndarr
     b = (f * Z[:, None]).ravel()
     w = 1.0 / Z.repeat(2)  # residuals in flow units (normalised coordinates)
     for _ in range(2):
-        t, *_ = np.linalg.lstsq(A * w[:, None], b * w, rcond=None)
+        Aw = A * w[:, None]
+        if np.linalg.matrix_rank(Aw) < 3 or np.linalg.cond(Aw.T @ Aw) > 1e8:
+            return None
+        t, *_ = np.linalg.lstsq(Aw, b * w, rcond=None)
         res = (A @ t - b) * w
         per = np.hypot(res[0::2], res[1::2])
         thr = 3.0 * max(np.median(per), 1e-9)
@@ -142,12 +145,19 @@ def camera_velocity_from_flow(xa: np.ndarray, xb: np.ndarray, R_ab_cam: np.ndarr
             break
         A, b, w = A[good], b[good], w[good]
     res = (A @ t - b) * w
-    sigma = float(np.sqrt(np.mean(res**2)))
+    # LK localization is not exact even when the plane fit residual looks nearly
+    # zero (especially on quantized/synthetic frames). A half-pixel floor keeps
+    # the propagated velocity covariance tied to focal length and dt rather than
+    # spuriously collapsing to a tiny value.
+    sigma = max(float(np.sqrt(np.mean(res**2))), 0.5 / max(float(focal_px), 1.0))
     residual_px = sigma * focal_px
     if residual_px > cfg.max_residual_px:
         return None
     Aw = A * w[:, None]
-    cov_t = np.linalg.inv(Aw.T @ Aw) * max(sigma, 1e-12) ** 2
+    normal = Aw.T @ Aw
+    if np.linalg.matrix_rank(Aw) < 3 or np.linalg.cond(normal) > 1e8:
+        return None
+    cov_t = np.linalg.pinv(normal) * sigma**2
     return FlowVelocity(t / dt, cov_t[:2, :2] / dt**2, residual_px, len(A) // 2)
 
 

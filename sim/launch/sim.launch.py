@@ -18,9 +18,11 @@ ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_tra
          beacon over the drone so the overview shows where it is;
          default (auto): in the strait world only
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
-         the down-camera view (with the ships: the RSSI map, nodes/rssi_map.py; the down camera is then a panel
+         the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera is then a panel
          in the Gazebo window)
-         and a terminal with the live sensor monitor (nodes/sensor_monitor.py) on the desktop
+         and the navigation dashboard (nodes/nav_dashboard.py) on the desktop
+monitor  with demo: window (default) opens the navigation dashboard; terminal opens the same information in a
+         terminal (nodes/sensor_monitor.py)
 gnss_cutoff_s     seconds after the first raw GPS fix when the GNSS gate closes (nodes/gnss_gate.py); negative: never
 gnss_cut_s        legacy spelling for gnss_cutoff_s
 record_mode       light records sensor and pose topics to outputs/sim_runs/<run>/rosbag2; full also the images;
@@ -106,8 +108,46 @@ OVERVIEW_TOPIC = "/views/overview"
 OVERVIEW_POSE = (425.0, -1700.0, 1100.0, 0.0, 0.53, 1.5708)
 
 
+def df_antenna_sdf(rf_cfg: dict) -> list:
+    """The direction finder, from config/rf.yaml, built like the pseudo-Doppler UAS payload of Gerhard and Tokekar
+    (arXiv 2003.00386, figure 1): four fixed VHF stubs standing on the rotor arms at the corners of a square, each on
+    an SMA mount with its coax running inboard, into an RF switch and a software-defined radio on the body (their
+    HackRF One and Opera Cake). No moving parts. Returns visuals of base_link."""
+    df = rf_cfg["direction_finder"]
+    n, radius, length = df["elements"], df["array_radius_m"], df["element_length_m"]
+    arm_top, top = 0.015, 0.02                    # top of the arms and of the body box, in base_link
+    def colour(rgb):
+        return f"<material><ambient>{rgb} 1</ambient><diffuse>{rgb} 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>"
+    black, grey, silver, board = (colour(c) for c in ("0.04 0.04 0.04", "0.3 0.3 0.32", "0.78 0.78 0.8",
+                                                      "0.08 0.25 0.12"))
+    def cyl(name, pose, r, h, mat):
+        return (f'<visual name="{name}"><pose>{pose}</pose><geometry><cylinder><radius>{r}</radius>'
+                f"<length>{h}</length></cylinder></geometry>{mat}</visual>")
+    def box(name, pose, size, mat):
+        return f'<visual name="{name}"><pose>{pose}</pose><geometry><box><size>{size}</size></box></geometry>{mat}</visual>'
+    parts = [  # RF switch board under the radio, as the Opera Cake sits under the HackRF
+        box("df_switch_board", f"0 0 {top + 0.003} 0 0 0", "0.085 0.06 0.006", board),
+        box("df_radio", f"0 0 {top + 0.017} 0 0 0", "0.075 0.05 0.022", grey),
+    ]
+    stub = length - 0.03                          # the helical section; a thinner tip above it
+    for k in range(n):
+        yaw = math.pi / 4 + 2 * math.pi * k / n   # along the arms (the arms are at +-45 and +-135 deg)
+        x, y = radius * math.cos(yaw), radius * math.sin(yaw)
+        z = arm_top
+        parts += [
+            box(f"df_mount_{k}", f"{x} {y} {z + 0.003} 0 0 {yaw}", "0.024 0.024 0.006", grey),
+            cyl(f"df_sma_{k}", f"{x} {y} {z + 0.012} 0 0 0", 0.005, 0.012, silver),
+            cyl(f"df_stub_{k}", f"{x} {y} {z + 0.018 + stub / 2} 0 0 0", 0.0065, stub, black),
+            cyl(f"df_tip_{k}", f"{x} {y} {z + 0.018 + stub + 0.0125} 0 0 0", 0.004, 0.025, black),
+            # the coax from the mount inboard along the arm to the switch board
+            cyl(f"df_coax_{k}", f"{x / 2} {y / 2} {z + 0.004} 0 1.5708 {yaw}", 0.002, radius, black),
+        ]
+    return [ET.fromstring(v) for v in parts]
+
+
 def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: float = 0.30, views: bool = False,
-              wind: bool = False) -> Path:
+              wind: bool = False, rf_cfg: dict = None, range_min_m: float = 0.20, range_max_m: float = 100.0,
+              range_noise_std_m: float = 0.02) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
     if wind:
         ET.SubElement(tree.find("model"), "enable_wind").text = "true"
@@ -116,6 +156,10 @@ def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: 
     forward_image = link.find("sensor[@name='camera_forward']/camera/image")
     image.find("width").text = image.find("height").text = str(cam_res)
     forward_image.find("width").text = forward_image.find("height").text = str(cam_res)
+    range_sensor = link.find("sensor[@name='range_down']/lidar/range")
+    range_sensor.find("min").text = str(range_min_m)
+    range_sensor.find("max").text = str(range_max_m)
+    link.find("sensor[@name='range_down']/lidar/noise/stddev").text = str(range_noise_std_m)
     if not gps:
         link.remove(link.find("sensor[@name='navsat']"))
     if stereo:
@@ -134,6 +178,10 @@ def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: 
             '<visual name="beacon"><pose>0 0 30 0 0 0</pose><geometry><sphere><radius>15</radius></sphere>'
             '</geometry><material><ambient>1 0.1 0.1 1</ambient><diffuse>1 0.1 0.1 1</diffuse>'
             '<emissive>0.6 0 0 1</emissive></material></visual>'))
+    if rf_cfg:
+        base = tree.find(".//link[@name='base_link']")
+        for element in df_antenna_sdf(rf_cfg):
+            base.append(element)
     tree.write(GENERATED_MODEL, xml_declaration=True, encoding="utf-8")
     return GENERATED_MODEL
 
@@ -174,7 +222,7 @@ def overview_camera_sdf() -> Path:
 def views_gui_config() -> Path:
     """The Gazebo window for the strait world: the 3rd-person chase view of the drone, with two panels beside it:
     the overview of the ships and the drone's down camera (the desktop's top-right slot holds
-    the RSSI map instead, nodes/rssi_map.py). The far clip is raised so ships kilometres away
+    the RF navigation display instead, nodes/aoa_map.py). The far clip is raised so ships kilometres away
     are drawn (the default cuts them off)."""
     text = (SIM / "config/gui.config").read_text()
     text = text.replace("<camera_pose>-6 0 6 0 0.5 0</camera_pose>",
@@ -290,6 +338,9 @@ def setup(context):
     gui = LaunchConfiguration("gui").perform(context).lower() == "true"
     world = SIM / "worlds" / f"{LaunchConfiguration('world').perform(context)}.sdf"
     demo = LaunchConfiguration("demo").perform(context).lower() == "true"
+    monitor = LaunchConfiguration("monitor").perform(context).lower()
+    if monitor not in ("window", "terminal"):
+        sys.exit("monitor must be window or terminal")
     stereo = LaunchConfiguration("stereo").perform(context).lower() == "true"
     stereo_baseline_m = float(LaunchConfiguration("stereo_baseline_m").perform(context))
     ships = LaunchConfiguration("ships").perform(context).lower()
@@ -302,6 +353,13 @@ def setup(context):
     run_label = LaunchConfiguration("run_label").perform(context).strip()
     if run_label and not re.fullmatch(r"[A-Za-z0-9_-]+", run_label):
         sys.exit("run_label may contain only letters, numbers, underscores, and hyphens")
+    metric_flow = LaunchConfiguration("metric_flow").perform(context).lower() == "true"
+    range_min_m = float(LaunchConfiguration("range_min_m").perform(context))
+    range_max_m = float(LaunchConfiguration("range_max_m").perform(context))
+    range_noise_std_m = float(LaunchConfiguration("range_noise_std_m").perform(context))
+    flow_update_every_n = max(1, int(LaunchConfiguration("flow_update_every_n").perform(context)))
+    if not (0 < range_min_m < range_max_m and range_noise_std_m >= 0):
+        sys.exit("range_min_m/range_max_m/noise must satisfy 0 < min < max and noise >= 0")
     if not world.exists():
         sys.exit(f"No world {world}. Choose one of: {', '.join(sorted(w.stem for w in world.parent.glob('*.sdf')))}")
     if record_mode not in ("off", "light", "full"):
@@ -320,12 +378,15 @@ def setup(context):
         except ValueError:
             sys.exit(f"wind must be SPEED_MPS,FROM_DEG (for example 6,20), not {wind!r}")
         world_file = windy_world(world, speed, from_deg)
-    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, views=ships, wind=world_file != world)
+    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, views=ships, wind=world_file != world,
+                      rf_cfg=yaml.safe_load(RF_CONFIG.read_text()) if ships else None,
+                      range_min_m=range_min_m, range_max_m=range_max_m, range_noise_std_m=range_noise_std_m)
     gui_config = views_gui_config() if ships else SIM / "config/gui.config"
     sim_time = {"use_sim_time": True}
 
     run_id = dt.datetime.now().strftime(f"{world.stem}_%Y%m%d_%H%M%S")
-    run_dir = (SIM.parent / "outputs" / "sim_runs" / "velocity_phase" / run_label
+    output_phase = "metric_velocity" if metric_flow or run_label.startswith("OF") else "velocity_phase"
+    run_dir = (SIM.parent / "outputs" / "sim_runs" / output_phase / run_label
                if run_label else SIM.parent / "outputs" / "sim_runs" / run_id)
     run_dir.mkdir(parents=True, exist_ok=False)
     try:
@@ -362,6 +423,11 @@ def setup(context):
         "sim_tracker_min_tracks": pose_cfg["min_correspondences"],
         "pose_min_correspondences": pose_cfg["min_correspondences"], "pose_min_inliers": pose_cfg["min_inliers"],
         "gnss_velocity_fit": velocity_fit_config,
+        "metric_flow": {"enabled": metric_flow, "algorithm": "Shi-Tomasi/LK + homography RANSAC + ESKF-attitude derotation",
+                        "range_min_m": range_min_m, "range_max_m": range_max_m,
+                        "range_noise_std_m": range_noise_std_m, "range_topic": "/range/down",
+                        "update_every_n_images": flow_update_every_n,
+                        "update_rate_qualifier": "consecutive image-pair temporal correlation decimation"},
         "gnss_local_enu_origin": {"latitude_deg": gps_origin[0], "longitude_deg": gps_origin[1],
                                    "elevation_m": gps_origin[2]},
     }
@@ -375,11 +441,15 @@ def setup(context):
     (run_dir / "config.json").write_text(json.dumps({"world": world.stem, "demo": demo, "cam_res": cam_res,
         "gnss_cutoff_s_since_first_fix": gnss_cut_s, "record_mode": record_mode, "ships": ships,
         "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true",
+        "metric_flow": metric_flow, "range_min_m": range_min_m, "range_max_m": range_max_m,
+        "range_noise_std_m": range_noise_std_m,
+        "flow_update_every_n": flow_update_every_n,
         "gnss_velocity_fit": velocity_fit_config}, indent=2), encoding="utf-8")
     (run_dir / "sim.log").write_text(f"Run {run_id}; launch logs are emitted by ros2 launch.\n", encoding="utf-8")
     bag_topics = ["/ground_truth/odom", "/sim/gps_raw", "/gps/fix", "/nav/gnss_available",
                   "/sim/imu_raw", "/imu/data", "/sim/air_pressure_raw", "/air_pressure", "/tf", "/tf_static",
                   "/camera/down/camera_info", "/camera/forward/camera_info", "/nav/odom", "/nav/estimator_status"]
+    bag_topics += ["/range/down"]
     if ships:
         bag_topics += ["/rf/detections", "/rf_nav/odom", "/nav_rf/odom", "/nav_rf/estimator_status"]
     if record_mode == "full":
@@ -389,6 +459,9 @@ def setup(context):
     estimator = [sys.executable, str(SIM / "nodes/eskf_ros_adapter.py"),
                  "--ros-args", "-p", f"vision_rotation:={vision_rotation}",
                  "-p", f"vision_direction:={vision_direction}",
+                 "-p", f"metric_flow:={str(metric_flow).lower()}",
+                 "-p", f"flow_range_std_m:={range_noise_std_m}",
+                 "-p", f"flow_update_every_n:={flow_update_every_n}",
                  "-p", f"gps_origin_latitude:={gps_origin[0]}",
                  "-p", f"gps_origin_longitude:={gps_origin[1]}",
                  "-p", f"gps_origin_elevation:={gps_origin[2]}"]
@@ -453,12 +526,16 @@ def setup(context):
                                     *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else [])],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
-            # down camera is a panel in the Gazebo window and this slot shows the RSSI map.
+            # down camera is a panel in the Gazebo window and this slot shows the RF navigation display.
             TimerAction(period=20.0, actions=[
-                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/rssi_map.py"), "--world", world.stem],
-                               output="screen") if ships else
+                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem],
+                               output="screen", respawn=True, respawn_delay=2.0) if ships else
                 Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
-            ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "150x55", "-fa", "Monospace", "-fs", "9",
+            # the lower-right corner of the 1920 x 1080 desktop, under the RF navigation display: the navigation
+            # dashboard window (monitor:=window) or the same information in a terminal (-0-0: right, bottom)
+            ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/nav_dashboard.py"), "--world", world.stem],
+                           output="screen", respawn=True, respawn_delay=2.0) if monitor == "window" else
+            ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "118x42-0-0", "-fa", "Monospace", "-fs", "8",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
                                 str(SIM / "nodes/sensor_monitor.py"), "--world", world.stem]),
         ]
@@ -473,6 +550,7 @@ def generate_launch_description():
         DeclareLaunchArgument("gui", default_value="true"),
         DeclareLaunchArgument("world", default_value="terrain"),
         DeclareLaunchArgument("demo", default_value="false"),
+        DeclareLaunchArgument("monitor", default_value="window", description="with demo: the dashboard window, or terminal"),
         DeclareLaunchArgument("stereo", default_value="false"),
         DeclareLaunchArgument("stereo_baseline_m", default_value="0.30"),
         DeclareLaunchArgument("wind", default_value="none"),
@@ -483,6 +561,11 @@ def generate_launch_description():
         DeclareLaunchArgument("vision_rotation", default_value="true"),
         DeclareLaunchArgument("vision_direction", default_value="true"),
         DeclareLaunchArgument("run_label", default_value=""),
+        DeclareLaunchArgument("metric_flow", default_value="false"),
+        DeclareLaunchArgument("range_min_m", default_value="0.20"),
+        DeclareLaunchArgument("range_max_m", default_value="100.0"),
+        DeclareLaunchArgument("range_noise_std_m", default_value="0.02"),
+        DeclareLaunchArgument("flow_update_every_n", default_value="5"),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])

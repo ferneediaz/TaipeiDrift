@@ -1,11 +1,11 @@
 # Finding the drone's position from ships' radio (AIS), without GPS
 
-In the `strait` world, three warships transmit AIS radio. The drone's GPS is cut 20 s into the flight. It listens to the ships and works out where it is in two ways:
+In the `strait` world, three warships transmit AIS radio. The drone's GPS is cut 20 s into the flight. It listens to the ships and works out where it is from the angle of arrival (AoA) of their signals, shown two ways:
 
-1. **From bearings:** the direction each signal comes from. This is the navigator, `nodes/rf_nav.py`, good to tens of metres.
-2. **From signal strength (RSSI):** how strong each signal is. This is the live map, `nodes/rssi_map.py`, good to a few hundred metres. It is for watching only.
+1. **Filtered:** the bearing (AoA) to each ship, the direction its signal comes from. This is the navigator, `nodes/rf_nav.py`, good to tens of metres.
+2. **On screen:** the RF navigation display, `nodes/aoa_map.py`, which shows that estimate, the bearings it uses and its error against the truth. Signal strength (RSSI) is not used for the position: it is good only to a few hundred metres.
 
-This document explains the radio, what the drone measures, the math of both methods, how well they work and how to run them.
+This document explains the radio, what the drone measures, the math, how well they work and how to run them.
 
 ## Run it
 
@@ -21,8 +21,8 @@ docker compose exec sim bash -ic "python3 sim/scripts/check_rf.py"           # c
 |---|---|
 | Gazebo window, main view | the drone from behind (3rd person) |
 | Gazebo window, right-hand panels | overview of the ships (red ball = drone), the drone's down camera |
-| Top right | the RSSI map: where the drone could be from signal strength alone |
-| Bottom right | the sensor monitor: the NAVIGATION table (RF only, ESKF, ESKF + RF, each against the truth), the sensors, each ship's RSSI and bearing |
+| Top right | the RF navigation display: rf_nav's estimate, its 95 % region, the lines of position and a readout |
+| Bottom right | the navigation dashboard: Overview (GNSS state, each estimator's position error, 2σ bound, heading and height error, sensor health), Navigation, Sensors, AIS (each ship's range, angle of arrival and its error, packets) |
 
 ## 1. The radio: AIS
 
@@ -54,7 +54,31 @@ For each packet it decodes, `nodes/rf_sensor.py` publishes on `/rf/detections`:
 | `rssi_dbm` | received signal strength | true received power + 1 dB noise, rounded to 1 dB |
 | `azimuth_body_rad` | bearing to the ship, measured from the drone's nose | true bearing + noise σ 3° + a fixed 1° mounting error |
 
-A **bearing** is the direction something lies in, as an angle. A bearing of 60° means the ship is 60° to the left of straight ahead. It says which way, not how far. Measuring it needs a direction-finding antenna: several antennas spaced apart, which compare when the wave reaches each one.
+A **bearing** is the direction something lies in, as an angle. A bearing of 60° means the ship is 60° to the left of straight ahead. It says which way, not how far. It is the signal's angle of arrival (AoA).
+
+**The antenna that measures it.** The drone carries a pseudo-Doppler direction finder, built by the launch file from `direction_finder` in `config/rf.yaml` (strait world only; the Mid-Air model file is unchanged). It copies a design that has flown on a four-rotor UAS at 150 MHz, close to AIS: Gerhard and Tokekar, [Experimental Evaluation of a Pseudo-Doppler Direction-Finding System for Localizing Radio Tags](https://arxiv.org/pdf/2003.00386) (Virginia Tech, 2020), figure 1. It has no moving parts.
+- **The array:** four 17 cm helical VHF stubs standing on the rotor arms, 9.5 cm from the centre, inboard of the propeller discs. They form a square with 13 cm sides, 0.07 wavelength. A square array is unambiguous while its side is under 0.35 wavelength; `rf_sensor.py` refuses a larger one.
+- **How it measures the angle:** an RF switch connects the four stubs one after another to a single receiver, 1000 times a second. The received phase then moves as if one antenna were circling, so a ship off to one side produces a Doppler tone. The phase of that tone against the switching gives the bearing. An AIS packet lasts 26.67 ms, which is 26.7 electronic rotations; `rf_sensor.py` refuses fewer than 10.
+- **The radio:** the switch board and a software-defined radio sit on the body, as the paper's Opera Cake and HackRF One do. The packets are decoded through the same stubs, so there is no separate whip. A helical stub picks up about 5 dB less than a full whip (`antenna_gain_db: -5`). At these ranges the ships are still 70 dB or more above the noise, so the 3° floor (calibration, multipath off the airframe) sets the accuracy.
+
+**Where the design comes from.**
+
+- **The direct source:** Gerhard and Tokekar (Virginia Tech, 2020), [Experimental Evaluation of a Pseudo-Doppler Direction-Finding System for Localizing Radio Tags](https://arxiv.org/pdf/2003.00386), figure 1 on page 1. Four whips at the corners of a square feed one radio through an RF switch (their Opera Cake board and HackRF One), and the caption says the antennas "can be mounted on the arms of the hybrid UAS", a four-rotor VTOL drone. From it we take:
+  - four antennas in a square;
+  - mounted on the rotor arms;
+  - one RF switch and one radio (our green board and grey box);
+  - the size rules: under 0.35 wavelength for an unambiguous bearing, about 0.22 works best (their section III).
+
+  They flew it at 150 MHz, close to AIS's 162 MHz, and found a radio tag to within 5 m.
+- **Where they got it:** two older ideas.
+  - [Doppler direction finding](https://en.wikipedia.org/wiki/Doppler_radio_direction_finding): an antenna circling at a known rate sees the signal's frequency rise and fall, and the timing gives the direction. Pseudo-Doppler fakes the circling by switching fixed antennas; it is the standard tool of amateur-radio "fox hunting", which is where the paper's 0.22-wavelength rule comes from.
+  - [The Adcock array](https://en.wikipedia.org/wiki/Adcock_antenna) (Frank Adcock's patent of 1919): four vertical elements in a square, the standard direction-finding layout for a century, from 40 m masts to 13 cm tactical sets. Commercial direction finders still use circular arrays like this, in a radome, for example the [R&S ADD507](https://www.rohde-schwarz.com/us/products/aerospace-defense-security/compact-single-channel/rs-add507-compact-vhf-uhf-df-antenna_334290.html).
+- **Our own choices:** these adapt the design to this drone and to AIS; they are not from the paper.
+  - 17 cm helical stubs instead of the paper's full whips, to stay clear of the propellers.
+  - Placed 9.5 cm out on the arms, to fit the Mid-Air drone.
+  - Switching at 1 kHz with a minimum of 10 rotations per packet, for AIS's 26.67 ms packets. The paper tracked continuous tag beeps, not AIS.
+  - The mounts, the coax and the box's look are cosmetic.
+- **Why not a spinning antenna:** the first version of this drone carried a spinning loop. Rotating loops are historically real (the aircraft direction finders of the 1930s, such as the Bendix loop on Amelia Earhart's Lockheed Electra), but aviation replaced them with fixed antennas switched electronically, and no drone with a fast-spinning loop has been published. Drones that rotate a directional antenna, such as the wildlife-tracking multirotors that turn the whole drone with a Yagi ([ConservationBots](https://arxiv.org/pdf/2308.08104)), take seconds per bearing, too slow for 26.67 ms AIS packets.
 
 ```
             ship
@@ -97,62 +121,29 @@ bᵢ = atan2(yᵢ − y, xᵢ − x) − ψ
 - heading within 2° RMS;
 - the truth inside the filter's own 2σ ellipse 98 % of the time.
 
-## 4. Position from signal strength (RSSI): `nodes/rssi_map.py`
+## 4. The live RF navigation display: `nodes/aoa_map.py`
 
-This needs no special antenna and no heading, only a plain AIS receiver. It is much less accurate. Worked example: the carrier, heard at RSSI −28 dBm.
+The top-right window ("RF Navigation: AIS angle of arrival") shows rf_nav's estimate, the one that combines the angles of arrival, the gyro and the Kalman filter, and the bearings it uses. RSSI is not used. It has four parts:
 
-**Step 1. What the ship sends (EIRP).** Transmit power, plus its antenna gain, minus its cable loss, for a standard Class A installation:
+- **AIS lines of position** (left): the three ships, named, and from each one the line along its last bearing, dashed at ±2σ. The estimate is the red dot with its 95 % confidence region. The ground truth (simulation) is the gold star. Both tracks cover the last 60 s, with the truth dotted.
+- **Close-up** (top right): the same, around the drone, at least ±250 m and wider when needed.
+- **Readout** (bottom right):
 
-```
-EIRP = 41 dBm + 2.15 dB − 2 dB = 41.15 dBm
-```
+  | Field | What it is |
+  |---|---|
+  | GNSS | AVAILABLE, or DENIED with the time since the cut (`/nav/gnss_available`) |
+  | SOURCE | AIS AoA + GYRO |
+  | SHIPS | ships heard within the last 12 s |
+  | POSITION ERROR | the horizontal distance from the estimate to the truth, at the estimate's time (the terminal's "RF (AoA)" row) |
+  | EST. ACCURACY 2σ | the filter's own uncertainty, 2·√(var_x + var_y) |
+  | INTEGRITY | WITHIN 95 % BOUND when the truth lies inside the 95 % ellipse (squared Mahalanobis distance under 5.99), otherwise BOUND EXCEEDED |
+  | HEADING ERROR | the filter's heading against the truth |
+  | SNAPSHOT ERROR | the error of a fix from the last three bearings alone, with no filter and no memory (rf_nav's resection): what the filter adds |
+- **Legend** (under the map), so it covers nothing.
 
-**Step 2. How much was lost on the way.** Our antenna adds 0 dB:
+**Drawing the bearings.** A bearing is measured from the drone's nose at its own time, and the drone turns between packets. Each one is turned to the estimate's time by the gyro, `bᵢ' = bᵢ − (yaw_gyro(t) − yaw_gyro(tᵢ))`, and drawn from the ship at the world angle `ψ + bᵢ' + 180°`, with ψ the filter's heading.
 
-```
-loss = EIRP − RSSI = 41.15 − (−28) = 69.15 dB
-```
-
-**Step 3. Loss to distance.** In free space the loss over a distance d is `20·log10(4π·d / λ)` dB, with λ = c / f = 1.85 m. Solving for d:
-
-```
-d = (λ / 4π) · 10^(loss / 20) = 0.147 · 10^(69.15 / 20) = 0.147 · 2,870 ≈ 422 m
-```
-
-The drone is on a circle of radius 422 m around the carrier.
-
-**Step 4. How sure that distance is.** The signal wobbles for reasons other than distance:
-
-| Source | dB |
-|---|---|
-| fading | 3 |
-| RSSI measurement error | 1 |
-| model error: the free-space formula ignores the sea reflection | 2 |
-| combined, σ = √(3² + 1² + 2²) | **3.7** |
-
-```
-d × 10^(±3.7/20)  =  d × 0.65 … d × 1.54  →  274 m … 650 m
-```
-
-On the map, the shaded ring around each ship is this band; it holds the drone about 68 % of the time. The band is measured in dB because fading multiplies the signal, so its error is symmetric in dB, not in metres.
-
-**Step 5. Combine the ships.** For every point (x, y) of a 10 m grid, compare its distance to each ship with the distance that ship's RSSI implies:
-
-```
-rᵢ   = √((x − xᵢ)² + (y − yᵢ)²)       distance from the point to ship i
-eᵢ   = 20·log10(rᵢ / dᵢ)               how far off that is, in dB
-cost = Σᵢ (eᵢ / σ)²
-```
-
-- **The ×:** the point with the lowest cost, the most likely position.
-- **Dark red:** `cost − min < 2.30`, the 68 % region.
-- **Light red:** `cost − min < 6.18`, the 95 % region.
-
-2.30 and 6.18 are the chi-square limits for two unknowns (x and y).
-
-**Step 6. Why three ships, enforced.** One ring could put the drone anywhere on it. Two rings usually cross at two points. The third ring picks one of them. So the map draws nothing until three different ships have been heard within the last 30 s (`MIN_SHIPS`). Until then it shows "Heard N of 3 ships".
-
-**Accuracy.** The ring's width grows with the distance: −35 % to +54 % is a ring about 600 m wide for a ship 1 km away. On top of that, the sea reflection makes the real signal 4 to 6 dB stronger or weaker than free space at some distances. In the example, the carrier was really about 750 m away, but its signal came in about 4 dB strong, so step 3 said 422 m. The receiver cannot know this. Typical error: a few hundred metres.
+**Why not RSSI.** Signal strength gives a distance by inverting free-space loss, but fading (3 dB), RSSI error (1 dB) and the sea reflection (2 dB) make it uncertain by about ±3.7 dB, which is −35 % to +54 % of the distance: a ring about 600 m wide for a ship 1 km away. That puts an RSSI-only fix hundreds of metres off (section 5), so RSSI is used only to decide whether a packet is decoded.
 
 ## 5. How good is it?
 
@@ -188,7 +179,7 @@ One snapshot from the current triangle of ships, simulated 400 times:
 | `nodes/ship_traffic.py` | sails the ships, publishes `/ships/<name>/odom` |
 | `nodes/rf_sensor.py` | the drone's AIS receiver and direction finder: `/rf/detections`, `/rf/truth` |
 | `nodes/rf_nav.py` | position from bearings: `/rf_nav/odom` |
-| `nodes/rssi_map.py` | the live RSSI map |
+| `nodes/aoa_map.py` | the live RF navigation display |
 | `scripts/check_rf.py` | checks the radio model and prints the link budget against range |
 | `scripts/check_rf_nav.py` | scores `rf_nav` and both ESKFs against ground truth and saves a plot to `data/sim/rf_nav/` |
 | `run.sh` | starts everything and opens the browser |

@@ -97,7 +97,8 @@ The Gazebo window appears in the browser tab. Launch options:
 | `stereo_baseline_m` | `0.30` | Stereo camera offset along body -Y (right), used when `stereo:=true` |
 | `gui` | `true` | `false` runs Gazebo without its window |
 | `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods), `islands` (two islands and open sea), `strait` (the islands with warships that transmit AIS) or `city` (roads and buildings) |
-| `demo` | `false` | `true` flies circles (in `islands` and `strait`: from island to island; in `city`: a loop through the streets) and opens the camera view and the sensor monitor |
+| `demo` | `false` | `true` flies circles (in `islands` and `strait`: from island to island; in `city`: a loop through the streets) and opens the camera view and the navigation dashboard (see `monitor`) |
+| `monitor` | `window` | with `demo`: `window` opens the navigation dashboard, `terminal` the same information in a terminal |
 | `ships` | `auto` | `true` sails AIS-transmitting ships and runs the drone's AIS receiver (see below); `auto` means on in `strait` only |
 | `wind` | `none` | `SPEED,FROM` in m/s and degrees, e.g. `6,20`: wind from the north-north-east with gusts; the drone leans into it |
 
@@ -275,8 +276,8 @@ GNSS is available at the start and is cut `gnss_cutoff_s` (20) seconds after its
 The browser desktop shows:
 - **Gazebo window, main view:** the chase camera behind the drone.
 - **Gazebo window, right-hand panels:** an overview from a fixed camera high in the south, showing the islands and all three ships, and the drone's down camera. A red ball floats 30 m above the drone so it can be found in the overview. It is only a visual, and the down camera does not see it.
-- **Top right:** the RSSI map (see [RF_README.md](RF_README.md)).
-- **Bottom right:** the sensor monitor.
+- **Top right:** the RF navigation display (see [RF_README.md](RF_README.md), section 4).
+- **Bottom right:** the navigation dashboard (`nodes/nav_dashboard.py`): tabs Overview (GNSS state; each estimator's position error, 2σ bound and whether the error is within it, heading and height error; sensor health), Navigation, Sensors and AIS. `monitor:=terminal` shows the same information in a terminal instead (`nodes/sensor_monitor.py`).
 
 `worlds/strait.sdf` is the islands world with three warships at full size. The scenery is the same, and the `islands` world itself has no ships. Each ship patrols a box at one corner of a triangle around the drone's route, so the drone always hears them from three well-separated directions:
 
@@ -313,7 +314,7 @@ The receiver loses about 10 dB against an ideal GMSK detector. That loss is comp
 | `/rf/params` | the receiver calibration and the bias drawn for this run (latched) |
 | `/ships/<name>/odom` | each ship's true position, heading and speed |
 
-The bearing is in the body frame because a direction finder measures it against the airframe. Each detection also carries the position the ship reports (latitude and longitude, from the ship's own GNSS, 3 m error), as a real AIS position report does. The sensor monitor shows each ship's range, packets decoded, last RSSI and bearing error.
+The bearing is in the body frame because a direction finder measures it against the airframe. In the strait world the drone carries one: a pseudo-Doppler array of four VHF stubs on its rotor arms, switched electronically, as flown on a four-rotor UAS by Gerhard and Tokekar ([arXiv 2003.00386](https://arxiv.org/pdf/2003.00386)). Where the design comes from, and what we changed: RF_README.md, section 2. Each detection also carries the position the ship reports (latitude and longitude, from the ship's own GNSS, 3 m error), as a real AIS position report does. The sensor monitor shows each ship's range, packets decoded, last angle of arrival (AoA) and its error.
 
 ### The drone's position from the ships, without GNSS
 
@@ -324,7 +325,7 @@ The bearing is in the body frame because a direction finder measures it against 
 - **Then a Kalman filter** (state: position, velocity, heading, gyro bias). The noisy gyro carries the heading between bearings, a constant-velocity model carries the position, and each new bearing corrects both. A bearing arrives every 2 to 3 s.
 - **Inputs:** only `/rf/detections` and the noisy IMU; never ground truth.
 
-**Position from signal strength only.** The top-right window, `nodes/rssi_map.py`, shows what a plain AIS receiver could do with no direction finder. Each ship's RSSI is turned into a distance by inverting free-space loss, assuming a nominal Class A installation (41 dBm EIRP). Around each ship it draws a circle at that distance, with a ring for ±3.7 dB of uncertainty (fading, RSSI error, the model being simpler than reality). Where the three rings overlap is shaded red, 68 % and 95 %, and the most likely point is marked with an ×. Nothing is drawn until three different ships have been heard within the last 30 s; until then the map says how many it has. The bearing estimate and the true position are drawn too, for comparison. It is typically hundreds of metres off, against tens of metres for bearings. The sea reflection makes the signal 4 to 6 dB stronger or weaker than free space at some distances, and the receiver cannot know which. The map is for watching only; the navigator does not use RSSI.
+**The RF navigation display.** The top-right window, `nodes/aoa_map.py`, shows rf_nav's estimate (angles of arrival, gyro and Kalman filter) with its 95 % confidence region, each ship's line of position, a close-up around the drone, and a readout: GNSS state, position error against the truth, the filter's own 2σ, whether the truth is within its 95 % bound, heading error, and the error of a snapshot fix from the last three bearings without the filter. RSSI is not used, and the display does not feed the navigation.
 
 To score it against ground truth, with a map and an error plot saved to `data/sim/rf_nav/`:
 
@@ -346,7 +347,7 @@ The strait world also runs the ESKF estimator (`nodes/eskf_ros_adapter.py`, from
 
 While GNSS is available, both get a velocity update from a robust least-squares line through the last 8 s of fixes (`nodes/gnss_velocity_fit.py`, settings `velocity_*` under `sim_gnss` in `vio/configs/midair_eskf.yaml`), on non-overlapping windows. With `rf_fix`, each `/rf_nav/odom` message that carries a new bearing (its covariance shrank) becomes a horizontal position update and a heading update, with rf_nav's own covariance. Unlike GNSS, no velocity is taken from the RF fixes: the RF error wanders slowly, and differences 5 s apart were off by about 10 m/s. If the gate rejects several fixes in a row, the ESKF has drifted and its position is reset to the fix. The settings are under `eskf_rf_fix` in `config/rf.yaml`. Without GNSS at all (`gps:=false`) the ESKF starts from the first RF fix.
 
-`check_rf_nav.py` scores all three, over the whole run and after the cutoff, and draws them on one map. The sensor monitor's NAVIGATION table shows the same comparison live: each estimate's distance from the truth, its own 2σ, the RMS since the cutoff, height and heading errors, and which updates it fused.
+`check_rf_nav.py` scores all three, over the whole run and after the cutoff, and draws them on one map. The navigation dashboard (Overview and Navigation tabs) and the terminal monitor's NAVIGATION table show the same comparison live: each estimate's distance from the truth, its own 2σ, the RMS since the cutoff, height and heading errors, and which updates it fused.
 
 ## Frames
 
@@ -371,6 +372,7 @@ config/sensor_noise.yaml    IMU noise bounds, barometer drift
 nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift and attitude zeroing
 nodes/gnss_gate.py          GNSS cutoff, counted from the first fix
 nodes/recorder.py           common replay-format recorder
+nodes/nav_dashboard.py      the navigation dashboard window: the same information as sensor_monitor.py, in tabs
 nodes/sensor_monitor.py     live sensor values in the terminal, and the NAVIGATION comparison of the estimates
 nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
 nodes/record_midair.py      records a flight in the Mid-Air dataset format
@@ -383,7 +385,7 @@ nodes/eskf_ros_adapter.py   the ESKF estimator: /nav/odom, and with rf_fix:=true
 nodes/gnss_gate.py          cuts GNSS gnss_cutoff_s after its first fix, publishes /nav/gnss_available
 nodes/run_logger.py         per-run CSV logs in outputs/sim_runs/<run>/
 scripts/check_rf_nav.py     scores rf_nav and both ESKFs against ground truth, saves a map and an error plot
-nodes/rssi_map.py           live map: where the drone could be from the ships' signal strength alone
+nodes/aoa_map.py            live RF navigation display: rf_nav's estimate, lines of position, readout
 scripts/check_rf.py         link budget table and checks of the RF model
 scripts/record_islands_set.sh  records a set of flights over the islands world
 scripts/frame_info.py       prints the sensor values recorded with one picture
