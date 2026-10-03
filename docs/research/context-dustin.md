@@ -11,7 +11,7 @@ Labels used everywhere:
 ## 0. In one minute
 
 1. **Your blocked held-out test can start now.** The three position files of the ALTO training section (`query.csv`, `reference.csv`, `gt_matches.csv`, 2.9 MB together) are on Ilhan's laptop. Section 1 says where and how.
-2. **We ran a held-out replication of the section 3.4 chain on Round 2 Train** (37.4 km, parameters frozen, protocol written before running). It reproduces Val in only 3 of 8 sections. **But it used the `offset_0_None` reference images: your leak.** It has to be rerun with your one-map search. Section 2.
+2. **Your navigator, leak-free, on Round 2 Train** (37.4 km, parameters frozen, protocol written before running): we reran it after it reproduced your Val table exactly. With a fix every 300 m and the score check, the median of the 8 section medians is 130.6 m against your 31.1 m on Val, and your stated uncertainty holds in 70 % of frames instead of 97–100 %. Val does not transfer. Section 2.
 3. **Integrity without a learned threshold**: four disjoint sub-templates of the same frame must agree ("quad ≥ 3"). It complements your finding that agreement of nearby frames fails. Section 3.
 4. **Scale is the weak point**: on Round 2, the zoom calibrated from three fixes before the jam is often wrong. Section 4.
 5. **Learned matchers do not help here**: XFeat 0/300 on real ALTO frames. Section 5.
@@ -64,7 +64,20 @@ Results: 8 sections of about 4.6 km plus the full 37 km, every parameter frozen 
 - with your circle search around the estimate, the cliff disappears on Val;
 - on Round 2 the result could go either way [INFERENCE]: more room to recover after a large drift, but also more look-alike places.
 
-**Rerunning this with your one-map search, built from the three Round 2 folders, is the most useful single experiment for the team.**
+**Done on 3 October, 12:56: the rerun with your navigator** (`experiments/w_dustin_heldout.py`; it imports your `baseline/src` from a detached worktree of `origin/alto-navigator` without changing it; protocol in `data/processed/w_dustin_heldout/preregistration.md`). It reproduced your four Val map rows of findings 3.8 exactly, fix counts included, before touching Round 2. One map from the three Round 2 folders (about ±40 m around the route), the same 8 sections, every setting frozen. MEASURED:
+
+| Config | Val (yours) | Round 2, median of section medians (min–max) | Fixes used / rejected / wrong > 50 m | Frames within 3 sigma, median section (min) |
+|---|---|---|---|---|
+| Camera only | 472 m | 219 m (68–420) | 0 / 0 / 0 | 100 % (75 %) |
+| Every 100 m, no check | 25.2 m | 50.2 m (17–437) | 289 / 31 / 95 | 39 % (9 %) |
+| Every 300 m, score check | 31.1 m | 130.6 m (26–1,135) | 47 / 76 / 6 | 70 % (15 %) |
+| Every 400 m, no check | 36.0 m | 170.5 m (50–419) | 71 / 5 / 44 | 33 % (16 %) |
+| Every 1,000 m, score check | 56.1 m | 98.3 m (43–783) | 16 / 20 / 3 | 82 % (24 %) |
+
+- The leak did not change the verdict: the leaky 300 m sized-search run gave 128.2 m, the leak-free one 130.6 m.
+- Without the score check, a third of the fixes used are wrong by more than 50 m.
+- Your stated uncertainty, which held in 97–100 % of frames on Val, holds in 70 % with fixes every 300 m on Round 2, and only 15 % in the worst section.
+- Figure: `data/processed/w_dustin_heldout/map_every_300_error_by_section.png`.
 
 Diagnosis, `experiments/t_alto_diag.py` (truth used only to score):
 1. **The zoom calibrated from 3 fixes before the jam is the first cause.** With a better zoom, correct fixes rise from 21–43 % to 86–100 % in sections 2, 3 and 7.
@@ -128,7 +141,7 @@ Your next step names UAV-VisLoc with full satellite maps. From our dataset audit
 | # | Task | Done when | Estimate |
 |---|---|---|---|
 | 1 | Get the Round 1 Train CSVs from Ilhan, run your held-out test on Round 1 Train with the one-map search | Your findings table on Train, parameters frozen | 1–2 h |
-| 2 | Same on Round 2 Train's 8 sections (three reference folders), to compare with section 2 above | Median, worst and end error per section; wrong fixes counted | 1–2 h |
+| 2 | ~~Same on Round 2 Train's 8 sections~~: done (section 2). Check our adapter `experiments/w_dustin_heldout.py` against your intent, especially the map built from three folders | You agree with the numbers or say what is wrong | 30 min |
 | 3 | Try quad ≥ 3 as an extra acceptance check next to the score and distance checks (logic in `experiments/r_integrity.py`) | Wrong fixes and fixes used, with and without | 2 h |
 | 4 | Feed the accepted fix zoom back as scale, and widen the zoom grid | End error vs the frozen chain on the same sections | 2–3 h |
 | 5 | Shared consistency plot with Alessandro (NEES or within 3 sigma) | One function used by both navigators | 1 h |

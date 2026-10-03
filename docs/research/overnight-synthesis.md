@@ -20,8 +20,13 @@ Labels: **MEASURED** (run here on real data), **SIMULATED** (declared generator)
 
 1. **ALTO's 26–31 m do not hold on a flight we never tuned on.**
    - ALTO Round 2 Train: 37.4 km of real flight, protocol written before running, parameters frozen.
-   - The team's chain gives a median of 94 m per section with a fix every 300 m (20–339 m depending on the section), against 31 m on Val. It reproduces Val in only 3 sections out of 8.
-   - The Val numbers must be presented as **tuned on the test section**. [MEASURED, `datasets-replay-sim.md`, on the leaky reference images]
+   - Leak-free rerun with Dustin's navigator (one map built from the three Round 2 reference folders, circle search around the estimate; it first reproduced findings 3.8 on Val exactly). Median of the 8 section medians:
+     - fix every 300 m with the score check: 130.6 m (25.5–1,135 m), against 31.1 m on Val;
+     - every 1,000 m with the score check: 98.3 m (43–783 m), against 56.1 m;
+     - every 100 m without a check: 50.2 m, but 95 of the 289 fixes used are more than 50 m wrong.
+   - The stated uncertainty no longer holds: with fixes every 300 m, the error stays within 3 sigma in 70 % of frames (median section, 15 % in the worst), against 97–100 % on Val.
+   - The Round 2 map is a strip of only about ±40 m around the route, narrower than Val's, so the search meets fewer look-alike places. The test is still easier than reality, and it still fails.
+   - The Val numbers must be presented as **tuned on the test section**. [MEASURED, `experiments/w_dustin_heldout.py`, `data/processed/w_dustin_heldout/`]
 2. **The main cause is the image zoom (scale), calibrated from three fixes**, not the matching itself.
    - With a better zoom, the share of correct fixes rises from 21–43 % to 86–100 % in three sections.
    - When the match is wrong, the correlation score peaks at the edge of the zoom grid. [MEASURED, a diagnostic that uses truth for scoring only]
