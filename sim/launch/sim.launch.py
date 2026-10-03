@@ -1,15 +1,13 @@
 """Start Gazebo with the Mid-Air-like drone, the ROS bridge and the sensor noise node.
 
-    ros2 launch sim/launch/sim.launch.py [cam_res:=1024] [gps:=true] [gui:=true] [world:=terrain] [demo:=false]
+    ros2 launch sim/launch/sim.launch.py [cam_res:=1024] [gps:=true] [gui:=true] [world:=terrain]
+        [demo:=false] [gnss_cut_s:=-1] [stereo:=false] [stereo_baseline_m:=0.30]
 
-cam_res  down camera width and height in pixels; 1024 matches Mid-Air, 512 renders faster on a CPU
-gps      false removes the GNSS receiver from the drone
-gui      false runs Gazebo without its window (server only)
-world    a file name in sim/worlds/ without .sdf: terrain (fields and woods) or islands (two islands and open sea)
-demo     true flies the drone (circles; island to island in the islands world, nodes/demo_flight.py), and opens
-         the down-camera view
-         and a terminal with the live sensor monitor (nodes/sensor_monitor.py) on the desktop
+gnss_cut_s          absolute simulation time in seconds; negative keeps GNSS enabled
+stereo              true adds a right down-camera by generating a temporary model variant
+stereo_baseline_m   right camera offset along body -Y, in metres
 """
+import copy
 import os
 import socket
 import subprocess
@@ -32,13 +30,22 @@ WORLD_ASSETS = {
 }
 
 
-def drone_sdf(cam_res: int, gps: bool) -> Path:
+def drone_sdf(cam_res: int, gps: bool, stereo: bool, stereo_baseline_m: float) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
     link = tree.find(".//link[@name='sensor_link']")
     image = link.find("sensor[@name='camera_down']/camera/image")
     image.find("width").text = image.find("height").text = str(cam_res)
     if not gps:
         link.remove(link.find("sensor[@name='navsat']"))
+    if stereo:
+        if stereo_baseline_m <= 0:
+            sys.exit("stereo_baseline_m must be > 0 when stereo:=true")
+        right = copy.deepcopy(link.find("sensor[@name='camera_down']"))
+        right.set("name", "camera_down_right")
+        right.find("pose").text = f"0 {-stereo_baseline_m:.9g} 0 0 1.5708 0"
+        right.find("topic").text = "camera/down_right/image_raw"
+        right.find("gz_frame_id").text = "camera_down_right"
+        link.append(right)
     tree.write(GENERATED_MODEL, xml_declaration=True, encoding="utf-8")
     return GENERATED_MODEL
 
@@ -73,6 +80,9 @@ def setup(context):
     gui = LaunchConfiguration("gui").perform(context).lower() == "true"
     world = SIM / "worlds" / f"{LaunchConfiguration('world').perform(context)}.sdf"
     demo = LaunchConfiguration("demo").perform(context).lower() == "true"
+    gnss_cut_s = float(LaunchConfiguration("gnss_cut_s").perform(context))
+    stereo = LaunchConfiguration("stereo").perform(context).lower() == "true"
+    stereo_baseline_m = float(LaunchConfiguration("stereo_baseline_m").perform(context))
     if not world.exists():
         sys.exit(f"No world {world}. Choose one of: {', '.join(sorted(w.stem for w in world.parent.glob('*.sdf')))}")
     if gui or demo:
@@ -80,7 +90,7 @@ def setup(context):
 
     for script in WORLD_ASSETS.get(world.stem, []):
         subprocess.run([sys.executable, str(SIM / "scripts" / script), "--if-missing"], check=True)
-    model = drone_sdf(cam_res, gps)
+    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m)
     sim_time = {"use_sim_time": True}
 
     actions = [
@@ -96,6 +106,13 @@ def setup(context):
             sys.executable, str(SIM / "nodes/sensor_noise.py"), "--ros-args",
             "--params-file", str(SIM / "config/sensor_noise.yaml"), "-p", "use_sim_time:=true"]),
     ]
+    actions.append(ExecuteProcess(output="screen", cmd=[
+        sys.executable, str(SIM / "nodes/gnss_gate.py"), "--ros-args",
+        "-p", f"gnss_cut_s:={gnss_cut_s}", "-p", "use_sim_time:=true",
+    ]))
+    if stereo:
+        actions.append(Node(package="ros_gz_image", executable="image_bridge", output="screen",
+                            arguments=["/camera/down_right/image_raw"], parameters=[sim_time]))
     if demo:
         actions += [
             # Give the Gazebo window time to open before asking it to follow the drone
@@ -120,6 +137,9 @@ def generate_launch_description():
         DeclareLaunchArgument("gui", default_value="true"),
         DeclareLaunchArgument("world", default_value="terrain"),
         DeclareLaunchArgument("demo", default_value="false"),
+        DeclareLaunchArgument("gnss_cut_s", default_value="-1"),
+        DeclareLaunchArgument("stereo", default_value="false"),
+        DeclareLaunchArgument("stereo_baseline_m", default_value="0.30"),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])

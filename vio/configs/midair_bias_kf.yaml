@@ -1,0 +1,10 @@
+# Bias-only gyro filter (vio/estimation/gyro_bias_kf.py). Tuned on sunny/trajectory_0001 only
+# (vio/scripts/run_bias_experiment.py tune; rule: mean NIS closest to 3), then frozen.
+interval_s: 0.5              # non-overlapping visual intervals; chosen by the NIS rule on sunny 0001
+sigma_vis_deg: 0.2           # visual relative-rotation noise per interval, per axis
+bias_walk: 1.0e-5            # rad/s/sqrt(s)
+gyro_noise_density: 0.0021   # rad/s/sqrt(Hz) = Mid-Air 0.021 rad/s per sample x sqrt(0.01 s)
+init_bias_std: 0.003         # rad/s
+init_att_std_deg: 0.2
+consider_attitude: true      # Schmidt consider state for the attitude error (needed: see docstring)
+gate_prob: 0.99

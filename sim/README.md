@@ -88,13 +88,27 @@ The Gazebo window appears in the browser tab. Launch options:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `cam_res` | `1024` | Down camera width and height in pixels. 1024 matches Mid-Air; use 512 if the simulation runs slowly |
+| `cam_res` | `1024` | Down-camera width and height in pixels. 1024 matches Mid-Air; use 512 if the simulation runs slowly |
 | `gps` | `true` | `false` removes the GNSS receiver |
+| `gnss_cut_s` | `-1` | Absolute simulation time in seconds when GNSS stops; negative means never |
+| `stereo` | `false` | `true` adds a second down camera at `/camera/down_right/image_raw` |
+| `stereo_baseline_m` | `0.30` | Stereo camera offset along body -Y (right), used when `stereo:=true` |
 | `gui` | `true` | `false` runs Gazebo without its window |
 | `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods) or `islands` (two islands and open sea) |
-| `demo` | `false` | `true` flies circles (in `islands`: from island to island) and opens the camera view and the sensor monitor |
+| `demo` | `false` | `true` flies circles and opens the camera view and sensor monitor |
 
-Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gps:=false`.
+Example: `ros2 launch sim/launch/sim.launch.py cam_res:=512 gui:=false world:=terrain gnss_cut_s:=60 stereo:=true`.
+
+### Record a common replay
+
+With the simulator running, start the recorder before the scenario. From the host, in `sim/`:
+
+```bash
+docker compose exec -d sim bash -ic "cd /ws/TaipeiDrift && python3 sim/nodes/recorder.py --name t_sim_terrain_cut60 --world terrain --duration-s 255 --image-rate-hz 5 --cam-res 512 --gnss-cut-s 60 --stereo --stereo-baseline-m 0.30 > /tmp/recorder.log 2>&1"
+docker compose exec -d sim bash -ic "cd /ws/TaipeiDrift && python3 sim/scripts/t_scenario.py > /tmp/scenario.log 2>&1"
+```
+
+The recorder writes `taipeidrift-replay/1` under `/ws/TaipeiDrift/recordings/<name>` (the mounted host working copy). Images are sampled at `image_rate_hz`; truth is evaluator-only.
 
 Docker on a Mac has no access to the graphics chip, so the processor draws the camera images. The simulation then runs slower than real time. Gazebo shows the real-time factor at the bottom right. All timestamps use simulation time, so recorded data is correct at any speed. On an M3 MacBook:
 
@@ -133,17 +147,17 @@ Its sensors match Mid-Air (Fonder and Van Droogenbroeck, CVPRW 2019, section 3.1
 
 | Sensor | Mid-Air | Here | ROS topic |
 |---|---|---|---|
-| Down camera | 1024×1024, 90° FOV, 25 Hz, ideal pinhole, global shutter | Same (`cam_res` can lower it) | `/camera/down/image_raw`, `/camera/down/camera_info` |
-| IMU | 100 Hz, eq. 1 noise: white noise + random-walk bias, drawn per flight | Same model, in `nodes/sensor_noise.py` | `/imu/data`; the draw is on `/imu/params` |
+| Down camera | 1024×1024, 90° FOV, 25 Hz, ideal pinhole, global shutter | Same (`cam_res` can lower it); optional right camera uses the same intrinsics | `/camera/down/image_raw`, `/camera/down/camera_info`, optional `/camera/down_right/image_raw` |
+| IMU | 100 Hz, eq. 1 noise: white noise + random-walk bias, drawn per flight | Same model; published orientation is zeroed and marked unavailable | `/imu/data`; the draw is on `/imu/params` |
 | Barometer | none | Gazebo Air Pressure sensor, 50 Hz, 10 Pa noise + slow drift | `/air_pressure` (Pa) |
-| GNSS | 1 Hz | 1 Hz, σ 1.5 m horizontal, 3 m vertical | `/gps/fix` |
+| GNSS | 1 Hz | 1 Hz, σ 1.5 m horizontal, 3 m vertical; optional simulation-time cutoff | `/gps/fix` (gated from `/sim/gps_raw`) |
 | Ground truth | 100 Hz | 100 Hz | `/ground_truth/odom` |
 
 - **Airframe.** It is AirSim's default quadcopter, as in Mid-Air: 1 kg, arm 0.2275 m, about 4.2 N thrust per rotor.
 - **Sensor placement.** All sensors sit at one point, `sensor_link`, 0.5 m ahead of the airframe centre on the body X-axis, as in Mid-Air. That point is the model origin, so ground truth describes the IMU itself and there are no lever arms.
-- **Camera.** It looks straight down, and the top of the image points forward. Intrinsics are fx = fy = cx = cy = width/2, as in Mid-Air.
-- **IMU noise.** The bounds in `config/sensor_noise.yaml` are our assumption for a consumer MEMS IMU; Mid-Air does not publish its own. Use `seed` for repeatable runs and `scale` for the noise sweep.
-- **Untouched data.** The noise-free IMU and pressure stay available on `/sim/imu_raw` and `/sim/air_pressure_raw`.
+- **Camera.** It looks straight down, and the top of the image points forward. Intrinsics are fx = fy = cx = cy = width/2, as in Mid-Air. Stereo is generated as a temporary model variant; the base SDF remains unchanged.
+- **IMU noise.** The bounds in `config/sensor_noise.yaml` are our assumption for a consumer MEMS IMU; Mid-Air does not publish its own. Use `seed` for repeatable runs and `scale` for the noise sweep. The true Gazebo attitude is zeroed before `/imu/data` is published.
+- **Untouched data.** The noise-free IMU and pressure stay available on `/sim/imu_raw` and `/sim/air_pressure_raw`; GNSS raw data is bridged to `/sim/gps_raw`.
 
 ## The environments
 
@@ -239,7 +253,9 @@ worlds/terrain.sdf          fields and woods
 worlds/islands.sdf          two islands and open sea
 config/bridge.yaml          Gazebo ↔ ROS topics
 config/sensor_noise.yaml    IMU noise bounds, barometer drift
-nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift
+nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift and attitude zeroing
+nodes/gnss_gate.py          simulation-time GNSS cutoff
+nodes/recorder.py           common replay-format recorder
 nodes/sensor_monitor.py     live sensor values in the terminal
 nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
 nodes/record_midair.py      records a flight in the Mid-Air dataset format
@@ -253,4 +269,5 @@ scripts/make_topo_map.py    topographic map and elevation grid of the islands wo
 maps/                       the islands map (PNG, PDF) and elevation grid (TIFF + JSON)
 scripts/check_sensors.py    checks rates, frames and camera intrinsics
 scripts/smoke_flight.py     short test flight, saves one down-camera frame
+scripts/t_scenario.py       60 m GNSS-cut flight scenario
 ```
