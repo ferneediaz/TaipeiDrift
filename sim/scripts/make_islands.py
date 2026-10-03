@@ -222,17 +222,17 @@ MODEL = """<?xml version="1.0"?>
         <pose>{sx:.1f} {sy:.1f} {sea_z:.2f} 0 0 0</pose>
         <geometry><plane><normal>0 0 1</normal><size>{sea:.0f} {sea:.0f}</size></plane></geometry>
         <material>
-          <ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse><specular>0.3 0.3 0.3 1</specular>
+          <!-- Open water: no static albedo features for the downward camera to track. -->
+          <ambient>0.015 0.08 0.16 1</ambient><diffuse>0.025 0.16 0.32 1</diffuse><specular>0.85 0.9 0.95 1</specular>
           <pbr><metal>
-            <albedo_map>model://islands/materials/textures/sea.jpg</albedo_map>
-            <roughness>0.55</roughness><metalness>0.0</metalness>
+            <roughness>0.08</roughness><metalness>0.0</metalness>
           </metal></pbr>
         </material>
       </visual>
       <visual name="ocean">
         <pose>{sx:.1f} {sy:.1f} {ocean_z:.2f} 0 0 0</pose>
         <geometry><plane><normal>0 0 1</normal><size>40000 40000</size></plane></geometry>
-        <material><ambient>0.055 0.22 0.42 1</ambient><diffuse>0.055 0.22 0.42 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+        <material><ambient>0.015 0.08 0.16 1</ambient><diffuse>0.025 0.16 0.32 1</diffuse><specular>0.85 0.9 0.95 1</specular></material>
       </visual>{body}
     </link>
   </model>
