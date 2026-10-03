@@ -1,6 +1,6 @@
 # Synthèse de la nuit du 2 au 3 octobre 2026
 
-Branche locale `research/offline-nav-evidence` (depuis `origin/main` 1286d5c). Rien n’est commité ni poussé. Les rapports détaillés sont dans ce dossier :
+Branche `research/offline-nav-evidence` (depuis `origin/main` 1286d5c), poussée sur GitHub le 3 octobre au matin. **Avertissement** : les scripts ALTO de cette branche cherchent encore dans les images de référence centrées sur la vraie trajectoire, une fuite trouvée par Dustin (`alto-navigator`, findings 3.8). Leurs chiffres sont à refaire avec sa recherche sur carte unique. Les rapports détaillés sont dans ce dossier :
 
 - `map-localization.md` : piste A, recalage caméra → carte ;
 - `sensor-fusion.md` : piste B, hauteur, vitesse et cap ;
