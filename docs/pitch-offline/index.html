@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Taipei Drift Pitch (offline)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url(assets/fonts/HankenGrotesk-300-700.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(assets/fonts/IBMPlexMono-400.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(assets/fonts/IBMPlexMono-500.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+*{margin:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:0 0}
+section{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;visibility:hidden}
+section.on{visibility:visible}
+h1{font-size:96px;font-weight:600;line-height:1.1}h2{font-size:64px;font-weight:600;line-height:1.15}h3{font-size:44px;font-weight:600;line-height:1.2}
+p{font-size:32px;font-weight:400;line-height:1.4}aside{display:none}img,svg,video{display:block}b{font-weight:700}
+body.idle{cursor:none}
+#notes{position:fixed;left:0;right:0;bottom:0;max-height:38%;overflow:auto;padding:20px 28px;background:rgba(10,11,13,.94);color:#F4F3EF;
+  font:20px/1.45 'Hanken Grotesk',Arial,sans-serif;border-top:1px solid rgba(244,243,239,.25);display:none}
+#notes.on{display:block}
+#notes b{color:#FFB000;font-weight:600}
+#hint{position:fixed;right:16px;bottom:12px;color:#7C828C;font:14px/1.3 'IBM Plex Mono','Courier New',monospace;opacity:0;transition:opacity .4s}
+#hint.on{opacity:1}
+</style></head><body>
+<div id="stage">
+<section id="cover" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">EDTH Taiwan Defense Tech Hackathon 2026 / Challenge 02</p>
+<div style="display:flex;flex-direction:column;gap:32px">
+<div style="position:relative;width:168px;height:168px">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:0;top:0" width="168" height="168" viewBox="0 0 168 168">
+<path d="M16.8 137.2 L112 39.2" fill="none" stroke="#7A7E86" stroke-width="12.6" stroke-linecap="round"/>
+<path d="M16.8 137.2 L151.2 137.2" fill="none" stroke="#F4F3EF" stroke-width="12.6" stroke-linecap="round"/>
+<path d="M112 39.2 L112 137.2" fill="none" stroke="#FFB000" stroke-width="12.6" stroke-linecap="round"/>
+<circle cx="112" cy="137.2" r="21" fill="#FFB000"/>
+</svg>
+</div>
+<h1 style="font-size:240px;font-weight:600;line-height:1;letter-spacing:-8px;white-space:nowrap">Taipei Drift</h1>
+<p style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">We stay on course when GNSS is jammed.</p>
+</div>
+<aside>0:00 to 0:15. A small drone off Kinmen, or over Zaporizhzhia. The jammer switches on and GNSS is gone. We are Taipei Drift. Our drone keeps its position anyway.</aside>
+</section>
+
+<section id="problem" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="From the moment GNSS is lost, the drone's actual path bends away from its planned course; after 36 seconds the two are 50 metres apart" style="position:absolute;left:128px;top:272px" width="1664" height="270" viewBox="0 0 1664 270">
+<path d="M0 240 L1650 240" fill="none" stroke="#F4F3EF" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="10 14"/>
+<path d="M0 240 C 560 240, 1180 205, 1650 24" fill="none" stroke="#F4F3EF" stroke-width="3" stroke-linecap="round"/>
+<path d="M1650 44 L1650 222" fill="none" stroke="#FFB000" stroke-width="2"/>
+<circle cx="0" cy="240" r="8" fill="#F4F3EF"/>
+<circle cx="1650" cy="240" r="7" fill="#0A0B0D" stroke="#F4F3EF" stroke-opacity="0.6" stroke-width="2"/>
+<circle cx="1650" cy="24" r="8" fill="#F4F3EF"/>
+</svg>
+<p style="position:absolute;left:128px;top:458px;width:300px;font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:2px;text-transform:uppercase;color:#9BA0A8;text-align:left">GNSS lost</p>
+<p style="position:absolute;left:768px;top:368px;width:420px;font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:2px;text-transform:uppercase;color:#9BA0A8;text-align:right">Where the drone really is</p>
+<p style="position:absolute;left:1028px;top:522px;width:400px;font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:2px;text-transform:uppercase;color:#9BA0A8;text-align:left">Planned course</p>
+<p style="position:absolute;left:1458px;top:384px;width:300px;font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:2px;text-transform:uppercase;color:#FFB000;text-align:right">50 m apart</p>
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">The problem</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">Once GNSS is jammed, a low-cost drone drifts off course.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-size:240px;font-weight:600;line-height:1;letter-spacing:-8px;color:#F4F3EF">36 s</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8;width:1664px">is all it takes to drift 50 m. Jamming is routine in Ukraine and around Taiwan's outlying islands.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Source: own measurement, inertial sensors alone, median of 30 flights of the Mid-Air dataset. Jamming: Breaking Defense, January 2026.</p>
+<aside>0:15 to 0:35. Read the picture from the left: GNSS is lost, and from that moment the path the drone really flies bends away from the course it believes it is on. With only its own inertial sensors, a low-cost drone is 50 m off after 36 seconds (median of 30 flights of the Mid-Air dataset, findings 2.4). Over our 4.3 km simulated flight the same sensors are 3 km off in the median. The drone cannot hold its route, find its target or come home. Fielded answers such as Vantor's Raptor need a GPU and licensed 3D map data. That does not fit a low-cost drone.</aside>
+</section>
+
+<section id="solution" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">The solution</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">It navigates by what it sees and hears.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:20px">
+<div style="position:relative;width:1664px;height:590px;background:radial-gradient(ellipse at 50% 52%, #262A31 0%, #0A0B0D 62%)">
+<img src="assets/drone.png" alt="A small quadcopter seen from the front, in grey: a GNSS antenna on a mast, four arms with motors, and a camera module with downward sensors under the body" style="position:absolute;left:452px;top:50px;width:760px;height:467px;object-fit:contain">
+<svg aria-label="Callouts on the drone. Added parts in amber: a sun sensor on the top plate, a memory card with the map in the body, a range finder underneath and four antennas on the arms. Already on the drone, in white: the GNSS antenna and the downward camera." style="position:absolute;left:0;top:0" width="1664" height="590" viewBox="0 0 1664 590">
+<g fill="none" stroke="#F4F3EF" stroke-opacity="0.7" stroke-width="1.5" stroke-linejoin="round">
+<path d="M416 106 L842 106"/>
+<path d="M901 219 L1014 106 L1248 106"/>
+<path d="M416 279 L821 279"/>
+<path d="M862 437 L862 520 L416 520"/>
+<path d="M890 437 L890 520 L1248 520"/>
+<path d="M971 213 L978 206 L1248 206"/>
+</g>
+<g stroke="#FFB000" stroke-width="5" stroke-linecap="round">
+<line x1="723" y1="330" x2="723" y2="290"/>
+<line x1="964" y1="330" x2="964" y2="290"/>
+<line x1="742" y1="258" x2="742" y2="218"/>
+<line x1="966" y1="258" x2="966" y2="218"/>
+</g>
+<g fill="#FFB000">
+<circle cx="723" cy="290" r="7"/>
+<circle cx="964" cy="290" r="7"/>
+<circle cx="742" cy="218" r="7"/>
+<circle cx="966" cy="218" r="7"/>
+</g>
+<g stroke="#0A0B0D" stroke-width="3">
+<circle cx="853" cy="106" r="9" fill="#F4F3EF"/>
+<circle cx="862" cy="426" r="9" fill="#F4F3EF"/>
+<circle cx="894" cy="226" r="9" fill="#FFB000"/>
+<circle cx="832" cy="279" r="9" fill="#FFB000"/>
+<circle cx="890" cy="426" r="9" fill="#FFB000"/>
+</g>
+</svg>
+<p style="position:absolute;left:0px;top:86px;width:400px;font-size:32px;line-height:1.25;text-align:right"><b>GNSS</b><br><span style="color:#9BA0A8">jammed</span></p>
+<p style="position:absolute;left:0px;top:259px;width:400px;font-size:32px;line-height:1.25;text-align:right"><b>Aerial map</b><br><span style="color:#9BA0A8">free, 4 MB per km²</span></p>
+<p style="position:absolute;left:0px;top:500px;width:400px;font-size:32px;line-height:1.25;text-align:right"><b>Camera</b><br><span style="color:#9BA0A8">speed and map fixes</span></p>
+<p style="position:absolute;left:1264px;top:86px;width:400px;font-size:32px;line-height:1.25"><b>Sun sensor</b><br><span style="color:#9BA0A8">heading</span></p>
+<p style="position:absolute;left:1264px;top:186px;width:400px;font-size:32px;line-height:1.25"><b>Four antennas</b><br><span style="color:#9BA0A8">ships' radio bearings</span></p>
+<p style="position:absolute;left:1264px;top:500px;width:400px;font-size:32px;line-height:1.25"><b>Range finder</b><br><span style="color:#9BA0A8">height above ground</span></p>
+</div>
+<div style="display:flex;flex-direction:row;justify-content:space-between;align-items:center">
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8">The whole drone from $875. Off-the-shelf parts. Free maps.</p>
+<div style="display:flex;flex-direction:row;gap:40px;align-items:center">
+<div style="display:flex;flex-direction:row;gap:12px;align-items:center">
+<div style="width:16px;height:16px;border-radius:50%;background:#FFB000"></div>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;color:#9BA0A8">added</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:12px;align-items:center">
+<div style="width:16px;height:16px;border-radius:50%;background:#F4F3EF"></div>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;color:#9BA0A8">already on the drone</p>
+</div>
+</div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Sources: Just Security, June 2026 (drone from $300); our cost slide and own measurements. Photo: PX4 Vision kit, PX4 docs, CC BY 4.0, edited.</p>
+<aside>0:35 to 0:55. The drone already has a camera, an IMU, a barometer and a GNSS receiver that is now useless. We add three things. A sun sensor gives a heading that no magnet disturbs. A free aerial photo on a memory card is the map: every 300 m the camera picture is matched against it, and a check refuses fixes that do not fit. Over water, where the camera has nothing to match, four small antennas take bearings on ships' AIS radio. A laser range finder gives the height for the camera's ground speed: the demo flight uses it, the map-matching results on the next slides do not. One filter fuses it all and reports a position with its own uncertainty. Cost: from 875 dollars for the whole drone, taking the low end of every price range: a frontline FPV drone from 300 dollars plus our kit from 575 dollars. With the high end of every range it is 995 dollars. No licensed map data, and every part is sold over the counter. The sun sensor and the low-cost radio are designed and simulated, not built yet. The photo is a stand-in: a PX4 Vision development drone, not our airframe.</aside>
+</section>
+
+<section id="demo-intro" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Taipei Drift</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-size:240px;font-weight:600;line-height:1;letter-spacing:-8px">Demo</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8;width:1664px">It crosses open water without GNSS.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Source of the video on the next slide: own simulator run, 4 October 2026.</p>
+<aside>0:55 to 1:00. One sentence, then the video: a simulated drone flies from one island to the next, loses GNSS on the way and lands on the second island. Watch the small map at the bottom of the picture: white is the true path, green is our estimate, red is the estimate with inertial sensors alone.</aside>
+</section>
+
+<section id="demo" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px">
+<video src="assets/demo.mp4" poster="assets/demo_poster.jpg" muted playsinline preload="auto" aria-label="Demo video, full screen: a simulated drone crosses open water between two islands after GNSS is lost. The 3D view, the bearings to three ships and the navigation dashboard are shown side by side." style="position:absolute;left:0px;top:0px;width:1920px;height:1080px;object-fit:contain"></video>
+<aside>1:00 to 2:10. The video starts when this slide is presented and runs 71 seconds without sound. Simulated flight between two islands: GNSS is lost at 26 s. Over land the camera and the range finder give the ground speed. Over 236 m of open water, bearings to three ships give a position that does not drift. The two numbers are the position error over the second helipad, 53 s after the loss, on the flight in the video (take 2): 14.4 m with us, 241 m with the inertial sensors alone. Over the whole stretch our median error is 7.8 m and the worst 56 m. Three flights with the same settings gave 8.1, 8.5 and 7.8 m median. The camera with the range finder carries most of this: camera speed alone gave 9.0 m median on this flight. The ships' fix is rough (7 to 100 m) and pays off late, after the helipad, where the camera-only estimate drifts to 60 m and ours stays under 15 m. Say it once: this is a simulation, and the autopilot steers by the true position while our estimate runs alongside. The clip is outputs/demo/final/TaipeiDrift_demo_pitch_small.mp4 from the repository, the cut of 4 October, 01:35. In the exported PDF this slide shows a still frame only: the organisers' guide asks for a link to the video in the deck, so add one here if you upload it.</aside>
+</section>
+
+<section id="results" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Results / simulated, 4.3 km without GNSS</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">Each sensor we add cuts the error.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#F4F3EF">3 km</p>
+<p style="font-size:32px;line-height:1.3;color:#9BA0A8">inertial sensors alone</p>
+</div>
+<div style="width:1664px;height:12px;border-radius:6px;background:#3A3F47"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#F4F3EF">2.4 km</p>
+<p style="font-size:32px;line-height:1.3;color:#9BA0A8">+ sun heading</p>
+</div>
+<div style="width:1331px;height:12px;border-radius:6px;background:#3A3F47"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#F4F3EF">57 m</p>
+<p style="font-size:32px;line-height:1.3;color:#9BA0A8">+ camera speed</p>
+</div>
+<div style="width:32px;height:12px;border-radius:6px;background:#8D929B"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#FFB000">18 m</p>
+<p style="font-size:32px;line-height:1.3;color:#F4F3EF">+ map fixes</p>
+</div>
+<div style="width:10px;height:12px;border-radius:5px;background:#FFB000"></div>
+</div>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8">On two sealed flights, run once after the code freeze: <span style="color:#F4F3EF">12 m and 32 m</span>. No wrong fix accepted.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Source: own runs, docs/simulation-results.md. Median error after GNSS loss, bars to scale. Simulated over real aerial imagery of Wufeng.</p>
+<aside>2:10 to 2:25. The bars are drawn to scale: the last one is the amber dot. Each source we add cuts the error. On the 100 m development flight: inertial sensors and barometer alone 3 km; plus the sun heading 2.4 km (heading error from 55 to 1.3 degrees); plus the camera's ground speed 57 m; plus map fixes 18 m. That flight was used for tuning, so the numbers we quote are the two sealed flights, run once after the freeze: 11.5 and 32.2 m median with the fused filter (the navigator alone 16.2 and 36.3 m, the camera alone 58 and 71 m), no wrong fix, and the stated error held 98 to 100 percent of the time. The ground is a real 2020 aerial photo of Wufeng, the on-board map the 2018 photo. Source: docs/simulation-results.md.</aside>
+</section>
+
+<section id="real-flight" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Results / real flight, Miaoli, Taiwan</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">It holds on real flight data from Taiwan.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-size:240px;font-weight:600;line-height:1;letter-spacing:-8px;color:#FFB000">3.3 m</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8;width:1664px">median error over 4 km without GNSS. Dead reckoning alone: 54 m. Of 1,646 map fixes, none wrong.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Source: own test, docs/research/tuniu-level2-results.md. Replay of a real DJI flight, 2019. RTK as truth. Barometer simulated.</p>
+<aside>2:25 to 2:40. The same idea on real drone photos from Taiwan: a DJI Phantom 4 RTK flight over the Tuniu River in Miaoli. GNSS is cut after photo 46, then 4.0 km and 630 s without it. Median error against RTK: 3.3 m. Dead reckoning on the same photos: 54 m. Of 1,646 accepted map fixes none is more than 10 m wrong, and lock is kept in 20 of 20 runs. The test was declared before it was run. Caveats if asked: the barometer is simulated, the margin is thin right after turns, and this is Ilhan's matcher (two matchers must agree), a second navigator next to the frozen one. Source: docs/research/tuniu-level2-results.md.</aside>
+</section>
+
+<section id="next" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Next steps</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">Next, we fly it for real.</h2>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#FFB000">1</p>
+<p style="font-size:32px;line-height:1.3">A real flight</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">The navigator on a small computer and a camera, on a cheap drone. GNSS recorded only as truth.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">2</p>
+<p style="font-size:32px;line-height:1.3">Build the hardware</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">The sun sensor and the radio direction finder, measured on the bench.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">3</p>
+<p style="font-size:32px;line-height:1.3">Night</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">A thermal camera against the same map.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">The plan after the hackathon. Nothing on this slide is built yet.</p>
+<aside>2:40 to 2:50. Three steps, in this order. First a real flight: the navigator on a Raspberry Pi with a camera, mounted on a cheap airframe, with GNSS logged only to score it. That turns a parts list and a simulation into evidence. Second, the hardware that exists only as a design and a simulation today: the sun sensor and the direction finder for ships' radio, each built and measured on the bench before anyone relies on its numbers. Third, night: a thermal camera against the same map, the route the fielded systems take. Also on the list, if asked: the link to the autopilot (a MAVLink position message carrying our stated uncertainty) and a test of radio bearings against distance, because a bearing error of a few degrees grows with range.</aside>
+</section>
+
+<section id="close" data-transition="fade" style="background:#0A0B0D;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Taipei Drift</p>
+</div>
+<div style="position:relative;width:1664px;height:150px">
+<svg aria-label="The path drifts off the course four times, and each time a fix drops it back onto it" style="position:absolute;left:0;top:0" width="1664" height="150" viewBox="0 0 1664 150">
+<g fill="none" stroke="#7A7E86" stroke-width="3" stroke-linecap="round">
+<path d="M8 130 L338 30"/>
+<path d="M338 130 L754 30"/>
+<path d="M754 130 L1170 30"/>
+<path d="M1170 130 L1586 30"/>
+</g>
+<path d="M8 130 L1656 130" fill="none" stroke="#F4F3EF" stroke-width="3" stroke-linecap="round"/>
+<g fill="none" stroke="#FFB000" stroke-width="3" stroke-linecap="round">
+<path d="M338 30 L338 130"/>
+<path d="M754 30 L754 130"/>
+<path d="M1170 30 L1170 130"/>
+<path d="M1586 30 L1586 130"/>
+</g>
+<g fill="#FFB000">
+<circle cx="338" cy="130" r="10"/>
+<circle cx="754" cy="130" r="10"/>
+<circle cx="1170" cy="130" r="10"/>
+<circle cx="1586" cy="130" r="10"/>
+</g>
+</svg>
+</div>
+<div style="display:flex;flex-direction:column;gap:32px">
+<p style="font-size:104px;font-weight:600;line-height:1.05;letter-spacing:-3px">We stay on course<br>when GNSS is jammed.</p>
+</div>
+<aside>2:50 to 3:00. The line on the slide is the whole idea: the estimate drifts, a fix drops it back on course, again and again. The ask is small and concrete: the next step is one real flight, so anyone with a drone, a test range or a mission that needs this should come and talk to us after the pitch. The organisers' guide asks every team to close by saying who should approach them. Business in one breath: one small sensor, free maps and our software, licensed per drone to the makers; the whole drone costs from 875 dollars. Taiwan's defence ministry has tendered 48,750 drones for 2026 and 2027. The numbers are on the backup slides.</aside>
+</section>
+
+<section id="backup" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">End of the pitch</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px">
+<p style="font-size:240px;font-weight:600;line-height:1;letter-spacing:-8px">Backup</p>
+<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px">
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">11</span> Our position</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">12</span> Cost per drone</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">13</span> Alternatives</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">14</span> Dependence</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">15</span> Market</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">16</span> Competition</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">17</span> Computing</p>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8"><span style="color:#F4F3EF">18</span> Limits</p>
+</div>
+</div>
+<aside>The pitch ends on the slide before this one. Everything after it is for questions: our position (11), cost per drone (12), alternatives (13), dependence (14), market (15), competition (16), computing (17), limits (18).</aside>
+</section>
+
+<section id="position" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / our position</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">It is cheap, independent and honestly tested.</h2>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:28px 0 28px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">Price class</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">A $575 kit. The only other price we found: about $20,000 per aircraft.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:28px 0 28px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">Independence</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Free maps and retail parts. Raptor needs a vendor licence per machine.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:28px 0 28px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">Rigour</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Code frozen first. Sealed flights run once. Tests declared in advance.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Sources: DroneXL, May 2026 (Vermeer); Vantor developer guide; our cost slide; docs/simulation-results.md; docs/research/tuniu-level2-prereg.md.</p>
+<aside>The answer to: what is new here? The idea is proven and fielded, so we do not claim novelty or better accuracy. Three things are ours. Price class: the only published price we found for navigation by camera and map is Vermeer's, about 20,000 dollars per aircraft (DroneXL, 29 May 2026); Vantor, UAV Navigation and Delian publish none; our kit is 575 dollars at the lowest retail prices, on a drone that costs a few hundred. Ukraine's own Eagle Eyes is reported as cheap enough for kamikaze drones, but it is not for sale. Independence: Vantor's developer guide describes the Raptor licence as a file that grants the right to use the software on a specific machine and that can expire, and the product needs Vantor's 3D terrain data; ours runs on open aerial photos and parts sold over the counter, which fits Taiwan's rule of non-Chinese supply chains and avoids hanging on one foreign vendor. Rigour: the navigator was frozen at a tagged commit before the two sealed flights were run, once; the real-flight test on the Tuniu photos was written down and pushed before any test photo was processed; 304 automated tests pass. That is why the numbers can be believed, including the unflattering ones.</aside>
+</section>
+
+<section id="cost" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / cost per drone</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">The whole drone costs from $875.</h2>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Frontline FPV drone, complete</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:260px;padding:0 24px 0 0">from $300</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">Just Security, June 2026</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Computer, Raspberry Pi 5 with 2 GB</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:260px;padding:0 24px 0 0">$78</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">raspberrypi.com</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Downward camera</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:260px;padding:0 24px 0 0">$29</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">adafruit.com</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Memory card for the map, 64 GB</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:260px;padding:0 24px 0 0">$32</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">samsung.com</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Sun sensor</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:260px;padding:0 24px 0 0">from $10</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">our cost report</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Laser range finder</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:260px;padding:0 24px 0 0">$299</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">digikey.com</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Ships' radio direction finder</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:260px;padding:0 24px 0 0">from $127</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">rtl-sdr.com, digikey.com</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:12px 0 12px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;flex:1;padding:0 24px 0 0">Drone and kit together</p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:260px;padding:0 24px 0 0">from $875</p>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:470px;padding:0 24px 0 0">sum of the rows above</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Sources: named in each row, checked 4 October 2026. Single-unit prices, lowest of each range. Amber: the parts we add.</p>
+<aside>The claim: the whole drone costs from 875 dollars, well under 1,000. The slide takes the lowest price of every range; with the highest it is 995 dollars. The drone: a frontline FPV drone costs 300 to 400 dollars in Ukraine (Just Security, 1 June 2026); CSIS gives 200 to 1,000 dollars as the wider range. Our kit, every price looked up on 4 October 2026: Raspberry Pi 5 with 2 GB, 77.50 dollars (raspberrypi.com, price since 1 October 2026; the 4 GB model is 110). Raspberry Pi Camera Module 3, 29.25 dollars at Adafruit. Samsung 64 GB microSD, 31.99 dollars; all of Taiwan at 1 m per pixel is 36 GB. Sun sensor, 10 to 20 dollars: a 128-pixel line sensor (TSL1401CL, 3 to 7 dollars at brokers; Digi-Key lists it as obsolete, so a successor part is needed), an RP2040 microcontroller (0.76 dollars) and a slit, filter and housing estimated at 2 to 10 dollars; not built yet. LightWare LW20/C range finder, 299.30 dollars at Digi-Key, 19 g, 0.2 to 100 m, currently out of stock; the demo flight uses it. Direction finder, 127 to 137 dollars: RTL-SDR V4L receiver 37.95, ADG904 RF switch 7.51, RP2040 0.76, four Nagoya NA-701 antennas at 18.98 each, plus 5 to 15 dollars of board and cable; not built or tested. The kit alone: 575 to 595 dollars. Honest limits if asked: these are single-unit retail prices, nobody has mounted the kit on such a drone, and whether 2 GB of memory is enough has not been measured. On a Holybro X500 V2 development kit (609 dollars) the total is about 1,185 dollars.</aside>
+</section>
+
+<section id="cost-compare" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / what the alternatives cost per drone</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">Other ways to resist jamming cost far more.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#F4F3EF">$20,000</p>
+<p style="font-size:32px;line-height:1.3;color:#9BA0A8">and up: anti-jam antenna (CRPA) for one long-range drone</p>
+</div>
+<div style="width:1664px;height:12px;border-radius:6px;background:#3A3F47"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#F4F3EF">$20,000</p>
+<p style="font-size:32px;line-height:1.3;color:#9BA0A8">camera navigation with a GPU computer (Vermeer)</p>
+</div>
+<div style="width:1664px;height:12px;border-radius:6px;background:#3A3F47"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#F4F3EF">$15,000</p>
+<p style="font-size:32px;line-height:1.3;color:#9BA0A8">and up: fibre-optic inertial unit</p>
+</div>
+<div style="width:1248px;height:12px;border-radius:6px;background:#3A3F47"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#F4F3EF">$1,500</p>
+<p style="font-size:32px;line-height:1.3;color:#9BA0A8">scanning LiDAR alone, 498 g (Livox Avia, NT$47,660)</p>
+</div>
+<div style="width:125px;height:12px;border-radius:6px;background:#3A3F47"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#FFB000">$575</p>
+<p style="font-size:32px;line-height:1.3;color:#F4F3EF">everything we add, with its own computer and camera</p>
+</div>
+<div style="width:48px;height:12px;border-radius:6px;background:#FFB000"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;align-items:baseline">
+<p style="font-size:56px;font-weight:600;line-height:1.1;letter-spacing:-1px;color:#FFB000">$10</p>
+<p style="font-size:32px;line-height:1.3;color:#F4F3EF">our core: the sun sensor</p>
+</div>
+<div style="width:3px;height:12px;border-radius:1px;background:#FFB000"></div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Bars to scale. Sources: Defence Blog, Aug 2026; DroneXL, May 2026; Inside GNSS, Nov 2022; DJI Store Taiwan; ours: vendor prices, 4 Oct 2026.</p>
+<aside>What a drone maker pays today to keep navigating under jamming. An imported anti-jam antenna (CRPA) costs 20,000 to 25,000 dollars on Ukraine's MICH 2000 long-range drone, which itself starts at 48,000 dollars (Defence Blog, 14 August 2026). Vermeer's visual positioning system, fielded in Ukraine, adds roughly 20,000 dollars per aircraft: up to four cameras, an Nvidia edge processor and a 3D terrain map (DroneXL, 29 May 2026). A fibre-optic inertial unit costs more than 15,000 dollars (Inside GNSS, 2022); a Honeywell HGuide n580 lists at about 25,000. A scanning LiDAR that sees the ground from our flight heights, the Livox Avia, is NT$47,660 in DJI's Taiwan store, about 1,500 US dollars at 31 NT dollars to the dollar, weighs 498 g and still needs a computer; it also emits laser light. At the cheap end, a terminal-guidance module such as The Fourth Law's TFL-1 costs under 100 dollars, but it only steers the last 400 to 500 m and gives no position. Vantor, UAV Navigation and Delian publish no prices. Ours, at the lowest price of each range: 10 dollars of parts for the sun sensor, 575 dollars for everything we add, including a Raspberry Pi 5, a camera, a memory card, the range finder and the direction finder (575 to 595 across the ranges; see the cost slide). The comparison is hardware price only: those products are fielded and ours is a prototype.</aside>
+</section>
+
+<section id="dependence" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / what each option ties you to</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">Every alternative ties the drone to a supplier.</h2>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:13px 0 13px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;width:500px;padding:0 24px 0 0"><b>Scanning LiDAR</b><br><span style="color:#9BA0A8">Livox Avia</span></p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:330px;padding:0 24px 0 0">NT$47,660</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Sold by DJI. Taiwan requires non-Chinese supply chains for drones bought by public agencies.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:13px 0 13px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;width:500px;padding:0 24px 0 0"><b>Licensed camera navigation</b><br><span style="color:#9BA0A8">Vantor Raptor Guide</span></p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:330px;padding:0 24px 0 0">Not public</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">A licence file per machine that can expire, and the vendor's own 3D map data.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:13px 0 13px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;width:500px;padding:0 24px 0 0"><b>Anti-jam antenna</b><br><span style="color:#9BA0A8">CRPA</span></p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:330px;padding:0 24px 0 0">from $20,000</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Imported. Only a handful of makers.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:13px 0 13px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;width:500px;padding:0 24px 0 0"><b>Thermal camera for night</b><br><span style="color:#9BA0A8">FLIR Boson 640</span></p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:330px;padding:0 24px 0 0">$3,558</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">An end-use statement before every shipment abroad.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:13px 0 13px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#F4F3EF;width:500px;padding:0 24px 0 0"><span style="color:#FFB000"><b>Taipei Drift</b></span><br><span style="color:#9BA0A8">camera, sun sensor, map</span></p>
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#FFB000;width:330px;padding:0 24px 0 0">from $875</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">For the whole drone. Retail parts and free aerial photos.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Sources: DJI Store Taiwan; Defence Blog, Aug and Sept 2026; Vantor developer guide; GroupGets; our cost slide. Checked 4 October 2026.</p>
+<aside>Why cheap and independent matters. The drones bought by the million cost 300 to 400 dollars each in Ukraine (Just Security, June 2026), so a navigation kit has to cost a fraction of that, and it must not hang on one supplier. LiDAR: the Livox Avia is NT$47,660 in DJI's Taiwan store, 498 g, and it emits laser light; Taiwan requires drones bought by public agencies to come from non-Chinese supply chains (Defence Blog, 28 September 2026), and in August 2026 a Taiwanese drone supplier was detained over Chinese components (Vision Times, 21 August 2026). Raptor Guide: Vantor's developer guide describes the licence as a file distributed by Vantor that grants the right to use the SDK on a specific machine, lists an expired licence as an error, and the product relies on Vantor's 3D terrain data. Anti-jam antennas: Defence Blog, 14 August 2026, writes that CRPA antennas are made by only a handful of manufacturers and remain imported at 20,000 to 25,000 dollars. Thermal camera, the known route to night: a FLIR Boson 640 is 3,558 dollars at GroupGets, which requires an end-use statement from every international customer. Ours: from 875 dollars for the whole drone (cost slide), built from parts sold over the counter, with free aerial photos as the map. Two honest caveats: check where each of our own parts is made before claiming a non-Chinese supply chain, the low-cost radio receiver in particular; and the offline rights to Taiwan's government orthophotos are not confirmed, so the tests used OpenAerialMap images under CC BY 4.0.</aside>
+</section>
+
+<section id="market" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / market</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">Cheap drones are bought in very large numbers.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:40px">
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">48,750</p>
+<p style="font-size:32px;line-height:1.3">drones in Taiwan's tender</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">For 2026 and 2027. 34,000 are small multirotors.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">4.5 M</p>
+<p style="font-size:32px;line-height:1.3">FPV drones for Ukraine</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">Planned purchases in 2025, from $300 each.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">$22.8 B</p>
+<p style="font-size:32px;line-height:1.3">military drones by 2030</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">Market forecast, up from $15.8 B in 2025.</p>
+</div>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8">Proposed price: <span style="color:#FFB000">a $200 licence per drone</span>, sold to drone makers. Taiwan's small multirotors alone: $6.8 M.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Sources: CNA, 23 July 2025 (tender notice); Kyiv Independent, March 2025; Just Security, June 2026; MarketsandMarkets, May 2025.</p>
+<aside>Who pays: drone makers, per drone. Taiwan's Ministry of National Defense published a tender notice in July 2025 for 48,750 domestically built drones: 11,270 in 2026 and 37,480 in 2027. 34,000 of them are Type A, small multirotors; later reports put the budget at up to NT$50 billion. It is a procurement plan, not a signed contract, so say tender and not order. Ukraine planned to buy 4.5 million FPV drones in 2025 (Kyiv Independent, 10 March 2025); a frontline FPV drone costs about 300 to 400 dollars (Just Security, June 2026; CSIS gives 200 to 1,000). MarketsandMarkets, May 2025: military drones grow from 15.8 billion dollars in 2025 to 22.81 billion in 2030. The 200 dollar licence is the team's proposal, not a tested price. Arithmetic: 34,000 drones times 200 dollars is 6.8 million dollars; one million drones a year would be 200 million. A benchmark from the hardware side: a terminal-guidance module sells for under 100 dollars.</aside>
+</section>
+
+<section id="competition" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / competition</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">The idea is proven. Ours is the low-cost version.</h2>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;flex-direction:row;align-items:baseline;padding:11px 0 11px 0">
+<p style="font-size:24px;line-height:1.3;font-weight:700;color:#F4F3EF;width:232px;padding:0 24px 0 0"></p>
+<p style="font-size:24px;line-height:1.3;font-weight:700;color:#FFB000;flex:1;padding:0 24px 0 0">Taipei Drift</p>
+<p style="font-size:24px;line-height:1.3;font-weight:700;color:#F4F3EF;flex:1;padding:0 24px 0 0">Raptor (Vantor)</p>
+<p style="font-size:24px;line-height:1.3;font-weight:700;color:#F4F3EF;flex:1;padding:0 24px 0 0">VNS01</p>
+<p style="font-size:24px;line-height:1.3;font-weight:700;color:#F4F3EF;flex:1;padding:0 24px 0 0">Vermeer VPS</p>
+<p style="font-size:24px;line-height:1.3;font-weight:700;color:#F4F3EF;flex:1;padding:0 24px 0 0">Eagle Eyes (Ukraine)</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:11px 0 11px 0">
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:232px;padding:0 24px 0 0">Map</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Free aerial photos</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Licensed 3D data</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Satellite imagery</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">3D terrain from satellite</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Fresh reconnaissance</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:11px 0 11px 0">
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:232px;padding:0 24px 0 0">Hardware</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Camera, sun sensor, one CPU core</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Camera and a GPU</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">100 g unit, 5 W</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Four cameras, GPU computer</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not public</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:11px 0 11px 0">
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:232px;padding:0 24px 0 0">Price per drone</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">$575 for the kit</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not public</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not public</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">About $20,000</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not public</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:11px 0 11px 0">
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:232px;padding:0 24px 0 0">Accuracy</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">12 to 32 m, simulated</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Under 10 m</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Up to 30 m</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not stated</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not public</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:11px 0 11px 0">
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:232px;padding:0 24px 0 0">States its error</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Every frame, in metres</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Confidence per frame</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not public</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not stated</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not public</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:11px 0 11px 0">
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#9BA0A8;width:232px;padding:0 24px 0 0">Maturity</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#F4F3EF;flex:1;padding:0 24px 0 0">Weekend prototype</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Flight-tested in Taiwan</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Product</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Fielded in Ukraine</p>
+<p style="font-size:24px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">In combat since 2023</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Sources: makers' product pages (Vantor, UAV Navigation), DroneXL May 2026 (Vermeer), The Economist May 2024 (Eagle Eyes), own tests and cost slide.</p>
+<aside>Say it openly: the idea is proven. Tomahawk matched camera pictures against a map in the 1980s, and Ukraine's Eagle Eyes has done it in combat since 2023. Fielded systems are more accurate than we are today. Ours is the open, low-cost version with measured limits. Raptor Guide (Vantor, formerly Maxar; AIDC holds the Taiwan distribution rights and flight-tested it as AIxVNAV in August 2026): the maker states under 10 m RMSE, day and night; one published test of eight daytime flights measured 12.2 m mean; its developer guide requires a GPU and a per-device licence, and it relies on the vendor's licensed 3D terrain data; no public price. VNS01 (UAV Navigation): a 100 g, 5 W peripheral for the maker's own VECTOR autopilots; drift bounded to 30 m over unknown terrain; no public price. Vermeer VPS: up to four cameras, an Nvidia edge processor and a 3D terrain map; roughly 20,000 dollars per aircraft (DroneXL, 29 May 2026). Eagle Eyes: the software of Ukraine's special operations forces, with a map stitched from recent reconnaissance flights; no accuracy or price published; it is unrelated to Eagle Eyes Search, a search-and-rescue app for DJI drones. Also fielded: Osiris (Delian, Greece), 15 m CEP by day, under 300 g, 25 W, no public price. Ours: 12 to 32 m median on the sealed simulated flights; on real flights from other countries that an earlier version never saw, 60 to 131 m; over open water we use ships' radio, in simulation only. Our kit costs 575 to 595 dollars.</aside>
+</section>
+
+<section id="compute" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / computing</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">It runs on one CPU core, without a GPU.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:40px">
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">11 ms</p>
+<p style="font-size:32px;line-height:1.3">per camera frame</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">Room for 90 frames a second. The camera delivers 5 to 25.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">0.07–2 s</p>
+<p style="font-size:32px;line-height:1.3">per map fix</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">One fix every 30 s: under 7 percent of a core.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(244,243,239,0.2);padding:32px 0 0">
+<p style="font-size:104px;font-weight:600;line-height:1;letter-spacing:-3px;color:#F4F3EF">4 MB</p>
+<p style="font-size:32px;line-height:1.3">of map per km²</p>
+<p style="font-size:24px;line-height:1.4;color:#9BA0A8">All of Taiwan fits on a $32 card (36 GB).</p>
+</div>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#9BA0A8">Target: <span style="color:#FFB000">a Raspberry Pi 5, $78</span>, 50 g, 3 to 10 W. GPU-based systems: a Jetson kit, $399, 174 g, 7 to 25 W.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Sources: own timing on one laptop core, not yet on a drone computer; raspberrypi.com, CNX Software, NVIDIA, Jeff Geerling's board tests.</p>
+<aside>Measured with baseline/scripts/time_navigator.py on one core: 4.7 ms to read a frame and turn it north up, 6.0 ms of optical flow. One map fix: 68 ms for the smallest search (60 m radius), 274 ms at 150 m, 803 ms at 300 m, 2.0 s at the 600 m cap, with 5 zooms and 3 angles tried. The map is a grey image at 0.5 m per pixel, 4 MB per square kilometre. Not measured on drone hardware. An estimate only, if asked: a Raspberry Pi 5 core scores about 770 to 900 in Geekbench 6 single core against about 2,560 for an Apple M2, and our timing ran under Intel emulation at roughly 80 percent of native speed, so expect about two and a half times our numbers: about 30 ms per frame and about 5 s for the widest fix, still far inside the 30 s between fixes. Boards: Raspberry Pi 5 with 2 GB, 77.50 dollars (raspberrypi.com; the 4 GB model is 110), 50 g, 2.8 W idle and 9.7 W at full load; whether 2 GB is enough for the navigator has not been measured; Jetson Orin Nano Super developer kit, 399 dollars since July 2026 (249 at launch), 174 g, 7 to 25 W. Raptor's developer guide requires a GPU and ships a Jetson build; Vermeer uses an Nvidia edge processor. The live filter in the simulator and Ilhan's second matcher (which uses a learned matcher) are not included in these timings.</aside>
+</section>
+
+<section id="limits" data-transition="fade" style="background:#111317;color:#F4F3EF;font-family:'Hanken Grotesk', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between">
+<svg aria-label="Taipei Drift mark: a line drifts off course and a fix drops it back" style="position:absolute;left:1744px;top:118px" width="48" height="48" viewBox="0 0 48 48">
+<path d="M4.8 39.2 L32 11.2" fill="none" stroke="#7A7E86" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M4.8 39.2 L43.2 39.2" fill="none" stroke="#F4F3EF" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M32 11.2 L32 39.2" fill="none" stroke="#FFB000" stroke-width="3.6" stroke-linecap="round"/>
+<circle cx="32" cy="39.2" r="6" fill="#FFB000"/>
+</svg>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:3px;text-transform:uppercase;color:#9BA0A8">Backup / limits</p>
+<h2 style="font-size:56px;font-weight:500;line-height:1.15;letter-spacing:-1px">Night, fog and a jammed take-off are still open.</h2>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:24px 0 24px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">Night</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Needs a thermal camera against the same map. Not built.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:24px 0 24px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">No ships' radio</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Over water the estimate drifts until land is in view again.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:24px 0 24px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">Fog, rebuilt ground</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">The map match fails. The status then reads DEGRADED or LOST.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:24px 0 24px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">Jammed from take-off</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Not covered. It calibrates itself on a few hundred metres with GNSS.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:baseline;border-top:1px solid rgba(244,243,239,0.2);padding:24px 0 24px 0">
+<p style="font-size:32px;line-height:1.3;font-weight:600;color:#F4F3EF;width:440px;padding:0 24px 0 0">What is simulated</p>
+<p style="font-size:32px;line-height:1.3;font-weight:400;color:#C9CCD1;flex:1;padding:0 24px 0 0">Demo and sealed flights. The demo autopilot flies on the true position.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;line-height:1.4;color:#7C828C">Source: own tests, docs/simulation-results.md and docs/findings.md.</p>
+<aside>The expected questions. Night: an ordinary camera sees nothing; the known route is a thermal camera against the same map, as Raptor does; not started. AIS switched off or spoofed: over water only dead reckoning is left; in the demo flight the inertial sensors alone were 241 m off at the helipad. Fog: at 1 km of visibility the error grows up to three and a half times and the stated bound fails 2 to 25 percent of the time; where the ground was rebuilt since the map (UAV-VisLoc flight 01) the fixes do not help. Jammed from take-off: not covered, the system learns its camera scale while GNSS still works. Simulation: the demo and the sealed flights are simulated over real aerial imagery; the real-flight result is a replay of recorded photos; nothing was flown by us. In the live demo the filter's own error bound is too small (the truth is inside its 2 sigma only about half of the time), which is why the dashboard often shows EXCEEDED. The honest bound is the frozen navigator's on the recorded flights: held 100 percent.</aside>
+</section>
+
+</div>
+<div id="notes"></div>
+<div id="hint"></div>
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('#stage > section')), stage=document.getElementById('stage');
+  var notes=document.getElementById('notes'), hint=document.getElementById('hint'), cur=-1, hintTimer, idleTimer;
+  function fit(){var s=Math.min(innerWidth/1920, innerHeight/1080);
+    stage.style.transform='translate('+(-960*s)+'px,'+(-540*s)+'px) scale('+s+')';}
+  function showHint(t){hint.textContent=t;hint.className='on';clearTimeout(hintTimer);hintTimer=setTimeout(function(){hint.className='';},1800);}
+  function go(n){n=Math.max(0,Math.min(slides.length-1,n)); if(n===cur) return;
+    if(cur>=0){slides[cur].classList.remove('on'); var ov=slides[cur].querySelector('video'); if(ov){ov.pause();}}
+    cur=n; var s=slides[cur]; s.classList.add('on');
+    var v=s.querySelector('video'); if(v){try{v.currentTime=0;}catch(e){} var p=v.play(); if(p&&p.catch){p.catch(function(){});}}
+    var a=s.querySelector('aside'); notes.innerHTML='<b>'+(cur+1)+' / '+slides.length+'</b> &nbsp; '+(a?a.innerHTML:'');
+    history.replaceState(null,'','#'+(cur+1));}
+  document.addEventListener('keydown',function(e){var k=e.key;
+    if(k==='ArrowRight'||k==='PageDown'||k===' '||k==='Enter'||k==='ArrowDown'){go(cur+1);e.preventDefault();}
+    else if(k==='ArrowLeft'||k==='PageUp'||k==='Backspace'||k==='ArrowUp'){go(cur-1);e.preventDefault();}
+    else if(k==='Home'){go(0);} else if(k==='End'){go(slides.length-1);}
+    else if(k==='f'||k==='F'){if(document.fullscreenElement){document.exitFullscreen();}else{document.documentElement.requestFullscreen();}}
+    else if(k==='n'||k==='N'){notes.classList.toggle('on');}
+    else if(k==='b'||k==='B'){var i=slides.findIndex(function(s){return s.id==='backup';}); if(i>=0) go(i);}
+    else if(k==='r'||k==='R'){var v=slides[cur].querySelector('video'); if(v){v.currentTime=0;v.play();}}
+  });
+  document.addEventListener('click',function(e){var v=slides[cur].querySelector('video');
+    if(v){ if(v.paused){v.play();}else{v.pause();} return; }
+    if(e.clientX>innerWidth*0.3){go(cur+1);}else{go(cur-1);} });
+  document.addEventListener('mousemove',function(){document.body.classList.remove('idle');clearTimeout(idleTimer);
+    idleTimer=setTimeout(function(){document.body.classList.add('idle');},2500);});
+  addEventListener('resize',fit); fit();
+  var start=parseInt((location.hash||'#1').slice(1),10); go(isNaN(start)?0:start-1);
+  showHint('arrows: move   F: full screen   N: notes   B: backup   R: restart video');
+})();
+</script></body></html>
