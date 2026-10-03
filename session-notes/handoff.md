@@ -55,3 +55,10 @@ Merge test on Saturday 00:35: each branch merges into `main` cleanly. Merged one
 ## Next exact step
 
 Saturday morning, in this order: Alessandro confirms `mid-air-baseline-fix`; merge the three branches into `main`; the team fills the roles table; then `experiments/h_alto_end_to_end.py` is turned into shared code for result 2.
+
+## Overnight research, Saturday 3 October 00:00-09:30 (local branch `research/offline-nav-evidence`, not pushed)
+
+- Start with `docs/research/overnight-synthesis.md` (French). Details per track in `docs/research/`; open questions in `questions.md`.
+- Most important result: on ALTO Round 2 Train (37.4 km, never used for tuning, pre-registered, parameters frozen) the chain of `h_alto_end_to_end.py` gives a median of 94 m per 4.6 km section with a fix every 300 m (Val: 31 m). Treat the Val numbers as tuned on the test set.
+- `data/raw/alto/Val.zip` and `UAV_Round2_Train.zip` are on Ilhan's laptop, fetched with per-file Dropbox links (method in `docs/research/datasets-replay-sim.md`).
+- New experiment scripts use prefixes `n_` to `v` in `experiments/`; outputs in `data/processed/`. Optional dependencies: `uv sync --extra research`.
