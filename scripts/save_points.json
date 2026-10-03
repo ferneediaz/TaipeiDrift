@@ -128,6 +128,49 @@
     }
    },
    "seconds": 187
+  },
+  {
+   "name": "sp4-sun-heading",
+   "commit": "cd79a3a",
+   "date": "2026-10-03 17:12",
+   "note": "Heading from the simulated sun sensor (Fan et al.): every development flight works and is better over 3 seeds (2018 map medians 16.5, 32.3, 18.0 m); on the single seed of this check flight 1 is worse in the median (25.2 against 18.2) and better in the worst case (72 against 94)",
+   "tests": {
+    "passed": 304,
+    "failed": 0,
+    "skipped": 0,
+    "summary": "304 passed, 3 warnings in 129.72s (0:02:09)"
+   },
+   "visloc_03_confirm_body_seed1": {
+    "median": 28.0,
+    "p90": 176.7,
+    "worst": 368.2,
+    "fixes_used": 119.0,
+    "used_but_wrong": 0.0
+   },
+   "sim_wufeng_seed3": {
+    "camera_alone": {
+     "median": 73.1,
+     "p90": 157.9,
+     "worst": 211.4,
+     "fixes_used": 0.0,
+     "used_but_wrong": 0.0
+    },
+    "map_2018": {
+     "median": 25.2,
+     "p90": 51.1,
+     "worst": 72.4,
+     "fixes_used": 11.0,
+     "used_but_wrong": 0.0
+    },
+    "map_2020_fresh": {
+     "median": 27.2,
+     "p90": 55.7,
+     "worst": 79.1,
+     "fixes_used": 12.0,
+     "used_but_wrong": 0.0
+    }
+   },
+   "seconds": 242
   }
  ]
 }
