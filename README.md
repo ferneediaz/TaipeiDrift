@@ -2,12 +2,14 @@
 
 Repository of team Taipei Drift for the Taiwan Defense Tech Hackathon 2026, organised by EDTH and the Unmanned Vehicles R&D Center at National Taiwan University, 2 to 4 October 2026 in Taipei.
 
-We are working on Challenge 2, navigation without GNSS. The plan is proposed and awaits the team's confirmation. The repository holds the shared environment, the datasets, the research and first experiment scripts. Product code has not been started.
+We are working on Challenge 2, navigation without GNSS. The plan is proposed and awaits the team's confirmation. The repository holds the shared environment, the research and experiment scripts on the Mid-Air and ALTO datasets. Product code has not been started.
 
 ## Contents
 
-- [docs/PLAN.md](docs/PLAN.md): **start here**, the plan: what we build, roles, timeline, demo
+- [docs/findings.md](docs/findings.md): **read first**, what we measured on Friday night and what it changes
+- [docs/PLAN.md](docs/PLAN.md): the plan: what we build, roles, timeline, demo
 - [docs/brief.md](docs/brief.md): what the challenge asks for
+- [docs/method.md](docs/method.md): how image matching and the particle filter work, with worked numbers
 - [docs/landscape.md](docs/landscape.md): existing products and their limits
 - [docs/experiments.md](docs/experiments.md): earlier experiments on Taiwan data, made before the dataset was chosen, with scripts in `experiments/`
 - [docs/challenge-2-research.md](docs/challenge-2-research.md): papers, data sources and reading list
@@ -26,4 +28,4 @@ uv sync                              # creates .venv with Python 3.12 and the li
 source .venv/bin/activate
 ```
 
-The Mid-Air data is requested through a form on its website. See "Datasets" in [docs/PLAN.md](docs/PLAN.md) for what to select; the first download is about 300 MB.
+The datasets are not in the repository. [data/README.md](data/README.md) says how to get Mid-Air (about 10 GB, through a form and `scripts/fetch_midair.sh`) and ALTO (1.73 GB, from Dropbox in a browser).

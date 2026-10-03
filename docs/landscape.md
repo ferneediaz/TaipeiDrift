@@ -87,6 +87,50 @@ A navigation method for small drones that runs on open maps and cheap sensors, t
 - A solution for the full Strait crossing. We have simulated 30 km.
 - Performance at night or in fog. Not tested.
 
+## How Raptor and VNS01 work, and what they publish about night
+
+Researched on Friday night from the vendors' developer pages and datasheets, two test reports by Inertial Labs (a partner of Vantor), a technical paper by UAV Navigation and two patents. We found no independent test of either product. The key quotes were checked against saved copies of the sources.
+
+### Raptor Guide (Vantor, formerly Maxar)
+
+- **What it does with one camera frame.** It takes the frame and a rough position and attitude from the drone's own navigation, renders how the 3D map would look from there, matches the frame against that rendering, and computes the camera's position and attitude. It returns a confidence between 0 and 1 and an uncertainty. Source: [integration guide](https://developers.maxar.com/raptor/guide/1.0/sdk/integration).
+- **It has no memory.** It "performs separate camera pose estimations for each individual frame" and "should not be used as a standalone navigation system". It is meant to be fused with an IMU and other sensors.
+- **Search.** Given an uncertainty for the rough position, it searches a region around it. Without one, it only refines that single guess.
+- **Rejection.** The guide rates a confidence below 0.7 as "Poor — reject; no robust match found".
+- **Reference data.** A textured 3D surface model at 50 cm, derived from 30 cm satellite imagery. Source: [terrain datasheet](https://cdn.sanity.io/files/ava0h2e5/production/5a74a29c81f5f8a6213542a1c674c9a687dfa93e.pdf).
+- **Camera.** A visible-light or infrared video feed. Wide lenses are not recommended and fisheye lenses are not supported.
+- **Computing.** A graphics processor is required. There is a build for the Jetson Orin Nano, and the guide asks for at least 4 GB of memory.
+- **Stated limits.** The match is poor over water and sky, where the terrain has changed since mapping, and at low contrast. Source: [troubleshooting page](https://developers.maxar.com/raptor/guide/1.0/sdk/raptor-guide-troubleshooting).
+- **Published test.** Eight daytime flights on a Cessna 182 with a fixed infrared camera, at 62 m/s and 100 to 1,000 m above ground, fused with an inertial system. The mean error is 12.2 m, half of the positions are within 9.3 m and 95 percent within 25.8 m. The best flight, at 7.0 m, had the camera mounted at 45 degrees. Segments over large water were removed. Source: [Inertial Labs report, December 2025](https://inertiallabs.com/wp-content/uploads/2026/02/VINS_Integrated_with_Vantor_Raptor_Guide_Technical_Report_DEC2025.pdf).
+- **The principle in a patent.** A [patent](https://patents.google.com/patent/US9360321B2/en) of the company's Swedish predecessor describes rendering a picture from the 3D database at an assumed pose, comparing it with the camera picture by normalised cross-correlation, and repeating. That is the comparison our brightness matching uses. No source says that the product works exactly this way.
+
+### VNS01 (UAV Navigation)
+
+Source for this section: the company's [architecture paper](https://www.uavnavigation.com/company/blog/gnss-denied-architecture-unmanned-aerial-systems), September 2026.
+
+- **Visual odometry.** Follows distinctive points between consecutive frames and corrects the speed. About 1 percent drift. It works "as long as there is enough luminosity".
+- **Template matching.** Recognises features that were stored with coordinates on earlier flights with GNSS. Valid from half to twice the height of the original flight.
+- **Terrain navigation.** Compares the profile from a radar altimeter with an elevation model, at low altitude. Reported error: 239 ± 16 m over 187 km.
+- **Map matching.** A deep-learning model aligns the camera image with satellite imagery, at higher altitude. Reported error: 31 ± 9 m over 36 km. It follows the public [STHN paper](https://arxiv.org/abs/2405.20470).
+- **Fusion.** The fixes go into the autopilot's own estimator as corrections at a low rate.
+- **Hardware.** The unit weighs 100 g and uses a global-shutter camera.
+- **Stated limits.** Not available above clouds or over the ocean. Oceans and deserts are named as a challenge.
+
+### Night
+
+- **Neither product claims night operation with an ordinary camera.**
+- **Raptor at night means an infrared camera.** The one published night flight used a FLIR Boson+ camera over about 58 km. The report's table gives an error of 5.0 m and its text says under 15 m. Source: [Inertial Labs white paper](https://inertiallabs.com/gnss-denied-performance-of-vision-based-positioning-apnt-solution/).
+- **How the infrared picture is matched is not explained.** The white paper only says that patterns from a "day or IR camera" are compared with maps derived from satellite imagery. The developer pages we saved do not contain the words night, infrared or thermal. A [2019 patent](https://patents.google.com/patent/US11164338B2/en) of the company describes map textures for "low ambient light conditions"; whether the product uses them is not stated anywhere.
+- **VNS01 makes no night claim.** Without light its visual odometry is unavailable. What remains is terrain navigation with the radar altimeter, which needs no camera, and dead reckoning. Its map-matching model was pretrained on a dataset of thermal and daylight images, which points to a thermal option, but no source states a thermal camera.
+
+### What this means for us
+
+- **Our chain on ALTO has the same parts.** A prior position, a search around it that grows with the uncertainty, a match score, a threshold below which a fix is rejected, and fusion with dead reckoning.
+- **Our accuracy is in the published range.** Our median of 26 to 31 m compares with the 31 ± 9 m that VNS01 reports for map matching. Our conditions are easier: a short section, and reference images along the route only.
+- **Night needs another sensor.** Our result is for daylight. The known route to night is an infrared camera against the same reference data.
+- **Water is excluded by both vendors.** It is an open problem for everyone, and it is first on our list for Taiwan.
+- **Quote vendor figures with their document.** They vary between the vendor's own papers: accuracy "under 10 m" and "under 7 m", minimum altitude 50, 100 and 120 m.
+
 ## Correction to an earlier statement
 
 After the first experiments I wrote that I had found nothing like the learned-wind result. That was wrong. Estimating wind and using it for dead reckoning is standard in the PX4 and ArduPilot autopilots. What remains ours is learning the wind from camera and terrain fixes when GNSS is never available, and measuring what that buys over water.

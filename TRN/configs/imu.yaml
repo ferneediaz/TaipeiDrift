@@ -1,0 +1,40 @@
+# Strapdown INS + error presets. Units: gyro bias deg/h, ARW deg/sqrt(h), accel bias micro-g,
+# VRW micro-g/sqrt(Hz), tau s, attitude deg, velocity m/s, position m.
+grade: tactical
+gravity_mps2: 9.80665
+earth_rate_rps: 7.292115e-5
+earth_radius_m: 6371000.0
+presets:
+  navigation:
+    gyro_bias_dph: 0.003
+    gyro_tau_s: 3600
+    arw_dpsh: 0.001
+    accel_bias_ug: 25
+    accel_tau_s: 3600
+    vrw_ug_rthz: 5
+    init_att_deg: [0.005, 0.005, 0.02]
+  tactical:
+    gyro_bias_dph: 1.0
+    gyro_tau_s: 1800
+    arw_dpsh: 0.1
+    accel_bias_ug: 300
+    accel_tau_s: 1800
+    vrw_ug_rthz: 50
+    init_att_deg: [0.05, 0.05, 0.2]
+  mems:
+    gyro_bias_dph: 10.0
+    gyro_tau_s: 600
+    arw_dpsh: 0.3
+    accel_bias_ug: 2000
+    accel_tau_s: 600
+    vrw_ug_rthz: 150
+    init_att_deg: [0.2, 0.2, 1.0]
+init_errors:                 # at GNSS loss (start of TRN phase), 1-sigma
+  horiz_pos_m: 500.0
+  vert_pos_m: 30.0
+  vel_mps: 0.3
+baro:
+  enabled: true
+  bias_sigma_m: 30.0         # stationary sigma of baro bias (GM)
+  bias_tau_s: 3600.0
+  noise_m: 1.0

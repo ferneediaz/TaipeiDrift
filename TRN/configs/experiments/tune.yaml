@@ -1,0 +1,10 @@
+name: tune
+description: Filter tuning on a SEPARATE seed (not used for evaluation). Clear air, tactical IMU.
+routes: [A_mountain_crossing, B_coastal_plain, C_foothills]
+filters: [mpf_gated, mpf_proposed]
+runs: 6
+overrides:
+  montecarlo.base_seed: 777
+sweep:
+  filters.common.decorrelation_length_m: [50.0, 100.0]
+  filters.mpf_proposed.map_sigma_m: [3.0, 5.0, 8.0]

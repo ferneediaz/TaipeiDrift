@@ -19,6 +19,7 @@ dependencies = [
     "pydantic>=2",
     # tests
     "pytest",
+    "h5py>=3.16.0",
 ]
 
 [tool.uv]

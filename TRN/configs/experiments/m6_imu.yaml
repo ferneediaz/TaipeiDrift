@@ -1,0 +1,11 @@
+name: m6_imu
+description: M6 - IMU grade sweep at 30 % cloud.
+routes: [A_mountain_crossing, B_coastal_plain, C_foothills]
+filters: [mpf_baseline, mpf_proposed]
+runs: 20
+quick_runs: 4
+overrides:
+  atmosphere.enabled: true
+  atmosphere.cloud_fraction: 0.3
+sweep:
+  imu.grade: [navigation, tactical, mems]
