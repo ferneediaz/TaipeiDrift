@@ -313,7 +313,7 @@ The receiver loses about 10 dB against an ideal GMSK detector. That loss is comp
 | `/rf/params` | the receiver calibration and the bias drawn for this run (latched) |
 | `/ships/<name>/odom` | each ship's true position, heading and speed |
 
-The bearing is in the body frame because a direction finder measures it against the airframe. In the strait world the drone carries one: a shielded loop spinning at 25 rev/s in a radome on its back, and a quarter-wave sense whip on the forward boom (RF_README.md, section 2). Each detection also carries the position the ship reports (latitude and longitude, from the ship's own GNSS, 3 m error), as a real AIS position report does. The sensor monitor shows each ship's range, packets decoded, last angle of arrival (AoA) and its error.
+The bearing is in the body frame because a direction finder measures it against the airframe. In the strait world the drone carries one: a pseudo-Doppler array of four VHF stubs on its rotor arms, switched electronically, as flown on a four-rotor UAS by Gerhard and Tokekar ([arXiv 2003.00386](https://arxiv.org/pdf/2003.00386)). Where the design comes from, and what we changed: RF_README.md, section 2. Each detection also carries the position the ship reports (latitude and longitude, from the ship's own GNSS, 3 m error), as a real AIS position report does. The sensor monitor shows each ship's range, packets decoded, last angle of arrival (AoA) and its error.
 
 ### The drone's position from the ships, without GNSS
 
