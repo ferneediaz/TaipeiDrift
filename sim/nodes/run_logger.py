@@ -3,6 +3,7 @@ import argparse
 import csv
 import json
 import math
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import numpy as np
 
@@ -10,11 +11,12 @@ import rclpy
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import CameraInfo, FluidPressure, Imu, NavSatFix
+from sensor_msgs.msg import CameraInfo, FluidPressure, Imu, LaserScan, NavSatFix
 from std_msgs.msg import Bool, String
 from scipy.spatial.transform import Rotation, Slerp
 from run_policy import gps_csv_values
 from frame_conversions import body_velocity_to_world
+from frame_conversions import gazebo_down_optical_to_flu
 
 
 def stamp(msg):
@@ -50,6 +52,8 @@ class RunLogger(Node):
         self.file = (Path(out) / "trajectory.csv").open("w", newline="", encoding="utf-8")
         self.run_dir = Path(out)
         run_metadata = json.loads((self.run_dir / "metadata.json").read_text(encoding="utf-8"))
+        self.world_name = run_metadata.get("world")
+        self.city_boxes = self.load_city_collision_boxes() if self.world_name == "city" else []
         self.velocity_fit_window_s = float(run_metadata.get("gnss_velocity_fit", {}).get("window_s", 8.0))
         self.log_file = (self.run_dir / "sim.log").open("a", encoding="utf-8")
         self.debug_file = (self.run_dir / "estimator_debug.csv").open("w", newline="", encoding="utf-8")
@@ -76,6 +80,23 @@ class RunLogger(Node):
             "fit_speed_error", "fit_direction_error_deg", "fit_sample_count", "fit_span_s",
             "fit_residual_rms_m", "fit_accepted", "fit_nis", "fit_rejection_reason", "gnss_available"])
         self.latest_velocity_fit = None
+        self.flow_file = (self.run_dir / "flow_velocity.csv").open("w", newline="", encoding="utf-8")
+        self.flow_writer = csv.writer(self.flow_file)
+        self.flow_writer.writerow(["timestamp", "range_m", "flow_u_px_s", "flow_v_px_s", "flow_spread_px_s",
+            "measured_vx", "measured_vy", "gt_vx", "gt_vy", "est_vx", "est_vy",
+            "flow_vector_error", "flow_speed_error", "flow_direction_error_deg", "track_count",
+            "valid_flow_count", "inlier_count", "inlier_ratio", "quality", "image_dt_s",
+            "measurement_covariance", "update_attempted", "update_accepted", "rejection_reason"])
+        self.range_file = (self.run_dir / "range_debug.csv").open("w", newline="", encoding="utf-8")
+        self.range_writer = csv.writer(self.range_file)
+        self.range_writer.writerow(["timestamp", "frame_id", "range_m", "valid", "range_min_m", "range_max_m",
+                                    "gt_world_z_m_evaluation_only", "gt_ray_expected_range_m_evaluation_only",
+                                    "range_error_m_evaluation_only", "camera_width", "camera_height",
+                                    "fx", "fy", "cx", "cy"])
+        self.cov_file = (self.run_dir / "state_covariance.csv").open("w", newline="", encoding="utf-8")
+        self.cov_writer = csv.writer(self.cov_file)
+        self.cov_writer.writerow(["timestamp", "position_var_x", "position_var_y", "position_var_z",
+                                  "velocity_var_x", "velocity_var_y", "velocity_var_z"])
         self.gt_history = []
         self.started = False
         self.rows = 0
@@ -83,7 +104,7 @@ class RunLogger(Node):
         self.writer.writerow(["timestamp_sim_s", "gt_x", "gt_y", "gt_z", "gt_vx", "gt_vy", "gt_vz",
                               "gt_roll", "gt_pitch", "gt_yaw", "est_x", "est_y", "est_z", "est_vx",
                               "est_vy", "est_vz", "est_roll", "est_pitch", "est_yaw", "gps_x_lat_deg",
-                              "gps_y_lon_deg", "gps_z_alt_m", "gnss_available", "barometer_pa",
+                              "gps_y_lon_deg", "gps_z_alt_m", "gnss_available", "gps_fix_fresh", "barometer_pa",
                               "imu_ax", "imu_ay", "imu_az", "imu_gx", "imu_gy", "imu_gz"])
         self.gt = self.est = self.gps = self.imu = self.baro = None
         self.gnss_available = False
@@ -95,12 +116,81 @@ class RunLogger(Node):
         self.create_subscription(FluidPressure, "/air_pressure", lambda m: setattr(self, "baro", m), qos_profile_sensor_data)
         self.create_subscription(CameraInfo, "/camera/forward/camera_info", self.camera_info, qos_profile_sensor_data)
         self.create_subscription(CameraInfo, "/camera/down/camera_info", self.camera_info, qos_profile_sensor_data)
+        self.create_subscription(LaserScan, "/range/down", self.range_scan, qos_profile_sensor_data)
         self.create_subscription(String, "/nav/estimator_status", self.estimator_status, qos_profile_sensor_data)
         self.last_camera = {}
         self.create_timer(0.1, self.write_row)
 
     def camera_info(self, m):
-        self.last_camera[m.header.frame_id] = {"width": m.width, "height": m.height, "k": list(m.k)}
+        info = {"width": m.width, "height": m.height, "k": list(m.k)}
+        self.last_camera[m.header.frame_id] = info
+        if "down" in m.header.frame_id:
+            metadata_path = self.run_dir / "metadata.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["down_camera_info_observed"] = {"frame_id": m.header.frame_id, **info,
+                "update_rate_hz_sdf": 25.0, "horizontal_fov_rad_sdf": 1.5708,
+                "body_extrinsic_from_sdf": "sensor_link to downward camera: pitch +90 deg; optical +Z points down"}
+            metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    @staticmethod
+    def load_city_collision_boxes():
+        path = Path(__file__).resolve().parents[1] / "models" / "city" / "model.sdf"
+        if not path.exists():
+            return []
+        boxes = []
+        for link in ET.parse(path).findall(".//link"):
+            pose = np.fromstring(link.findtext("pose", "0 0 0 0 0 0"), sep=" ")
+            if len(pose) < 6:
+                continue
+            for box in link.findall("./collision/geometry/box"):
+                size = np.fromstring(box.findtext("size", ""), sep=" ")
+                if len(size) == 3:
+                    boxes.append((pose[:3] - size / 2.0, pose[:3] + size / 2.0))
+        return boxes
+
+    def expected_city_range(self, truth):
+        """GT/model ray intersection is evaluation-only; estimator never receives this value."""
+        if truth is None or not self.city_boxes:
+            return math.nan
+        pos, attitude = truth
+        # SDF: sensor_link is +0.5 m along base_link/body X; ray axis is optical +Z.
+        origin = pos + attitude.apply([0.5, 0.0, 0.0])
+        direction = attitude.apply(gazebo_down_optical_to_flu()[:, 2])
+        nearest = math.inf
+        for lo, hi in self.city_boxes:
+            t0, t1 = -math.inf, math.inf
+            possible = True
+            for axis in range(3):
+                if abs(direction[axis]) < 1e-10:
+                    if origin[axis] < lo[axis] or origin[axis] > hi[axis]:
+                        possible = False
+                        break
+                    continue
+                a = (lo[axis] - origin[axis]) / direction[axis]
+                b = (hi[axis] - origin[axis]) / direction[axis]
+                t0, t1 = max(t0, min(a, b)), min(t1, max(a, b))
+                if t1 < t0:
+                    possible = False
+                    break
+            hit = t0 if t0 > 0 else t1
+            if possible and hit > 0:
+                nearest = min(nearest, hit)
+        return nearest if math.isfinite(nearest) else math.nan
+
+    def range_scan(self, m):
+        vals = np.asarray(m.ranges, dtype=float)
+        valid = vals[np.isfinite(vals) & (vals >= m.range_min) & (vals <= m.range_max)]
+        value = float(np.median(valid)) if len(valid) else math.nan
+        truth = self.truth_at(stamp(m))
+        z = float(truth[0][2]) if truth is not None else math.nan
+        expected = self.expected_city_range(truth)
+        info = next((v for key, v in self.last_camera.items() if "down" in key), {})
+        k = info.get("k", [math.nan] * 9)
+        self.range_writer.writerow([stamp(m), m.header.frame_id, value, int(bool(len(valid))),
+            m.range_min, m.range_max, z, expected, value - expected if math.isfinite(expected) else math.nan,
+            info.get("width", ""), info.get("height", ""),
+            k[0], k[4], k[2], k[5]])
+        self.range_file.flush()
 
     def on_truth(self, m):
         self.gt = m
@@ -158,6 +248,40 @@ class RunLogger(Node):
                 d.get("velocity_reason"), d.get("velocity_sample_count"), d.get("velocity_span_s"),
                 d.get("velocity_residual_rms_m"), json.dumps(d.get("velocity_rejected_stamps"))])
             self.gnss_debug_file.flush()
+            return
+        if d.get("event") == "metric_flow":
+            measured = d.get("measured_velocity_camera")
+            measured_xy = [math.nan, math.nan]
+            flow_error = speed_error = flow_direction = math.nan
+            gt_v = self.truth_velocity_at(float(d["stamp"]))
+            truth = self.truth_at(float(d["stamp"]))
+            if measured is not None and truth is not None:
+                # Compare in the camera-lateral coordinates observed by the 2D
+                # ESKF update. No unobserved camera-axis/vertical velocity is
+                # invented when the aircraft is tilted or climbing.
+                Rbc = gazebo_down_optical_to_flu()
+                measured_xy = np.asarray(measured, dtype=float)[:2].tolist()
+                if gt_v is not None:
+                    gt_camera = (Rbc.T @ truth[1].as_matrix().T @ gt_v)[:2]
+                    flow_error = float(np.linalg.norm(np.asarray(measured_xy) - gt_camera))
+                    speed_error = abs(float(np.linalg.norm(measured_xy)) - float(np.linalg.norm(gt_camera)))
+                    flow_direction = direction_error_deg(measured_xy, gt_camera)
+            if self.est is not None:
+                ep, eq = self.est.pose.pose.position, self.est.pose.pose.orientation
+                er = Rotation.from_quat([eq.x, eq.y, eq.z, eq.w])
+                ev = self.est.twist.twist.linear
+                est_v = (gazebo_down_optical_to_flu().T @ er.as_matrix().T @ np.array([ev.x, ev.y, ev.z]))[:2]
+            else:
+                est_v = [math.nan, math.nan]
+            self.flow_writer.writerow([d.get("stamp"), d.get("range_m"), d.get("flow_u_px_s"),
+                d.get("flow_v_px_s"), d.get("flow_spread_px_s"), *measured_xy,
+                *((gazebo_down_optical_to_flu().T @ truth[1].as_matrix().T @ gt_v)[:2].tolist()
+                  if gt_v is not None and truth is not None else [math.nan, math.nan]), *np.asarray(est_v).tolist(),
+                flow_error, speed_error, flow_direction, d.get("tracked"), d.get("valid_flow_count"),
+                d.get("ransac_inliers"), d.get("inlier_ratio"), d.get("quality"), d.get("dt"),
+                json.dumps(d.get("measurement_covariance")), d.get("update_attempted"),
+                d.get("accepted"), d.get("reason")])
+            self.flow_file.flush()
             return
         if d.get("event") == "gnss_velocity_fit":
             fit_v = np.asarray(d["velocity_observation"], dtype=float)
@@ -223,8 +347,12 @@ class RunLogger(Node):
                   imu.angular_velocity.x, imu.angular_velocity.y, imu.angular_velocity.z] if imu else [math.nan] * 6)
         gt = pose_values(self.gt)
         est = pose_values(self.est) if self.est else [math.nan] * 9
-        self.writer.writerow([now, *gt, *est, *gps, int(gps_ok),
+        self.writer.writerow([now, *gt, *est, *gps, int(self.gnss_available), int(gps_ok),
                               self.baro.fluid_pressure if self.baro else math.nan, *imu_v])
+        if self.est is not None:
+            pc, vc = self.est.pose.covariance, self.est.twist.covariance
+            self.cov_writer.writerow([now, pc[0], pc[7], pc[14], vc[0], vc[7], vc[14]])
+            self.cov_file.flush()
         gt_v = gt_velocity_world(self.gt)
         est_v = np.asarray(est[3:6], dtype=float)
         fit = self.latest_velocity_fit
@@ -261,6 +389,9 @@ class RunLogger(Node):
         self.debug_file.close()
         self.gnss_debug_file.close()
         self.velocity_debug_file.close()
+        self.flow_file.close()
+        self.range_file.close()
+        self.cov_file.close()
 
 
 def main():

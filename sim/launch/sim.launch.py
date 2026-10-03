@@ -107,7 +107,8 @@ OVERVIEW_POSE = (425.0, -1700.0, 1100.0, 0.0, 0.53, 1.5708)
 
 
 def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: float = 0.30, views: bool = False,
-              wind: bool = False) -> Path:
+              wind: bool = False, range_min_m: float = 0.20, range_max_m: float = 100.0,
+              range_noise_std_m: float = 0.02) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
     if wind:
         ET.SubElement(tree.find("model"), "enable_wind").text = "true"
@@ -116,6 +117,10 @@ def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: 
     forward_image = link.find("sensor[@name='camera_forward']/camera/image")
     image.find("width").text = image.find("height").text = str(cam_res)
     forward_image.find("width").text = forward_image.find("height").text = str(cam_res)
+    range_sensor = link.find("sensor[@name='range_down']/lidar/range")
+    range_sensor.find("min").text = str(range_min_m)
+    range_sensor.find("max").text = str(range_max_m)
+    link.find("sensor[@name='range_down']/lidar/noise/stddev").text = str(range_noise_std_m)
     if not gps:
         link.remove(link.find("sensor[@name='navsat']"))
     if stereo:
@@ -302,6 +307,13 @@ def setup(context):
     run_label = LaunchConfiguration("run_label").perform(context).strip()
     if run_label and not re.fullmatch(r"[A-Za-z0-9_-]+", run_label):
         sys.exit("run_label may contain only letters, numbers, underscores, and hyphens")
+    metric_flow = LaunchConfiguration("metric_flow").perform(context).lower() == "true"
+    range_min_m = float(LaunchConfiguration("range_min_m").perform(context))
+    range_max_m = float(LaunchConfiguration("range_max_m").perform(context))
+    range_noise_std_m = float(LaunchConfiguration("range_noise_std_m").perform(context))
+    flow_update_every_n = max(1, int(LaunchConfiguration("flow_update_every_n").perform(context)))
+    if not (0 < range_min_m < range_max_m and range_noise_std_m >= 0):
+        sys.exit("range_min_m/range_max_m/noise must satisfy 0 < min < max and noise >= 0")
     if not world.exists():
         sys.exit(f"No world {world}. Choose one of: {', '.join(sorted(w.stem for w in world.parent.glob('*.sdf')))}")
     if record_mode not in ("off", "light", "full"):
@@ -320,12 +332,14 @@ def setup(context):
         except ValueError:
             sys.exit(f"wind must be SPEED_MPS,FROM_DEG (for example 6,20), not {wind!r}")
         world_file = windy_world(world, speed, from_deg)
-    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, views=ships, wind=world_file != world)
+    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, views=ships, wind=world_file != world,
+                      range_min_m=range_min_m, range_max_m=range_max_m, range_noise_std_m=range_noise_std_m)
     gui_config = views_gui_config() if ships else SIM / "config/gui.config"
     sim_time = {"use_sim_time": True}
 
     run_id = dt.datetime.now().strftime(f"{world.stem}_%Y%m%d_%H%M%S")
-    run_dir = (SIM.parent / "outputs" / "sim_runs" / "velocity_phase" / run_label
+    output_phase = "metric_velocity" if metric_flow or run_label.startswith("OF") else "velocity_phase"
+    run_dir = (SIM.parent / "outputs" / "sim_runs" / output_phase / run_label
                if run_label else SIM.parent / "outputs" / "sim_runs" / run_id)
     run_dir.mkdir(parents=True, exist_ok=False)
     try:
@@ -362,6 +376,11 @@ def setup(context):
         "sim_tracker_min_tracks": pose_cfg["min_correspondences"],
         "pose_min_correspondences": pose_cfg["min_correspondences"], "pose_min_inliers": pose_cfg["min_inliers"],
         "gnss_velocity_fit": velocity_fit_config,
+        "metric_flow": {"enabled": metric_flow, "algorithm": "Shi-Tomasi/LK + homography RANSAC + ESKF-attitude derotation",
+                        "range_min_m": range_min_m, "range_max_m": range_max_m,
+                        "range_noise_std_m": range_noise_std_m, "range_topic": "/range/down",
+                        "update_every_n_images": flow_update_every_n,
+                        "update_rate_qualifier": "consecutive image-pair temporal correlation decimation"},
         "gnss_local_enu_origin": {"latitude_deg": gps_origin[0], "longitude_deg": gps_origin[1],
                                    "elevation_m": gps_origin[2]},
     }
@@ -375,11 +394,15 @@ def setup(context):
     (run_dir / "config.json").write_text(json.dumps({"world": world.stem, "demo": demo, "cam_res": cam_res,
         "gnss_cutoff_s_since_first_fix": gnss_cut_s, "record_mode": record_mode, "ships": ships,
         "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true",
+        "metric_flow": metric_flow, "range_min_m": range_min_m, "range_max_m": range_max_m,
+        "range_noise_std_m": range_noise_std_m,
+        "flow_update_every_n": flow_update_every_n,
         "gnss_velocity_fit": velocity_fit_config}, indent=2), encoding="utf-8")
     (run_dir / "sim.log").write_text(f"Run {run_id}; launch logs are emitted by ros2 launch.\n", encoding="utf-8")
     bag_topics = ["/ground_truth/odom", "/sim/gps_raw", "/gps/fix", "/nav/gnss_available",
                   "/sim/imu_raw", "/imu/data", "/sim/air_pressure_raw", "/air_pressure", "/tf", "/tf_static",
                   "/camera/down/camera_info", "/camera/forward/camera_info", "/nav/odom", "/nav/estimator_status"]
+    bag_topics += ["/range/down"]
     if ships:
         bag_topics += ["/rf/detections", "/rf_nav/odom", "/nav_rf/odom", "/nav_rf/estimator_status"]
     if record_mode == "full":
@@ -389,6 +412,9 @@ def setup(context):
     estimator = [sys.executable, str(SIM / "nodes/eskf_ros_adapter.py"),
                  "--ros-args", "-p", f"vision_rotation:={vision_rotation}",
                  "-p", f"vision_direction:={vision_direction}",
+                 "-p", f"metric_flow:={str(metric_flow).lower()}",
+                 "-p", f"flow_range_std_m:={range_noise_std_m}",
+                 "-p", f"flow_update_every_n:={flow_update_every_n}",
                  "-p", f"gps_origin_latitude:={gps_origin[0]}",
                  "-p", f"gps_origin_longitude:={gps_origin[1]}",
                  "-p", f"gps_origin_elevation:={gps_origin[2]}"]
@@ -483,6 +509,11 @@ def generate_launch_description():
         DeclareLaunchArgument("vision_rotation", default_value="true"),
         DeclareLaunchArgument("vision_direction", default_value="true"),
         DeclareLaunchArgument("run_label", default_value=""),
+        DeclareLaunchArgument("metric_flow", default_value="false"),
+        DeclareLaunchArgument("range_min_m", default_value="0.20"),
+        DeclareLaunchArgument("range_max_m", default_value="100.0"),
+        DeclareLaunchArgument("range_noise_std_m", default_value="0.02"),
+        DeclareLaunchArgument("flow_update_every_n", default_value="5"),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])
