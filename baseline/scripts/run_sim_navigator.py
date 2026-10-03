@@ -17,6 +17,7 @@ import json
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime, timedelta
 from dataclasses import replace
 from pathlib import Path
 
@@ -32,7 +33,8 @@ from src.data.sim_replay import SimReplayConfig, load_sim_flight, with_camera, w
 from src.estimation.camera_navigator import NavigatorConfig, calibrate, navigate  # noqa: E402
 from src.estimation.image_motion import shifts_for_flight  # noqa: E402
 from src.evaluation.navigation_metrics import integrity_summary, navigation_errors, summarize_navigation  # noqa: E402
-from src.sensors.heading import compass_heading  # noqa: E402
+from src.sensors.heading import compass_heading, sun_position  # noqa: E402
+from src.sensors.sun_sensor import SunSensorModel, sun_heading_readings  # noqa: E402
 
 _FLIGHTS: dict[str, object] = {}  # one loaded flight per worker process and map
 
@@ -72,24 +74,54 @@ def compass(cfg: dict, flight, seed: int) -> np.ndarray:
     return compass_heading(flight.metadata["true_heading_deg"], np.random.default_rng(seed), **cfg["heading"]["compass"])
 
 
-def flow_path(cfg: dict, seed: int) -> Path:
-    """Where the camera motion of one compass draw is cached.
+def heading_reading(cfg: dict, flight, seed: int) -> np.ndarray:
+    """The heading sensor's readings for one draw (seed): the compass, or a sun sensor (src/sensors/sun_sensor.py).
 
-    The name carries a fingerprint of the recording's image list and of the compass settings, so a
-    flight recorded again under the same name, or another compass, never reuses old camera motion.
+    A sun sensor is told the flight's date and time (``heading.when``) and the world's latitude and longitude
+    (the recording's meta.json). Under the realistic camera's clouds, the sun is hidden when the drone's line
+    to the sun passes through a cloud: traced down to the ground, it ends in that cloud's shadow.
+    """
+    source = cfg["heading"].get("source", "compass")
+    if source == "compass":
+        return compass(cfg, flight, seed)
+    model = SunSensorModel(**cfg["heading"][source])
+    meta = json.loads((Path(flight.metadata["recording"]) / "meta.json").read_text())
+    lat, lon = meta["origin"]["lat_deg"], meta["origin"]["lon_deg"]
+    start = datetime.fromisoformat(cfg["heading"]["when"])
+    hidden = None
+    camera = flight.metadata.get("camera")
+    if camera is not None:
+        az_el = np.array([sun_position(lat, lon, start + timedelta(seconds=float(s))) for s in flight.timestamp])
+        a, zenith = np.radians(az_el[:, 0]), np.radians(90.0 - az_el[:, 1])
+        reach = flight.metadata["height_m"] * np.tan(zenith)  # from the drone along the sun's ray to the ground
+        north = flight.position_gt[:, 0] - reach * np.cos(a)
+        east = flight.position_gt[:, 1] - reach * np.sin(a)
+        hidden = camera.shadow_at(north, east, flight.timestamp) > 0.5 * camera.model.cloud_shadow
+    reading, _ = sun_heading_readings(model, flight.metadata["attitude_q"], flight.timestamp, start, lat, lon,
+                                      np.random.default_rng(seed), hidden)
+    return reading
+
+
+def flow_path(cfg: dict, seed: int) -> Path:
+    """Where the camera motion of one heading-sensor draw is cached.
+
+    The name carries a fingerprint of the recording's image list and of the heading sensor's settings, so
+    a flight recorded again under the same name, or another sensor, never reuses old camera motion.
     """
     recording = Path(_path(cfg, "recording"))
-    content = (recording / "images.csv").read_bytes() + json.dumps(cfg["heading"]["compass"], sort_keys=True).encode()
+    source = cfg["heading"].get("source", "compass")
+    sensor = cfg["heading"]["compass"] if source == "compass" else {source: cfg["heading"][source], "when": cfg["heading"]["when"]}
+    content = (recording / "images.csv").read_bytes() + json.dumps(sensor, sort_keys=True).encode()
     if cfg.get("camera"):  # the ideal camera keeps the fingerprint it always had
         content += json.dumps(cfg["camera"], sort_keys=True).encode()
-    return Path(_path(cfg, "cache_dir")) / f"sim_flow_{recording.name}_{hashlib.sha1(content).hexdigest()[:10]}_compass_seed{seed}.npy"
+    return Path(_path(cfg, "cache_dir")) / f"sim_flow_{recording.name}_{hashlib.sha1(content).hexdigest()[:10]}_{source}_seed{seed}.npy"
 
 
 def flow_job(job: tuple) -> str:
-    """Camera motion for one compass draw: the frames are turned north up by its readings."""
+    """Camera motion for one heading-sensor draw: the frames are turned north up by its readings."""
     cfg, seed = job
     flight0 = flight_for(cfg, "2018")
-    shifts_for_flight(with_heading(flight0, compass(cfg, flight0, seed)), flow_path(cfg, seed))
+    shifts_for_flight(with_heading(flight0, heading_reading(cfg, flight0, seed)), flow_path(cfg, seed))
     return f"seed {seed}"
 
 
@@ -97,7 +129,7 @@ def one_run(job: tuple) -> dict:
     cfg, name, settings, seed, keep_result = job
     settings = dict(settings)
     flight0 = flight_for(cfg, settings.pop("map"))
-    reading = compass(cfg, flight0, seed)
+    reading = heading_reading(cfg, flight0, seed)
     flight = with_heading(flight0, reading)
     shifts = shifts_for_flight(flight, flow_path(cfg, seed))
     run = replace(NavigatorConfig(**cfg["navigator"]), **settings)

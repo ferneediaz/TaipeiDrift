@@ -120,6 +120,7 @@ def load_sim_flight(cfg: SimReplayConfig, heading_deg: np.ndarray | None = None)
             "map": Path(cfg.map_tif).name,
             "origin_enu_m": [float(east[first]), float(north[first])],
             "true_heading_deg": true_heading[keep],
+            "attitude_q": q[keep],  # (M, 4) qw, qx, qy, qz: body (forward, left, up) to ENU, for sensor models only
             "height_m": up[keep],
             "recording_t_s": t[keep],
             "image_paths": paths,

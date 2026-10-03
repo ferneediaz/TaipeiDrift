@@ -128,6 +128,14 @@ class RealisticCamera:
         self.map_x = (c + self.right_px * scale).astype(np.float32)
         self.map_y = (c - self.forward_px * scale).astype(np.float32)
 
+    def shadow_at(self, north: np.ndarray, east: np.ndarray, t: np.ndarray) -> np.ndarray:
+        """Cloud shadow strength on the ground at these points (metres, the flight's frame) and times (s)."""
+        m = self.model
+        n = self.clouds.shape[0]
+        col = np.mod((np.asarray(east) - m.wind_east_mps * np.asarray(t)) / CLOUD_GRID_M, n).astype(np.float32)
+        row = np.mod(-(np.asarray(north) - m.wind_north_mps * np.asarray(t)) / CLOUD_GRID_M, n).astype(np.float32)
+        return cv2.remap(self.clouds, col.reshape(1, -1), row.reshape(1, -1), cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)[0]
+
     def shadow(self, i: int) -> np.ndarray:
         """Cloud shadow strength under every pixel of frame ``i``."""
         m = self.model

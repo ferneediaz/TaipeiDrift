@@ -67,6 +67,7 @@ def main() -> int:
     p.add_argument("--set", nargs="*", default=[], help="navigator settings to change, as name=value")
     p.add_argument("--camera", default="ideal")
     p.add_argument("--camera-set", nargs="*", default=[], help="camera settings to change, as name=value (e.g. visibility_m=300)")
+    p.add_argument("--heading", help="heading sensor from the config's heading section: compass, sun_digital or sun_photodiode")
     p.add_argument("--seeds", nargs="+", type=int)
     p.add_argument("--runs", nargs="+", default=["camera_alone", "map_2018", "map_2020_fresh"])
     p.add_argument("--flights", nargs="+", help="development flights to use (default: all that are recorded)")
@@ -74,11 +75,14 @@ def main() -> int:
     args = p.parse_args()
 
     cfg = yaml.safe_load((REPO / "baseline" / "configs" / "sim_navigator.yaml").read_text())
+    if args.heading:
+        cfg["heading"] = {**cfg["heading"], "source": args.heading}
     overrides = {k: parse_value(v) for k, v in (s.split("=", 1) for s in args.set)}
     camera_overrides = {k: parse_value(v) for k, v in (s.split("=", 1) for s in args.camera_set)}
     seeds = args.seeds or cfg["seeds"]
     flights = {n: r for n, r in cfg["flights"]["development"].items() if (not args.flights or n in args.flights) and recorded(n)}
-    print(f"development flights: {', '.join(flights)}; camera {args.camera} {camera_overrides or ''}; changes {overrides or 'none'}")
+    print(f"development flights: {', '.join(flights)}; camera {args.camera} {camera_overrides or ''}; "
+          f"heading {cfg['heading'].get('source', 'compass')}; changes {overrides or 'none'}")
 
     jobs, flows = [], []
     for name, route in flights.items():
