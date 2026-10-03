@@ -66,10 +66,15 @@ class RfSensor(Node):
         self.impl_loss = rf.calibrate_impl_loss(rx["sensitivity_dbm"], rx["per_at_sensitivity"], ais["packet_bits"],
                                                 ais["bit_rate"], rx["noise_figure_db"], ais["ber_alpha"])
         self.noise_floor = rf.noise_floor_dbm(ais["bandwidth_hz"], rx["noise_figure_db"])
+        # The rotating loop must pass one of its two nulls (180 deg apart) while a packet lasts
+        sweep_deg = 360.0 * df["spin_rate_hz"] * ais["packet_bits"] / ais["bit_rate"]
+        if sweep_deg < 180.0:
+            raise SystemExit(f"direction_finder.spin_rate_hz {df['spin_rate_hz']} sweeps {sweep_deg:.0f} deg per "
+                             f"packet; the loop needs 180 deg to pass a null")
         self.bias = {r["name"]: float(self.rng.normal(0.0, math.radians(df["bias_sigma_deg"])))
                      for r in cfg["receivers"]}
         params = {"seed": seed, "impl_loss_db": self.impl_loss, "noise_floor_dbm": self.noise_floor,
-                  "azimuth_bias_rad": self.bias}
+                  "azimuth_bias_rad": self.bias, "loop_sweep_deg_per_packet": sweep_deg}
         self.get_logger().info(f"RF model: {json.dumps(params)}")
         if self.impl_loss < 0:
             self.get_logger().warn("Sensitivity is better than an ideal GMSK receiver allows; check receiver config")
@@ -143,7 +148,9 @@ class RfSensor(Node):
             self.truth_pub.publish(String(data=json.dumps(truth)))
             if not decoded:
                 continue
-            sigma = rf.bearing_sigma_rad(snr, df["sigma_floor_deg"], df["sigma_at_ref_deg"], df["snr_ref_db"])
+            # the bearing comes from the loop's null, at the loop's SNR; the whip only decodes and resolves the side
+            snr_loop = snr + df["loop_gain_db"] - rx["antenna_gain_db"]
+            sigma = rf.bearing_sigma_rad(snr_loop, df["sigma_floor_deg"], df["sigma_at_ref_deg"], df["snr_ref_db"])
             reported = antenna[:2] + self.rng.normal(0.0, ais["position_sigma_m"], 2)
             lat, lon = rf.enu_to_latlon(reported[0], reported[1], *self.origin)
             det = {"t": t, "receiver": rname, "mmsi": ship["mmsi"], "channel": ch + 1, "freq_hz": freq,
