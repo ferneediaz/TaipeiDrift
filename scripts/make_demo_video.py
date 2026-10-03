@@ -58,7 +58,7 @@ def fitted(draw: ImageDraw.ImageDraw, text: str, size: int, bold: bool, max_widt
 class Flight:
     """The logged flight: the true path, two estimates with their errors, and the moments the captions hang on."""
 
-    def __init__(self, log: Path, ours: str, baseline: str):
+    def __init__(self, log: Path, ours: str, baseline: str, ships: str = "ships"):
         rows = list(csv.DictReader(log.open()))
 
         def track(name: str) -> dict:
@@ -80,6 +80,9 @@ class Flight:
         self.lost = first(o["gnss"] == 0)
         self.coast_a, self.coast_b = first(along > COAST_A_M), first(along > COAST_B_M)
         self.pad = first(along > math.hypot(*PAD_B) - 15.0)
+        # the first position from the ships' bearings after the drone has left island A (else 8 s after the coast)
+        fixes = [float(x["t"]) for x in rows if x["name"] == ships and float(x["t"]) >= self.coast_a]
+        self.first_fix = min(fixes[0], self.coast_b) if fixes else self.coast_a + 8.0
         blind = (o["t"] >= self.lost) & (o["t"] <= self.pad)
         self.worst = float(o["err"][blind].max()) if blind.any() else float("nan")
         self.median = float(np.median(o["err"][blind])) if blind.any() else float("nan")
@@ -97,8 +100,13 @@ class Flight:
                    "Simulated flight: 490 m from one island to the next, three ships in the strait"]),
             (self.lost, ["GNSS is lost. The drone keeps navigating on its own.",
                          "Over land a downward camera and a range finder measure its speed over the ground"]),
-            (self.coast_a, ["Over open water the camera finds nothing to hold on to",
-                            "The drone takes bearings on the ships' AIS radio and works out its position from them"]),
+            (self.coast_a, ["Over open water the camera finds little to hold on to",
+                            "The drone listens for the ships' AIS radio: the RF window opens at the top right"]),
+            (self.first_fix, ["Bearings to three ships give a position that does not drift",
+                              "Each fix is rough, some tens of metres, but its error does not grow with time"]),
+            ((self.first_fix + self.coast_b) / 2, ["Camera, inertial sensors and radio are fused into one estimate",
+                                                   "Dashboard, first row: the fused estimate and its distance from "
+                                                   "the true position"]),
             (self.coast_b, ["Land again: the camera has ground to track",
                             "Approach to the helipad on the second island"]),
             (self.pad, [f"{self.pad - self.lost:.0f} s without GNSS: our estimate was typically {self.median:.0f} m off, "
@@ -135,7 +143,7 @@ class Overlay:
                                   (flight.ours, "x", "y", GREEN)):
             keep = np.concatenate(([True], np.diff(np.floor(d["t"] / 0.2)) > 0))      # five points per second
             self.tracks.append((d["t"][keep], map_px(d[xk][keep], d[yk][keep]), colour))
-        self.legend_font, self.tag_font = font(21, True), font(20, True)
+        self.legend_font, self.tag_font, self.note_font = font(21, True), font(20, True), font(16)
 
     def draw(self, frame: Image.Image, t: float, speed: float) -> None:
         d = ImageDraw.Draw(frame)
@@ -151,8 +159,14 @@ class Overlay:
         bw, bh = MAP_W + 2 * pad, MAP_H + 3 * pad + 3 * line
         bx, by = VIEW_RIGHT - bw - 10, H - BAR - bh - 10
         d.rectangle([bx, by, bx + bw, by + bh], fill=DARK)
+        # the comparison ends when the drone arrives over the helipad: the landing is the autopilot's part, and the
+        # touchdown bump throws the inertial-only estimate about
+        arrived = t >= self.f.pad
+        t = min(t, self.f.pad)
         small = self.map.copy()
         m = ImageDraw.Draw(small)
+        if arrived:
+            m.text((8, 6), "at arrival over the helipad", font=self.note_font, fill=GREY)
         for times, pts, colour in self.tracks:
             k = int(np.searchsorted(times, t, side="right"))
             if k >= 2:
@@ -161,7 +175,7 @@ class Overlay:
                 u, v = pts[k - 1]
                 m.ellipse([u - 5, v - 5, u + 5, v + 5], fill=colour, outline=DARK)
         frame.paste(small, (bx + pad, by + pad))
-        t_shown = math.floor(t * 2) / 2                       # numbers change twice a second, not every frame
+        t_shown = t if arrived else math.floor(t * 2) / 2     # numbers change twice a second, not every frame
         rows = (("True path", WHITE),
                 (f"Our estimate: {Flight.error(self.f.ours, t_shown):.0f} m off", GREEN),
                 (f"Inertial sensors alone: {Flight.error(self.f.base, t_shown):.0f} m off", RED))
@@ -241,7 +255,8 @@ def main() -> None:
     if not args.plain and (args.run / "estimators.csv").exists():
         flight = Flight(args.run / "estimators.csv", args.ours, args.baseline)
         overlay = Overlay(flight)
-        print(f"GNSS lost {flight.lost:.1f} s, coast A {flight.coast_a:.1f} s, coast B {flight.coast_b:.1f} s, "
+        print(f"GNSS lost {flight.lost:.1f} s, coast A {flight.coast_a:.1f} s, first ships' fix "
+              f"{flight.first_fix:.1f} s, coast B {flight.coast_b:.1f} s, "
               f"over pad B {flight.pad:.1f} s; from the loss to pad B our estimate: median {flight.median:.1f} m, "
               f"worst {flight.worst:.1f} m, at pad B {flight.ours_at_pad:.1f} m; inertial only at pad B "
               f"{flight.base_at_pad:.0f} m")

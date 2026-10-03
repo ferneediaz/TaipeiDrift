@@ -16,6 +16,9 @@ ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_tra
          AIS receiver and direction finder (nodes/rf_sensor.py) and the triangulation navigator (nodes/rf_nav.py),
          and shows the drone's down camera floating over the top left of the chase view;
          default (auto): in the strait world only
+ais_start_s   sim time when the ships start transmitting; the RF navigation display opens with their first
+         bearing. Default (config): ais.start_after_s of config/rf.yaml. The video's flight uses 41, the moment
+         the drone leaves island A
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
          the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera then floats
          over the Gazebo window)
@@ -339,6 +342,9 @@ def setup(context):
     rf_when_flow_blind_s = float(LaunchConfiguration("rf_when_flow_blind_s").perform(context))
     flow_max_dt_s = float(LaunchConfiguration("flow_max_dt_s").perform(context))
     flow_soft_limit = float(LaunchConfiguration("flow_soft_limit").perform(context))
+    ais_start_s = LaunchConfiguration("ais_start_s").perform(context).strip().lower()
+    if ais_start_s != "config":
+        ais_start_s = str(float(ais_start_s))
     if not (0 < range_min_m < range_max_m and range_noise_std_m >= 0):
         sys.exit("range_min_m/range_max_m/noise must satisfy 0 < min < max and noise >= 0")
     if not world.exists():
@@ -491,7 +497,8 @@ def setup(context):
             ExecuteProcess(output="screen", cmd=[sys.executable, str(SIM / "nodes/ship_traffic.py"),
                                                  "--world", world.stem, "--config", str(RF_CONFIG)]),
             ExecuteProcess(output="screen", cmd=[sys.executable, str(SIM / "nodes/rf_sensor.py"),
-                                                 "--world", world.stem, "--config", str(RF_CONFIG)]),
+                                                 "--world", world.stem, "--config", str(RF_CONFIG),
+                                                 *(["--start-after-s", ais_start_s] if ais_start_s != "config" else [])]),
             # the drone's position from the ships' bearings, without GNSS
             ExecuteProcess(output="screen", cmd=[sys.executable, str(SIM / "nodes/rf_nav.py"), "--world", world.stem]),
             # the same estimator, also fusing the ships' position fix: keeps navigating after the GNSS cutoff
@@ -555,6 +562,9 @@ def generate_launch_description():
         DeclareLaunchArgument("rf_when_flow_blind_s", default_value="0.0"),
         DeclareLaunchArgument("flow_max_dt_s", default_value="0.2"),
         DeclareLaunchArgument("flow_soft_limit", default_value="0.0"),
+        DeclareLaunchArgument("ais_start_s", default_value="config",
+                              description="sim time when the ships start transmitting (the RF display opens then); "
+                                          "config: ais.start_after_s of config/rf.yaml"),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])

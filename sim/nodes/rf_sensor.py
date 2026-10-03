@@ -176,10 +176,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(CONFIG))
     ap.add_argument("--world", default="strait", help="for the latitude and longitude of the world origin")
+    ap.add_argument("--start-after-s", type=float, help="sim time when the ships start transmitting; "
+                                                         "default: ais.start_after_s of the config")
     args, ros_args = ap.parse_known_args()
     rclpy.init(args=ros_args)
+    cfg = yaml.safe_load(open(args.config))
+    if args.start_after_s is not None:
+        cfg["ais"]["start_after_s"] = args.start_after_s
     try:
-        rclpy.spin(RfSensor(yaml.safe_load(open(args.config)), args.world))
+        rclpy.spin(RfSensor(cfg, args.world))
     except KeyboardInterrupt:
         pass
 
