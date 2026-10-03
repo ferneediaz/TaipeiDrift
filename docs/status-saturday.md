@@ -1,6 +1,43 @@
-# Where we stand: Saturday 3 October, 11:00
+# Where we stand (the working doc)
 
-For the team. What we are building, what we tested this morning and why, what we expect from the tests that are running, and what is left until the code freeze on Sunday at 10:00. Every number here comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 11:45.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+
+## Now, in short
+
+The core system works on real data from two countries. The test on data it was never tuned on exposed one weakness: wrong position fixes slip through. Two checks against that are built. The clean final test runs next, results around 12:45.
+
+**How the plan changed this morning**
+
+| Before | Now | Why |
+|---|---|---|
+| Wait for Dropbox to test on ALTO Train | Test on a second dataset from China (UAV-VisLoc) | The jury scores technical validity; Dropbox was blocked |
+| Navigator ignores the heading | Navigator uses the drone's heading (compass, or the mentor's sun sensor) | The brief lists heading, every drone has it, and without it we fail at the first turn |
+| Next step: blurred and dark frames | First: make the check against wrong fixes hold on unseen flights | Both held-out tests (ours and Ilhan's) show it is the weak point |
+| Sun sensor as a "future" slide | Sun sensor simulated now; the mentor's phone test measures it for real | The mentor's idea; gives a measured number |
+
+**Achieved**
+
+- **USA (ALTO, real helicopter flight):** camera alone ends 472 m off (median); with map fixes 31 m. A flaw in our test (the search knew the true path) was found and removed; the numbers did not change.
+- **China (real drone photos against a map 2.5 years older):** the matcher, unchanged, finds 80 percent of the photos within 30 m.
+- **74 km without GNSS:** median 27 m, against 1,041 m without fixes. But about 11 wrong fixes slipped through and the drone got lost in stretches: our honest weakness. Ilhan found the same independently on unseen ALTO data (94 m instead of 31 m).
+- Built against it: confirmation of large jumps by the next fix, Ilhan's quarters check, the fix offset in the drone's own frame (fix error 19 to 13 m), compass and sun-sensor models, the aviation integrity measure.
+
+**Asks to the team**
+
+- **Ilhan:** rerun the ALTO Train test with the map search (`search: area`); your quarters rule is in the shared code.
+- **Alessandro:** the heading error of the visual-inertial odometry after 30, 60 and 80 s without GNSS; it becomes our compass model.
+- **Felix:** one slide on terrain navigation for forest and night (forest is 76 percent of Taiwan, where camera fixes fail).
+- **Dan:** can the simulator show a flight for the demo by 18:00? Yes or no by 14:00.
+- **Anyone with an iPhone, before about 13:00 while the sun is high:** the mentor's sun-compass test (steps below).
+- **Dustin:** the story and slides; ask the organisers what the brief's "suggested dataset" is.
+
+**The mentor's sun-compass test with an iPhone** (code ready: `baseline/scripts/phone_sun_compass.py`)
+
+1. Settings, Camera: location on. Back camera at 1x.
+2. Show `data/raw/phone_sun/chessboard_9x6_inner_corners.png` full-screen on a laptop; take 15 to 20 photos of it from different angles and distances, filling much of the frame. Put them in `data/raw/phone_sun/chessboard/`.
+3. Lay the phone screen down on a level table in the sun (check with the Measure app's Level), back camera looking up, exposure turned all the way down. Shoot with the volume button.
+4. Take 8 photos, turning the phone in 90-degree steps along a table edge (0, 90, 180, 270, twice). Note what the Compass app shows for each. Put them in `data/raw/phone_sun/sun/`.
+5. Run `python baseline/scripts/phone_sun_compass.py`: the scatter of the measured turns around the 90-degree steps is the sun compass's error.
 
 ## 1. The goal for Sunday
 

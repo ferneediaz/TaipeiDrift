@@ -55,11 +55,11 @@ def sun_heading(
     return np.asarray(true_heading_deg, dtype=float) + rng.normal(0.0, 1.0, sd.shape) * sd
 
 
-def sun_elevation(latitude_deg: float, longitude_deg: float, when: datetime) -> float:
-    """Elevation of the sun above the horizon in degrees, by the NOAA solar calculator equations.
+def sun_position(latitude_deg: float, longitude_deg: float, when: datetime) -> tuple[float, float]:
+    """Where the sun stands: (azimuth, elevation) in degrees, by the NOAA solar calculator equations.
 
-    ``when`` must carry a time zone. Accurate to well under a tenth of a degree, which is plenty
-    for an error model.
+    Azimuth is a bearing from north, clockwise; elevation is above the horizon. ``when`` must carry
+    a time zone. Accurate to well under a tenth of a degree, which is plenty for an error model.
     """
     t = when.astimezone(timezone.utc)
     day = t.toordinal() + 1721424.5  # Julian day at 0:00 UTC
@@ -84,4 +84,14 @@ def sun_elevation(latitude_deg: float, longitude_deg: float, when: datetime) -> 
     hour_angle = np.radians(solar_minutes / 4 - 180)
     lat = np.radians(latitude_deg)
     cos_zenith = np.sin(lat) * np.sin(declination) + np.cos(lat) * np.cos(declination) * np.cos(hour_angle)
-    return float(90 - np.degrees(np.arccos(np.clip(cos_zenith, -1, 1))))
+    zenith = np.arccos(np.clip(cos_zenith, -1, 1))
+    # azimuth from north, clockwise (the NOAA spreadsheet's formula)
+    cos_az = (np.sin(lat) * np.cos(zenith) - np.sin(declination)) / (np.cos(lat) * np.sin(zenith))
+    az = np.degrees(np.arccos(np.clip(cos_az, -1, 1)))
+    azimuth = (az + 180) % 360 if hour_angle > 0 else (540 - az) % 360
+    return float(azimuth), float(90 - np.degrees(zenith))
+
+
+def sun_elevation(latitude_deg: float, longitude_deg: float, when: datetime) -> float:
+    """Elevation of the sun above the horizon in degrees; see ``sun_position``."""
+    return sun_position(latitude_deg, longitude_deg, when)[1]

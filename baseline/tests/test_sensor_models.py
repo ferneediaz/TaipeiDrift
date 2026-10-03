@@ -57,3 +57,43 @@ def test_simulated_steps_drift_without_a_heading_error():
     steps = simulated_steps(path, np.zeros(len(path)), rng)
     end_error = np.linalg.norm(steps.sum(axis=0) - (path[-1] - path[0]))
     assert 10.0 < end_error < 1000.0  # it drifts, by less than 10 percent over 10 km
+
+
+def test_sun_compass_examples_from_the_docstring():
+    from src.sensors.sun_compass import heading_from_sun
+
+    heading, elevation = heading_from_sun(0.0, 1.0, 180.0)  # sun due south at 45 degrees, image up north
+    assert heading == pytest.approx(0.0, abs=1e-9) and elevation == pytest.approx(45.0)
+    heading, elevation = heading_from_sun(-1.0, 0.0, 180.0)  # the same sun left of centre: image up east
+    assert heading == pytest.approx(90.0) and elevation == pytest.approx(45.0)
+
+
+def test_sun_compass_inverts_its_own_geometry():
+    from src.sensors.sun_compass import heading_from_sun
+
+    rng = np.random.default_rng(0)
+    for _ in range(50):
+        psi, a, e = rng.uniform(0, 360), rng.uniform(0, 360), rng.uniform(20, 85)
+        cot = 1 / np.tan(np.radians(e))
+        x, y = -cot * np.sin(np.radians(a - psi)), -cot * np.cos(np.radians(a - psi))
+        heading, elevation = heading_from_sun(x, y, a)
+        assert (heading - psi + 180) % 360 - 180 == pytest.approx(0.0, abs=1e-6)
+        assert elevation == pytest.approx(e, abs=1e-6)
+
+
+def test_find_sun_takes_the_largest_bright_patch():
+    from src.sensors.sun_compass import find_sun
+
+    sky = np.full((200, 300), 90, np.uint8)
+    sky[50:70, 200:220] = 255  # the sun, 400 pixels
+    sky[150:153, 20:23] = 255  # a lens flare, 9 pixels
+    x, y, area = find_sun(sky)
+    assert (x, y) == pytest.approx((209.5, 59.5)) and area == 400
+
+
+def test_sun_position_matches_pvlib():
+    from src.sensors.heading import sun_position
+
+    # pvlib.solarposition.get_solarposition: azimuth 188.76, elevation 60.72 (Taipei, today at noon)
+    azimuth, elevation = sun_position(25.03, 121.56, datetime(2026, 10, 3, 12, 0, tzinfo=TAIWAN))
+    assert (azimuth, elevation) == pytest.approx((188.76, 60.72), abs=0.05)
