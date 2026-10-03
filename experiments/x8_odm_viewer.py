@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Look around the OpenDroneMap 3D model of the Tuniu reach (survey flight 2019-09-16).
+
+The model is OpenDroneMap's own textured 2.5D mesh (stage mvs_texturing):
+  data/processed/x_tuniu_survey_odm/odm_texturing_25d/odm_textured_model_geo.{obj,mtl} + 30 textures 8192 px.
+Nothing is rebuilt here. `prepare` only makes a display copy whose textures are downscaled (default 2048 px),
+because 30 x 8192^2 textures do not fit comfortably in memory; the geometry and texture coordinates are unchanged.
+
+The April 2019 test flight (RTK) is drawn on top: white line = camera positions, yellow = where the camera
+looked (30 deg ahead of nadir), so you can see what the real photos saw.
+
+    uv run --with pyvista python experiments/x8_odm_viewer.py prepare
+    uv run --with pyvista python experiments/x8_odm_viewer.py view            # interactive window
+    uv run --with pyvista python experiments/x8_odm_viewer.py view --shot out.png --off-screen
+
+Mouse in the window: left drag = rotate around the focus, right drag or wheel = zoom, middle drag / shift +
+left = pan; key `f` with the mouse over a point = fly to it; `r` = reset view; `q` = quit.
+Textures come from Yu-Huang Wang's photos (licence unknown): keep screenshots private.
+"""
+from __future__ import annotations
+
+import argparse
+import shutil
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+from pyproj import Transformer
+
+ROOT = Path(__file__).resolve().parents[1]
+ODM = ROOT / "data/processed/x_tuniu_survey_odm"
+SRC = ODM / "odm_texturing_25d"
+OBJ = "odm_textured_model_geo.obj"
+MTL = "odm_textured_model_geo.mtl"
+OUT = ODM / "viewer"
+TRUTH = ROOT / "data/processed/t_replay/tuniu_tw_1/truth.csv"
+ATT = ROOT / "data/processed/t_replay/tuniu_tw_1/attitude.csv"
+
+
+def offset() -> tuple[float, float]:
+    lines = (ODM / "odm_georeferencing/coords.txt").read_text().splitlines()
+    if lines[0].strip() != "WGS84 UTM 51N":
+        raise ValueError(f"unexpected CRS line in coords.txt: {lines[0]!r}")
+    e, n = map(float, lines[1].split())
+    return e, n
+
+
+def cmd_prepare(args) -> None:
+    Image.MAX_IMAGE_PIXELS = None
+    OUT.mkdir(parents=True, exist_ok=True)
+    mtl_out = []
+    for line in (SRC / MTL).read_text().splitlines():
+        if line.startswith("map_Kd "):
+            src = SRC / line.split(maxsplit=1)[1].strip()
+            dst = OUT / (src.stem + f"_{args.tex_px}.jpg")
+            if not dst.exists():
+                with Image.open(src) as im:
+                    im.convert("RGB").resize((args.tex_px, args.tex_px), Image.Resampling.LANCZOS).save(dst, quality=90)
+                print("texture", dst.name)
+            line = f"map_Kd {dst.name}"
+        mtl_out.append(line)
+    (OUT / MTL).write_text("\n".join(mtl_out) + "\n")
+    if not (OUT / OBJ).exists():
+        shutil.copyfile(SRC / OBJ, OUT / OBJ)
+    e0, n0 = offset()
+    tr, att = pd.read_csv(TRUTH), pd.read_csv(ATT)
+    x, y = Transformer.from_crs("EPSG:4326", "EPSG:32651", always_xy=True).transform(tr.lon_deg.values, tr.lat_deg.values)
+    out = pd.DataFrame({"x": x - e0, "y": y - n0, "z": tr.alt_m.values,
+                        "yaw_deg": np.interp(tr.t_s, att.t_s, att.gimbal_yaw_deg),
+                        "pitch_deg": np.interp(tr.t_s, att.t_s, att.gimbal_pitch_deg)})
+    out.to_csv(OUT / "april_flight_mesh_frame.csv", index=False)
+    print("ready:", OUT)
+
+
+def cmd_view(args) -> None:
+    import pyvista as pv
+    if not (OUT / MTL).exists():
+        raise SystemExit("run `prepare` first")
+    pl = pv.Plotter(off_screen=args.off_screen, window_size=(1600, 1000))
+    pl.import_obj(str(OUT / OBJ), str(OUT / MTL))
+    actors = pl.renderer.GetActors()   # VTK collection: also holds the actors made by the OBJ importer
+    actors.InitTraversal()
+    for _ in range(actors.GetNumberOfItems()):   # photo colours as they are: no shading, MTL ambient (Ka 1) off
+        prop = actors.GetNextActor().GetProperty()
+        prop.LightingOff()
+        prop.SetAmbient(0.0)
+        prop.SetDiffuse(1.0)
+        prop.SetSpecular(0.0)
+    pl.set_background("#202833")
+    fl = pd.read_csv(OUT / "april_flight_mesh_frame.csv")
+    cams = fl[["x", "y", "z"]].to_numpy()
+    pl.add_mesh(pv.lines_from_points(cams), color="white", line_width=3, label="April 2019 flight (RTK)")
+    # where each photo centre hits the ground, 30 deg ahead of nadir (display only: ground assumed 90 m below)
+    h = np.full(len(cams), 90.0)
+    ahead = h * np.tan(np.radians(90.0 + fl.pitch_deg.to_numpy()))
+    yaw = np.radians(fl.yaw_deg.to_numpy())
+    look = np.column_stack([cams[:, 0] + ahead * np.sin(yaw), cams[:, 1] + ahead * np.cos(yaw), cams[:, 2] - h])
+    pl.add_points(look[::3], color="yellow", point_size=6, render_points_as_spheres=True,
+                  label="photo centre on the ground (every 3rd)")
+    pl.add_legend(bcolor=(0.1, 0.1, 0.1), size=(0.5, 0.1), loc="lower right")
+    pl.add_text("Tuniu River, OpenDroneMap 3D (survey 2019-09-16)\nleft drag rotate | wheel zoom | shift+drag pan | "
+                "f fly to point | r reset | q quit", font_size=10, color="white")
+    pl.enable_terrain_style(mouse_wheel_zooms=True)
+    c = cams.mean(0)
+    pl.camera_position = [(c[0] - 250, c[1] - 450, c[2] + 250), (c[0], c[1], c[2] - 90), (0, 0, 1)]
+    if args.shot:
+        pl.show(screenshot=args.shot, auto_close=True)
+        print("screenshot", args.shot)
+    else:
+        pl.show()
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("prepare")
+    p.add_argument("--tex-px", type=int, default=2048)
+    v = sub.add_parser("view")
+    v.add_argument("--shot", help="save a screenshot to this path")
+    v.add_argument("--off-screen", action="store_true")
+    a = ap.parse_args()
+    {"prepare": cmd_prepare, "view": cmd_view}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    main()
