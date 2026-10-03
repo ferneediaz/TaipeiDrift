@@ -1,10 +1,21 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 11:45.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 12:00.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
-The core system works on real data from two countries. The test on data it was never tuned on exposed one weakness: wrong position fixes slip through. Two checks against that are built. The clean final test runs next, results around 12:45.
+The core system works on real data from two countries. The test on data it was never tuned on exposed one weakness: wrong position fixes slip through. The new checks cut them from about 12 per flight to 0 to 2, on the flight where they were developed (UAV-VisLoc 03). The clean final test on two flights never looked at (01 and 04) is the next step.
+
+**The new checks, on the development flight** (UAV-VisLoc 03, 74 km without GNSS, median over 3 seeds; "all clear while wrong" = the share of the flight where the navigator's stated bound is within 50 m but the true error is above it):
+
+| | Median error | 90% below | Worst | Wrong fixes used, per seed | Error within the stated 3 sigma | All clear while wrong |
+|---|---|---|---|---|---|---|
+| Dead reckoning only | 822 m | 1,391 m | 1,571 m | | 100% | 0% |
+| First version (as tuned on ALTO) | 41 m | 427 m | 1,301 m | 11, 12, 12 | 73% | 2.5% |
+| **New: compass, confirmation of large jumps, offset in the drone's frame, search capped at 600 m** | **28 m** | **180 m** | **368 m** | **0, 0, 2** | **97%** | **0.0%** |
+| New, with the sun sensor instead of the compass | 33 m | 162 m | 395 m | 0, 2, 2 | 96% | 0.3% |
+
+On ALTO the new checks change nothing at fixes every 300 m (31.1 m). The sun sensor does not help on this flight: here the heading is not the main error, which matches Ilhan's ALTO finding (6 percent). One seed stays poor (median about 200 m) without wrong fixes: long stretches without an accepted fix, which the navigator reports honestly as uncertain.
 
 **How the plan changed this morning**
 

@@ -55,6 +55,8 @@ class NavigatorConfig:
     # "area": one map of the whole area, in a circle around the estimate that grows with the uncertainty
     nearest_images: int = 7
     min_search_radius_m: float = 60.0  # sized and area search: within max(this, 3 sigma)
+    max_search_radius_m: float | None = None  # area search: never wider than this; a compute budget, and
+    # wider searches meet more look-alike places. The navigator still reports its full uncertainty.
     calibration_radius_m: float = 60.0  # area search before the jam: around the GNSS position
     offset_frame: str = "world"  # "world": the fix offset is learned in north and east; "body": in the drone's
     # forward and right directions, turned with the heading sensor (needs flight.heading_deg)
@@ -240,6 +242,8 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
             predicted = predicted_variance(variance, since_fix, cfg.drift_rate)
             zooms = np.clip(zoom + np.arange(-cfg.zoom_reach, cfg.zoom_reach + 0.01, cfg.zoom_step), *cfg.zoom_limits)
             radius = max(cfg.min_search_radius_m, cfg.gate_sigmas * float(np.sqrt(predicted)))
+            if cfg.search == "area" and cfg.max_search_radius_m is not None:
+                radius = min(radius, cfg.max_search_radius_m)
             candidates = np.array([], dtype=int)
             if cfg.search in ("nearest", "sized"):
                 candidates = reference.nearest(estimate, cfg.nearest_images)

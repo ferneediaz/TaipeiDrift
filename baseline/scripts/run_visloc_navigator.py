@@ -121,8 +121,12 @@ def main() -> int:
 
     jobs = [(cfg, n, name, s, seed, name in cfg.get("plot", []) and seed == seeds[0]) for n in flights for name, s in runs.items() for seed in seeds]
     t0 = time.time()
+    rows = []
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        rows = list(pool.map(one_run, jobs))
+        for r in pool.map(one_run, jobs):
+            rows.append(r)
+            print(f"  done {len(rows)}/{len(jobs)}: flight {r['flight']} {r['run']} seed {r['seed']}: median {r['median']:.1f} m, "
+                  f"wrong used {r['used_but_wrong']}, {r['run_time_s']:.0f} s", flush=True)
 
     results = {(r["flight"], r["run"]): r.pop("_result") for r in rows if "_result" in r}
     columns = [k for k in rows[0] if not k.startswith("_")]

@@ -36,10 +36,11 @@ heading:                 # src/sensors/heading.py
 # Each run picks a heading sensor and overrides navigator settings.
 #   confirm_jumps: a large jump out of a wide search waits for the next fix to agree
 #   offset_frame: body learns the fix offset in the drone's forward and right directions
+#   max_search_radius_m: the search circle never grows beyond this (a compute budget; wide searches meet look-alikes)
 runs:
   dead_reckoning:        {heading: compass, fix_every_m: null}
   first_version:         {heading: compass}                     # as on ALTO, unchanged
-  confirm:               {heading: compass, confirm_jumps: true}
-  confirm_body:          {heading: compass, confirm_jumps: true, offset_frame: body}
-  sun_confirm_body:      {heading: sun, confirm_jumps: true, offset_frame: body}
-  sun_confirm_body_1000: {heading: sun, confirm_jumps: true, offset_frame: body, fix_every_m: 1000.0}
+  confirm:               {heading: compass, confirm_jumps: true, max_search_radius_m: 600.0}
+  confirm_body:          {heading: compass, confirm_jumps: true, offset_frame: body, max_search_radius_m: 600.0}
+  sun_confirm_body:      {heading: sun, confirm_jumps: true, offset_frame: body, max_search_radius_m: 600.0}
+  sun_confirm_body_1000: {heading: sun, confirm_jumps: true, offset_frame: body, fix_every_m: 1000.0, max_search_radius_m: 600.0}
