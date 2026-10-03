@@ -19,6 +19,7 @@ Run: .venv/bin/python experiments/x_audit_tuniu.py
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -30,7 +31,8 @@ from pyproj import Transformer
 ROOT = Path(__file__).resolve().parents[1]
 X = ROOT / "data/processed/x_tuniu"
 REPLAY = ROOT / "data/processed/t_replay/tuniu_tw_1"
-PHOTOS = Path("/Users/ilhan.neuville/Downloads/20190411_Miaoli_Toufeng_Tuniu-River_5.75K/100_0005")
+PHOTOS = Path(os.environ.get(   # same folder as experiments/x1_tuniu_export.py SOURCE
+    "TUNIU_TW1", ROOT / "data/raw/tuniu_tw_1/20190411_Miaoli_Toufeng_Tuniu-River_5.75K/100_0005"))
 PRIOR_HALF_M = 40.0
 WRONG_M = 10.0
 
