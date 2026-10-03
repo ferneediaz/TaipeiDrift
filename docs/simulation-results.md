@@ -340,5 +340,61 @@ a wrong depth leaves the direction right and the speed wrong.
 - It rests on the same assumption, flat ground: one scale for the whole picture. Our simulated ground is a flat
   photo, so our flights never tested that. Over buildings that are tall compared with the flight height it would
   fail in the same way. His run is the first measurement of what happens when the assumption is broken.
-- Live in the simulator, without GNSS, only the ships' radio fix holds the position so far (Dan's strait world).
-  The live filter on its own diverges, with or without the new measurement.
+- Live in the simulator, without GNSS: the ships' radio fix holds the position in Dan's strait world; over the
+  city the live filter diverges with or without the new measurement; over flat ground the new measurement holds
+  it on a circle (the run below).
+
+### The same measurement over flat ground
+
+Saturday 3 October 2026, 21:00 to 21:04, one run. The terrain world (the flat Wufeng photo, no trees, no
+buildings), his settings unchanged (`metric_flow:=true`, GNSS cut 20 s after the first fix), the launch's own
+demo flight: a climb to 39 m, then circles with a radius of 38 m at 5.7 m/s. A second copy of his filter ran on
+the same sensor messages with the measurement switched off (`sim/scripts/log_two_estimators.py`), so the two
+differ in that one setting: the matched comparison his note asks for. Scored by
+`python scripts/metric_flow_flat_ground.py`; the run folder is
+`outputs/sim_runs/metric_velocity/OF_terrain_flat_1` (not in git). Said before the run: if the buildings are the
+cause, the readings should be less than about 1 m/s off here.
+
+**The readings are good over flat ground.**
+
+| Speed reading against the truth | City (his run) | Flat ground (this run) |
+|---|---|---|
+| Median | 4.45 m/s | **0.16 m/s** |
+| 90 percent below | 7.58 m/s | 0.77 m/s |
+| True speed | 8 m/s | 5.7 m/s |
+
+The error is the same for pairs of pictures 0.04 s and 0.2 s apart (0.15 to 0.17 m/s), so the tracking noise is
+far smaller than the half pixel assumed in the check above, and the spacing of the pictures does not matter here.
+What differs from the city is the ground: flat, and with a photo's detail on it (about 500 tracked points in
+every pair). The flight is also lower (39 m against 80 m); one run does not separate the three.
+
+**With the readings the filter holds; without them it does not** (same flight, same sensor data; horizontal
+error):
+
+| Time without GNSS | 5 s | 10 s | 20 s | 30 s | 60 s | 120 s | 164 s (end) | Median | Worst |
+|---|---|---|---|---|---|---|---|---|---|
+| With the flow speed | 6.7 m | 13.5 m | 39.8 m | 13.5 m | 17.2 m | 5.4 m | 7.8 m | 14.5 m | 54 m |
+| Without it | 27 m | 59 m | 165 m | 210 m | 372 m | 482 m | 689 m | 322 m | 689 m |
+
+**What limits this result.**
+
+- **One run, on a circle.** The drone flew 932 m without GNSS and was never more than 76 m from where it lost it.
+  On a circle the errors of one half of a lap partly cancel on the other. It does not show navigation over a
+  distance.
+- **The first 25 s after the loss.** The filter turned down every reading, 18 in a row, and its error grew to
+  54 m while it stated 1 to 7 m. GNSS is lost just as the drone ends its climb and speeds up; the filter's own
+  speed is wrong and it is too sure of it. Then a forward-camera reading turned its direction of travel by
+  30 degrees, the flow readings passed the gate again, and one second later the error was 20 m. The readings it
+  turned down were as good as the ones it took (0.18 against 0.15 m/s). The same lock-out appeared in our
+  replay, where weakening a far-off reading instead of turning it down removed it (`soft_update` in
+  `scripts/fused_replay.py`).
+- **Most readings are thrown away.** The filter received 5.5 pictures per simulated second of the camera's 25.
+  Of 1,007 pairs, 318 were more than 0.2 s apart and dropped, 488 were skipped by the rule that offers every
+  fifth, 135 were offered, 86 taken and 49 turned down.
+- **The heading drifts 4.5 degrees per minute** (2 degrees off at the loss, 16 at the end), in both filters:
+  nothing measures it. On a circle of 38 m that hardly shows; on a straight leg 15 degrees are a quarter of the
+  distance flown, across the track. In our replay the sun sensor holds the heading to 1.3 degrees.
+
+**What follows.** His measurement works where its assumption holds, so the buildings and the bare city ground
+explain the city result. The live filter now has a ground speed that works over our Wufeng ground. Against our
+replay it still lacks the sun heading, the weakened update in place of the gate, and the map fixes.
