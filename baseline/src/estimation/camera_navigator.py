@@ -69,6 +69,12 @@ class NavigatorConfig:
     # believed (the camera has lost track; a flying drone does not stop): the navigator then flies on at the
     # cruising speed learned with GNSS, along the last believable direction. None switches the check off.
     fallback_drift_rate: float = 0.30  # uncertainty growth while flying on like that, as a share of the distance
+    detail_scaling: bool = False  # fog, haze and blur wash out the picture's fine detail (image_motion.picture_detail);
+    # with a share s of the detail the frames had before the jam, the drift budget grows 1/s times faster (at most
+    # detail_max_factor), and below detail_lost_share the camera's motion is not believed (flying on, as above).
+    # Example: in fog with 1 km of visibility s is about 0.54, so the uncertainty grows 1.85 times faster.
+    detail_max_factor: float = 5.0
+    detail_lost_share: float = 0.25
     motion_fit: str = "least_squares"  # how image shift becomes ground motion, learned before the jam:
     # "least_squares": a general 2 x 2 matrix (ALTO, a straight flight with a steady helicopter);
     # "rotation_scale": one turn and one scale from medians, for a quadcopter whose fixed camera tilts in turns
@@ -112,6 +118,7 @@ class Calibration:
     offset_frame: str = "world"
     cruise_speed_mps: float = 0.0  # mean ground speed while GNSS worked
     last_direction: np.ndarray | None = None  # (2,) unit vector (north, east) of the motion just before the jam
+    reference_detail: float | None = None  # median picture detail of the frames before the jam, if measured
 
     def offset_at(self, heading_deg: float | None) -> np.ndarray:
         """The fix offset in north and east at a heading (bearing from north, degrees).
@@ -164,8 +171,9 @@ def jam_index(flight: CameraFlight, jam_after_m: float) -> int:
     return int(np.searchsorted(flight.travelled, jam_after_m))
 
 
-def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) -> Calibration:
-    """Learn the motion matrix, zoom, rotation and fix offset from the stretch with GNSS."""
+def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig, detail: np.ndarray | None = None) -> Calibration:
+    """Learn the motion matrix, zoom, rotation and fix offset from the stretch with GNSS (and the pictures'
+    usual detail, if ``detail`` is given: one value per frame, image_motion.detail_for_flight)."""
     jam = jam_index(flight, cfg.jam_after_m)
     if jam < 3 or jam >= len(flight):
         raise ValueError(f"the jam falls on frame {jam} of {len(flight)}; the flight needs GNSS before it and frames after it")
@@ -213,6 +221,7 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
         offset_frame=cfg.offset_frame,
         cruise_speed_mps=float(flight.travelled[jam] / elapsed) if elapsed > 0 else 0.0,
         last_direction=last / max(float(np.linalg.norm(last)), 1e-9),
+        reference_detail=float(np.median(detail[: jam + 1])) if detail is not None else None,
     )
 
 
@@ -228,10 +237,12 @@ def _ground_map(flight: CameraFlight) -> GroundMap:
     return flight.ground_map
 
 
-def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration, cfg: NavigatorConfig) -> NavigatorResult:
-    """Estimate the path after the jam from image shift and position fixes."""
+def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration, cfg: NavigatorConfig,
+             detail: np.ndarray | None = None) -> NavigatorResult:
+    """Estimate the path after the jam from image shift and position fixes (``detail``: see ``calibrate``)."""
     if cfg.search not in ("nearest", "sized", "area"):
         raise ValueError(f"unknown search {cfg.search!r}")
+    use_detail = bool(cfg.detail_scaling and detail is not None and calibration.reference_detail)
     jam = calibration.jam_index
     reference = flight.reference
     ground = _ground_map(flight) if cfg.search == "area" else None
@@ -263,9 +274,14 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
     for k in range(jam + 1, len(flight)):
         step = shifts[k] @ calibration.motion_matrix * scale
         rate = cfg.drift_rate
+        share = float(detail[k]) / calibration.reference_detail if use_detail else 1.0  # picture detail left
+        if share < 1.0:
+            rate = cfg.drift_rate * min(cfg.detail_max_factor, 1.0 / max(share, 1e-6))
         length = float(np.linalg.norm(step))
         expected = calibration.cruise_speed_mps * float(flight.timestamp[k] - flight.timestamp[k - 1])
-        if cfg.camera_motion_floor is not None and expected > 0 and length < cfg.camera_motion_floor * expected:
+        too_short = cfg.camera_motion_floor is not None and expected > 0 and length < cfg.camera_motion_floor * expected
+        too_flat = use_detail and share < cfg.detail_lost_share  # fog so thick the camera's motion is not believed
+        if too_short or too_flat:
             step, rate, length = direction * expected, cfg.fallback_drift_rate, expected
             lost_track.append(True)
         else:

@@ -4,7 +4,7 @@ Last updated: Saturday 3 October 2026, 14:55. Code freeze Sunday 10:00, demo 13:
 
 ## Resume here
 
-**Saturday 17:45: the state (newest first; older notes below still hold).**
+**Saturday 17:42: the state (newest first; older notes below still hold).**
 
 - **Rule from Dustin: one change at a time, smallest test first, a save point after each.** The demo will be the simulation; first the solution must be done, then video, README, pitch.
 - **`main` = save point 4** (`sp4-sun-heading`, PR #3 merged 17:38). Branches left on GitHub, all inside main: `integration` (ours), `simulations` (Dan), `research/offline-nav-evidence` and `docs/denseuav-critical-review` (Ilhan), `mid-air-vio` (Alessandro). Deleted with Dustin's OK: `alto-navigator`, `mid-air-baseline`, `mid-air-baseline-fix`. MIT licence added.
