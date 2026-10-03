@@ -291,9 +291,16 @@ Each results document ends with its full command list:
 | Anti-cheat tests | [`tuniu-anti-cheat.md`](docs/research/tuniu-anti-cheat.md#reproduce) |
 | Digital twin (needs the OpenDroneMap model of `tuniu_tw_2`) | [`tuniu-twin-results.md`](docs/research/tuniu-twin-results.md#reproduce) |
 
-The 3D model is built with [OpenDroneMap](https://opendronemap.org) from the 297 photos of `tuniu_tw_2` (Docker
-image `opendronemap/odm`). The 2.5D model used by the twin and the 3D clip: `--feature-quality medium
---pc-quality medium --skip-3dmodel --dsm --dtm --dem-resolution 10 --orthophoto-resolution 5 --gps-accuracy 0.1`.
+The 3D models are built with [OpenDroneMap](https://opendronemap.org) from the 297 photos of `tuniu_tw_2` (Docker
+image `opendronemap/odm`):
+
+- **2.5D model, used by the digital twin:** `--feature-quality medium --pc-quality medium --skip-3dmodel --dsm --dtm
+  --dem-resolution 10 --orthophoto-resolution 5 --gps-accuracy 0.1`.
+- **Full 3D model, used by the 3D clip** (buildings with walls, 2.9 M vertices, 5.8 M faces): `--feature-quality high
+  --pc-quality high --mesh-size 3000000 --mesh-octree-depth 12 --dsm --dtm --dem-resolution 10
+  --orthophoto-resolution 5 --gps-accuracy 0.1`. About 1.5 h on 22 threads with 50 GB of memory plus 32 GB of swap;
+  octree 13 with 5 M vertices ran out of memory at the meshing step. Then:
+  `uv run --with pyvista python experiments/x10_jury_replay.py flythrough --src <project>/odm_texturing --tex-px 1024 --margin 60`.
 
 ## Code map
 
