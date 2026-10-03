@@ -262,3 +262,30 @@ How to read it:
   for the navigator (at least 99 percent), the fused filter passes on the 110 m flight and misses on the 90 m flight.
 - **Without map fixes** the filter with the sun heading and the camera's speed drifts less than the camera alone on
   the 110 m flight (26 against 59 m) and about the same on the 90 m flight.
+
+### After that run: why the stated error slipped, and the fix
+
+Saturday 3 October 2026, 20:18. Looked for on the development flights only, where the 120 m flight shows the same
+(98.1 percent in its worst draw).
+
+- **Where:** in the first seconds after the GNSS loss, while the filter still states about 1 m. With GNSS it is that
+  sure of itself, yet its error is then up to 5 m (on that flight the true error is within its 3 sigma 96 percent of
+  the time), and it carries that error into the flight without GNSS. The excess was small (10 m against a bound of
+  9 m; twice the bound at worst), and never "within 50 m" while further off.
+- **It was not the turns or the camera dropouts,** as first suspected.
+- **The fix:** the navigator's own start uncertainty (`start_sigma_m`, 3 m), added once to the filter's position
+  uncertainty when GNSS is lost: `--start-sigma 3`. One line; the errors themselves hardly change.
+
+True error within the filter's 3 sigma on the development flights (100 m / 120 m / 65 m, lowest draw):
+
+| | As run on the sealed flights | With the start uncertainty of 3 m |
+|---|---|---|
+| Ideal camera | 100% / 98.1% / 99.9% | **100% / 99.4% / 99.9%** |
+| Realistic camera | 100% / 98.5% / 93.1% | **100% / 99.9% / 93.1%** |
+
+With clean pictures every development flight now meets the rule of 99 percent, with medians of 18.4, 30.0 and
+11.0 m. The 93.1 percent is the realistic 65 m flight, where the filter fuses the navigator's one wrong fix; that
+needs the fix check to improve, not the filter.
+
+**This version has not been run on the sealed flights.** Their result above is the declared one, and it stays.
+For a live integration use the start uncertainty of 3 m.
