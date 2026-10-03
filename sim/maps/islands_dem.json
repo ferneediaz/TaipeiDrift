@@ -4,14 +4,14 @@
   "world_z": "value - 4",
   "resolution_m": 1.0,
   "size_px": [
-    1549,
-    729
+    1069,
+    699
   ],
   "image_top": "north (+y)",
   "pixel_centres_world_m": {
-    "x_first": -385.0,
-    "x_last": 1163.0,
-    "y_top": 413.0,
+    "x_first": -275.0,
+    "x_last": 793.0,
+    "y_top": 383.0,
     "y_bottom": -315.0
   },
   "world_origin": {

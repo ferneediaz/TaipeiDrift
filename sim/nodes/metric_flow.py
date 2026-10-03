@@ -50,7 +50,7 @@ def track_pair(gray_a, gray_b, K, frame_index, prev_imu_index, imu_index, cfg=No
 
 
 def estimate_metric_velocity(pair, R_ab_cam, n_cam_a, range_m, dt, fx, flow_cfg=None,
-                             range_std_m=0.02, min_range=0.20, max_range=100.0):
+                             range_std_m=0.02, min_range=0.20, max_range=100.0, max_dt=0.20):
     """Return diagnostic record + metric camera velocity; never reads estimator GT."""
     out = {"valid": False, "reason": "", "flow_u_px_s": np.nan, "flow_v_px_s": np.nan,
            "flow_spread_px_s": np.nan, "velocity": None, "covariance": None, "inliers": 0}
@@ -60,7 +60,7 @@ def estimate_metric_velocity(pair, R_ab_cam, n_cam_a, range_m, dt, fx, flow_cfg=
     if not np.isfinite(range_m) or not min_range <= range_m <= max_range:
         out["reason"] = "invalid range"
         return out
-    if not np.isfinite(dt) or dt < 0.01 or dt > 0.20:
+    if not np.isfinite(dt) or dt < 0.01 or dt > max_dt:
         out["reason"] = "invalid image dt"
         return out
     # Median image displacement is logged only as a quality diagnostic; metric

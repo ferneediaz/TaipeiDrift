@@ -56,7 +56,7 @@ receivers:                     # drones that listen
     odom_topic: /ground_truth/odom
 
 # Ships of the strait world (worlds/strait.sdf): three warships, each patrolling a box at one corner of a triangle
-# around the drone's route (helipad A at the origin to helipad B at 850, 140), so the drone always sees them in
+# around the drone's route (helipad A at the origin to helipad B at 480, 110), so the drone always sees them in
 # three well-separated directions, which is the best geometry for triangulation. Waypoints are world metres, ENU,
 # sailed in a loop; each ship starts at its first waypoint.
 # Warships at full size, all transmitting AIS Class A. kind sets the shape the launch file draws (carrier, destroyer
@@ -74,7 +74,7 @@ ships:
     cable_loss_db: 2.0
     antenna_gain_db: 2.15
     speed_kn: 15.0
-    waypoints: [[100.0, 750.0], [800.0, 750.0], [800.0, 900.0], [100.0, 900.0]]   # north corner
+    waypoints: [[-50.0, 700.0], [450.0, 700.0], [450.0, 850.0], [-50.0, 850.0]]   # north corner
   - name: destroyer_chi_lung
     kind: destroyer
     mmsi: 416000202
@@ -98,7 +98,7 @@ ships:
     cable_loss_db: 2.0
     antenna_gain_db: 2.15
     speed_kn: 10.0
-    waypoints: [[1100.0, -350.0], [1500.0, -350.0], [1500.0, -550.0], [1100.0, -550.0]]   # south-east corner
+    waypoints: [[700.0, -350.0], [1100.0, -350.0], [1100.0, -550.0], [700.0, -550.0]]   # south-east corner
 
 # The ESKF's use of the RF fix (sim/nodes/eskf_ros_adapter.py with rf_fix:=true, the /nav_rf/odom instance)
 eskf_rf_fix:

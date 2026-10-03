@@ -1,8 +1,31 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 22:16. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
+Last updated: Sunday 4 October 2026, 00:12. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
 
 ## Resume here
+
+**THE DEMO VIDEO, as of Sunday 4 October 00:12 (read this first; it is what is being worked on).**
+
+- **What Dustin wants** (Saturday 22:25 on): a flight of about 75 s for the demo video. Start on land, climb, a few seconds of cruise, GNSS lost, more land, about 30 s over water to show the ships' radio, then landing on the island. The pitch is: a few slides, then the demo, then a final slide, plus backup slides. He agreed to: showing what happens without us (inertial only), captions readable without sound, flying it 3 to 5 times and fixing the seed, one honest sentence that the autopilot steers by the truth, the two expected questions (AIS off; night) on backup slides, a piece of real data (Felix's cart video), telling Dan, recording a safe version. He wants the drone to look faster (play the cruise at 1.5x) and the 3D view not to stutter.
+- **Done, committed locally on `integration` (not pushed; fetch, merge, run the full tests, then push):**
+  - Dan's f1a9a0e (23:07) merged: RF starts at 20 s, the down camera is an inset in the 3D view, the overview camera is gone.
+  - The world shortened: island A centre (40, 0), island B centre (530, 120), pad B (480, 110); the route is 492 m: 183 m of land, 236 m of water, 73 m to pad B (`sim/scripts/make_islands.py`, VERSION 3; ship boxes in `sim/config/rf.yaml`; `AREA` in `sim/nodes/aoa_map.py`; `sim/maps/` redrawn). **Dan has to be told: these are his files.**
+  - `sim/nodes/demo_flight.py`: `--route crossing` (to island B once) and `--land` (settles on the pad, about 20 s); launch options `route:=crossing land:=true`.
+  - Filter options in `sim/nodes/eskf_ros_adapter.py`, all off by default, with launch arguments: `flow_min_range_m`, `rf_when_flow_blind_s`, `flow_max_dt_s`, `flow_soft_limit`.
+  - `sim/nodes/sensor_monitor.py`: a longer queue for the IMU, so the dashboard's IMU chip no longer reads about 60 Hz in red (it was the dashboard's own counting; the filters get all 100 samples). **Not yet seen green in a flight.**
+  - `sim/scripts/capture_desktop.py` (frames of the desktop at even steps of simulated time) and `scripts/make_demo_video.py` (frames to video, with `--speed START:END:FACTOR`).
+- **The recording recipe that works:**
+  1. Start by hand before the launch: an inertial-only copy of the filter on `/nav_inertial/odom` (the "without us"), and `sim/scripts/log_two_estimators.py --topics ...` (see `outputs/demo/` runs and the commands in this session; GPS origin of the strait world 23.65, 119.85, 4.0).
+  2. `sim/run.sh strait gnss_cutoff_s:=26 route:=crossing land:=true metric_flow:=true flow_min_range_m:=10 flow_update_every_n:=2 flow_max_dt_s:=0.5 flow_soft_limit:=9.21 vision_rotation:=false vision_direction:=false`
+  3. For a smooth 3D view slow the simulator while recording: `gz service -s /world/strait/set_physics --reqtype gz.msgs.Physics --reptype gz.msgs.Boolean --timeout 3000 --req "max_step_size: 0.001, real_time_factor: 0.12"`, and capture with `sim/scripts/capture_desktop.py --fps 60`. At the normal pace (0.4 of real time) the scene moved 0.5 to 4.2 pixels per frame (stutter); at 0.12 it moves 1.1 to 2.1. A 105 s flight then takes about 15 minutes to record.
+  4. `python scripts/make_demo_video.py RUN --out X.mp4 --speed 0:19:4 19:85:1.5 85:999:4`.
+- **What the flights showed** (timeline: lift-off 7 s, at 40 m 19 s, GNSS lost 27 s, coast A 46 s, coast B 77 s, over pad B 84 s, on the ground 104 s; errors from the loss to pad B):
+  - The filter with the forward camera went wrong during the climb in 2 of 3 flights, with GNSS still on (it took a wrong "direction of travel" reading and then refused GNSS). So the forward camera is off for the demo.
+  - With the old flow settings the filter used only 3 camera speed readings in 19 s over land (pairs more than 0.2 s apart were dropped, only every fifth offered, some gated). With the new options it used 63 in 58 s, none refused.
+  - Last comparison flight, same sensor data (`outputs/demo/diag2`): new settings with the ships' fix always on 8.1 m median, 36 m worst, 14 m at pad B; new settings, camera only 8.1 / 45 / 42 m; new settings, ships only when the camera is blind 14.3 / 52 / 14 m; old settings 12 to 22 m median; ships only 43 m; inertial only 194 m median, 953 m at pad B. **One flight with the new settings; earlier flights with older settings gave 16 to 72 m median.** Its stated bound is still too small (inside its own 2 sigma 37 to 50 percent), so the dashboard shows EXCEEDED often.
+- **Still to do, in order:** (1) one slow take with the recipe above and check the IMU chip is green; (2) two to four more flights with the same settings for the range of results, then fix the seeds (`sim/config/sensor_noise.yaml` and `sim/config/rf.yaml`, both -1 now); (3) captions and the inertial-only number burned into the video (`scripts/make_demo_video.py` has no captions yet; the inertial copy is in every run's `estimators.csv`); (4) Felix's clip, 6 to 8 s, from `outputs/demo/clips/felix_position_video.mp4` (copied from Dustin's Downloads; a cart at 64 cm, 5.4 m path, re-visited places agree to 0.1 mm); (5) a short cut for the pitch and the full flight for the link; (6) backup slides: AIS off, night, simulated, steering by the truth; (7) push and tell Dan.
+- **Scratch tools kept in `outputs/demo/tools/`** (not in git): `demo_score.py` (table per run), `log_status.py`, `smoothness.py`. Runs in `outputs/demo/` (`run3` has frames and two test videos).
+
 
 **Next steps, as of Saturday 22:10 (read this first; details in the blocks below).**
 

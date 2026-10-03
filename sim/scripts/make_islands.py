@@ -1,7 +1,9 @@
 """Build the islands world's scenery: sim/models/islands/.
 
 Two small, low islands with open sea between them, in the style of the Penghu islands in the
-Taiwan Strait. Island A holds the start pad; island B lies about 700 m of open water to the east.
+Taiwan Strait. Island A holds the start pad on its west side; island B lies about 230 m of open water to
+the east (moved closer on Saturday 3 October for the demo flight: about 190 m of land after the pad, then
+30 s of water at 8 m/s, then island B).
 
 - Islands: 3D terrain meshes with irregular coastlines, beaches, dry grass, scrub and rock, up to
   about 14 m above the sea. They are solid.
@@ -30,14 +32,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from make_trees import tree  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "models" / "islands"
-VERSION = "2"  # bump when the scenery changes, so --if-missing rebuilds old copies
+VERSION = "3"  # bump when the scenery changes, so --if-missing rebuilds old copies
 PAD_ASL = 4.0  # m: helipad tops above the sea; the sea surface is at z = -PAD_ASL
 
 # name, centre (x, y) in m, mean radius in m, highest ground in m above the sea,
 # helipad (x, y), tree count, house count, lighthouse
 ISLANDS = [
-    dict(name="a", centre=(-70.0, 0.0), radius=150.0, top=14.0, pad=(0.0, 0.0), trees=160, houses=7, lighthouse=False),
-    dict(name="b", centre=(900.0, 150.0), radius=110.0, top=11.0, pad=(850.0, 140.0), trees=90, houses=3, lighthouse=True),
+    dict(name="a", centre=(40.0, 0.0), radius=150.0, top=14.0, pad=(0.0, 0.0), trees=160, houses=7, lighthouse=False),
+    dict(name="b", centre=(530.0, 120.0), radius=110.0, top=11.0, pad=(480.0, 110.0), trees=90, houses=3, lighthouse=True),
 ]
 GRID = 257          # terrain vertices per side
 COLLISION_STEP = 4  # every 4th vertex for the collision mesh

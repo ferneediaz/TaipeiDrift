@@ -20,6 +20,8 @@ demo     true flies the drone (circles; island to island in islands and strait, 
          the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera then floats
          over the Gazebo window)
          and the navigation dashboard (nodes/nav_dashboard.py) on the desktop
+route    with demo: auto (pads in islands and strait: to island B and back, again and again), crossing (to island B
+         once), survey; land:=true then settles onto island B's helipad (the demo flight for the video)
 monitor  with demo: window (default) opens the navigation dashboard; terminal opens the same information in a
          terminal (nodes/sensor_monitor.py)
 gnss_cutoff_s     seconds after the first raw GPS fix when the GNSS gate closes (nodes/gnss_gate.py); negative: never
@@ -309,6 +311,10 @@ def setup(context):
     gui = LaunchConfiguration("gui").perform(context).lower() == "true"
     world = SIM / "worlds" / f"{LaunchConfiguration('world').perform(context)}.sdf"
     demo = LaunchConfiguration("demo").perform(context).lower() == "true"
+    route = LaunchConfiguration("route").perform(context).strip().lower()
+    land = LaunchConfiguration("land").perform(context).lower() == "true"
+    if route not in ("auto", "pads", "crossing", "survey"):
+        sys.exit("route must be auto, pads, crossing or survey")
     monitor = LaunchConfiguration("monitor").perform(context).lower()
     if monitor not in ("window", "terminal"):
         sys.exit("monitor must be window or terminal")
@@ -329,6 +335,10 @@ def setup(context):
     range_max_m = float(LaunchConfiguration("range_max_m").perform(context))
     range_noise_std_m = float(LaunchConfiguration("range_noise_std_m").perform(context))
     flow_update_every_n = max(1, int(LaunchConfiguration("flow_update_every_n").perform(context)))
+    flow_min_range_m = float(LaunchConfiguration("flow_min_range_m").perform(context))
+    rf_when_flow_blind_s = float(LaunchConfiguration("rf_when_flow_blind_s").perform(context))
+    flow_max_dt_s = float(LaunchConfiguration("flow_max_dt_s").perform(context))
+    flow_soft_limit = float(LaunchConfiguration("flow_soft_limit").perform(context))
     if not (0 < range_min_m < range_max_m and range_noise_std_m >= 0):
         sys.exit("range_min_m/range_max_m/noise must satisfy 0 < min < max and noise >= 0")
     if not world.exists():
@@ -397,7 +407,7 @@ def setup(context):
         "metric_flow": {"enabled": metric_flow, "algorithm": "Shi-Tomasi/LK + homography RANSAC + ESKF-attitude derotation",
                         "range_min_m": range_min_m, "range_max_m": range_max_m,
                         "range_noise_std_m": range_noise_std_m, "range_topic": "/range/down",
-                        "update_every_n_images": flow_update_every_n,
+                        "update_every_n_images": flow_update_every_n, "min_range_used_m": flow_min_range_m,
                         "update_rate_qualifier": "consecutive image-pair temporal correlation decimation"},
         "gnss_local_enu_origin": {"latitude_deg": gps_origin[0], "longitude_deg": gps_origin[1],
                                    "elevation_m": gps_origin[2]},
@@ -433,6 +443,10 @@ def setup(context):
                  "-p", f"metric_flow:={str(metric_flow).lower()}",
                  "-p", f"flow_range_std_m:={range_noise_std_m}",
                  "-p", f"flow_update_every_n:={flow_update_every_n}",
+                 "-p", f"flow_min_range_m:={flow_min_range_m}",
+                 "-p", f"rf_when_flow_blind_s:={rf_when_flow_blind_s}",
+                 "-p", f"flow_max_dt_s:={flow_max_dt_s}",
+                 "-p", f"flow_soft_limit:={flow_soft_limit}",
                  "-p", f"gps_origin_latitude:={gps_origin[0]}",
                  "-p", f"gps_origin_longitude:={gps_origin[1]}",
                  "-p", f"gps_origin_elevation:={gps_origin[2]}"]
@@ -490,7 +504,9 @@ def setup(context):
             # Give the Gazebo window time to open before asking it to follow the drone
             TimerAction(period=15.0, actions=[
                 ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem,
-                                    *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else [])],
+                                    *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else
+                                      ["--route", route] if route != "auto" else []),
+                                    *(["--land"] if land else [])],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
             # down camera floats over the Gazebo window and this slot shows the RF navigation display.
@@ -517,6 +533,8 @@ def generate_launch_description():
         DeclareLaunchArgument("gui", default_value="true"),
         DeclareLaunchArgument("world", default_value="terrain"),
         DeclareLaunchArgument("demo", default_value="false"),
+        DeclareLaunchArgument("route", default_value="auto"),
+        DeclareLaunchArgument("land", default_value="false"),
         DeclareLaunchArgument("monitor", default_value="window", description="with demo: the dashboard window, or terminal"),
         DeclareLaunchArgument("stereo", default_value="false"),
         DeclareLaunchArgument("stereo_baseline_m", default_value="0.30"),
@@ -533,6 +551,10 @@ def generate_launch_description():
         DeclareLaunchArgument("range_max_m", default_value="100.0"),
         DeclareLaunchArgument("range_noise_std_m", default_value="0.02"),
         DeclareLaunchArgument("flow_update_every_n", default_value="5"),
+        DeclareLaunchArgument("flow_min_range_m", default_value="0.2"),
+        DeclareLaunchArgument("rf_when_flow_blind_s", default_value="0.0"),
+        DeclareLaunchArgument("flow_max_dt_s", default_value="0.2"),
+        DeclareLaunchArgument("flow_soft_limit", default_value="0.0"),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])
