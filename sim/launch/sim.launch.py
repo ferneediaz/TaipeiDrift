@@ -336,11 +336,13 @@ def setup(context):
     except Exception:
         commit = "unknown"
         working_tree_dirty = None
-    velocity_fit_config = {"window_s": 8.0, "min_samples": 6, "min_span_s": 6.0,
-                           "method": "robust generalized least squares; non-overlapping windows"}
     # the vision thresholds the estimator runs with: its tracker re-anchors at the pose estimator's minimum
     eskf_cfg = yaml.safe_load((SIM.parent / "vio/configs/midair_eskf.yaml").read_text())
     pose_cfg = yaml.safe_load((SIM.parent / eskf_cfg["vio_config"]).read_text())["pose"]
+    gnss_cfg = eskf_cfg["sim_gnss"]
+    velocity_fit_config = {"window_s": gnss_cfg["velocity_window_s"], "min_samples": gnss_cfg["velocity_min_samples"],
+                           "min_span_s": gnss_cfg["velocity_min_span_s"],
+                           "method": "robust generalized least squares; non-overlapping windows"}
     metadata = {
         "run_id": run_label or run_id, "world": world.stem, "gnss_cutoff_s_since_first_fix": gnss_cut_s,
         "camera_resolution": cam_res, "demo_trajectory": "city_loop" if world.stem == "city" else "default_world_route",

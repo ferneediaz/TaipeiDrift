@@ -149,7 +149,7 @@ class FrozenEskfAdapter(Node):
         position_result = self.filter.update_position(position, covariance, self.gnss_cfg["gate_prob"])
         velocity_result = None
         velocity_observation = velocity_covariance = None
-        if self.last_velocity_fit_stamp is None:  # the filter started from an RF fix: the fit windows start now
+        if self.last_velocity_fit_stamp is None:  # the filter started from an RF fix
             self.last_velocity_fit_stamp = t
         fit_diag = None
         window = self.gnss_cfg["velocity_window_s"]
