@@ -262,16 +262,23 @@ def setup(context):
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=SIM.parent,
                                 capture_output=True, text=True, check=True).stdout.strip()
+        working_tree_dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=SIM.parent,
+                                                 capture_output=True, text=True, check=True).stdout.strip())
     except Exception:
         commit = "unknown"
+        working_tree_dirty = None
     # the vision thresholds the estimator runs with: its tracker re-anchors at the pose estimator's minimum
     eskf_cfg = yaml.safe_load((SIM.parent / "vio/configs/midair_eskf.yaml").read_text())
     pose_cfg = yaml.safe_load((SIM.parent / eskf_cfg["vio_config"]).read_text())["pose"]
+    gnss_cfg = eskf_cfg["sim_gnss"]
+    velocity_fit_config = {"window_s": gnss_cfg["velocity_window_s"], "min_samples": gnss_cfg["velocity_min_samples"],
+                           "min_span_s": gnss_cfg["velocity_min_span_s"],
+                           "method": "robust generalized least squares; non-overlapping windows"}
     metadata = {
         "run_id": run_id, "world": world.stem, "gnss_cutoff_s_since_first_fix": gnss_cut_s,
         "camera_resolution": cam_res, "demo_trajectory": "default_world_route",
         "estimator_config": "vio/configs/midair_eskf.yaml; simulated GNSS + IMU + barometer; vision flags recorded below",
-        "git_commit": commit, "ros_distro": os.environ.get("ROS_DISTRO", "unknown"),
+        "git_commit": commit, "working_tree_dirty": working_tree_dirty, "ros_distro": os.environ.get("ROS_DISTRO", "unknown"),
         "run_created_local": dt.datetime.now().astimezone().isoformat(), "record_mode": record_mode,
         "topics": {"gt": "/ground_truth/odom", "raw_gps": "/sim/gps_raw", "gated_gps": "/gps/fix",
                    "gnss_status": "/nav/gnss_available", "imu": "/imu/data", "barometer": "/air_pressure",
@@ -284,6 +291,7 @@ def setup(context):
         "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true",
         "sim_tracker_min_tracks": pose_cfg["min_correspondences"],
         "pose_min_correspondences": pose_cfg["min_correspondences"], "pose_min_inliers": pose_cfg["min_inliers"],
+        "gnss_velocity_fit": velocity_fit_config,
         "gnss_local_enu_origin": {"latitude_deg": gps_origin[0], "longitude_deg": gps_origin[1],
                                    "elevation_m": gps_origin[2]},
     }
@@ -296,7 +304,8 @@ def setup(context):
     (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     (run_dir / "config.json").write_text(json.dumps({"world": world.stem, "demo": demo, "cam_res": cam_res,
         "gnss_cutoff_s_since_first_fix": gnss_cut_s, "record_mode": record_mode, "ships": ships,
-        "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true"}, indent=2), encoding="utf-8")
+        "vision_rotation": vision_rotation == "true", "vision_direction": vision_direction == "true",
+        "gnss_velocity_fit": velocity_fit_config}, indent=2), encoding="utf-8")
     (run_dir / "sim.log").write_text(f"Run {run_id}; launch logs are emitted by ros2 launch.\n", encoding="utf-8")
     bag_topics = ["/ground_truth/odom", "/sim/gps_raw", "/gps/fix", "/nav/gnss_available",
                   "/sim/imu_raw", "/imu/data", "/sim/air_pressure_raw", "/air_pressure", "/tf", "/tf_static",
