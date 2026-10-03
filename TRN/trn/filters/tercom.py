@@ -53,7 +53,10 @@ class Tercom(NavFilter):
         self._g = (np.asarray(g.z), g.x0, g.y0, g.dx)
 
     def initialize(self, m: Measurement) -> Estimate:
-        self.c = np.zeros(2)
+        self.c = np.zeros(2)          # correction at the last fix
+        self.v = np.zeros(2)          # drift rate of the correction [m/s]
+        self.t_fix = m.t
+        self.t_prev_fix = None
         self.sigma = float(self.fc["init_sigma_horiz_m"])
         self.buf: list = []
         self.dist = 0.0
@@ -61,9 +64,14 @@ class Tercom(NavFilter):
         self.fixes = 0
         return self._out(m)
 
+    def _corr(self, t: float) -> np.ndarray:
+        if not self.tc["drift_extrapolation"]:
+            return self.c
+        return self.c + self.v * (t - self.t_fix)
+
     def _out(self, m: Measurement) -> Estimate:
         pos = m.ins_pos.copy()
-        pos[:2] -= self.c
+        pos[:2] -= self._corr(m.t)
         return Estimate(pos=pos, cov=np.eye(2) * self.sigma ** 2, extra={"fixes": self.fixes})
 
     def step(self, m: Measurement) -> Estimate:
@@ -75,14 +83,15 @@ class Tercom(NavFilter):
         r = r[np.isfinite(r)]
         uz = abs((m.ins_C @ self.bvec)[2])
         alt = m.baro if np.isfinite(m.baro) else m.ins_pos[2]
-        self.buf.append((m.ins_pos[0], m.ins_pos[1], alt - r[-1] * uz if r.size else np.nan))
+        cc = self._corr(m.t)
+        self.buf.append((m.ins_pos[0] - cc[0], m.ins_pos[1] - cc[1], alt - r[-1] * uz if r.size else np.nan))
         if self.dist >= self.tc["profile_length_m"]:
-            self._fix()
+            self._fix(m.t)
             self.buf = []
             self.dist = 0.0
         return self._out(m)
 
-    def _fix(self) -> None:
+    def _fix(self, t: float) -> None:
         a = np.array(self.buf)
         valid = np.isfinite(a[:, 2])
         if valid.mean() < self.tc["min_valid_frac"]:
@@ -97,7 +106,7 @@ class Tercom(NavFilter):
         offs = np.array(np.meshgrid(g, g)).reshape(2, -1).T.copy()
         out = np.empty(offs.shape[0])
         _search(z, x0, y0, dx, np.ascontiguousarray(a[:, 0]), np.ascontiguousarray(a[:, 1]),
-                np.ascontiguousarray(a[:, 2]), self.c[0], self.c[1], offs, 0 if self.tc["metric"] == "msd" else 1, out)
+                np.ascontiguousarray(a[:, 2]), 0.0, 0.0, offs, 0 if self.tc["metric"] == "msd" else 1, out)
         if not np.isfinite(out).any():
             return
         k = int(np.argmin(out))
@@ -109,6 +118,12 @@ class Tercom(NavFilter):
         ww /= ww.sum()
         mu = ww @ offs
         var = float(np.mean(ww @ (offs - mu) ** 2)) + dx ** 2 / 12
-        self.c = self.c + offs[k]
+        c_new = self._corr(t) + offs[k]
+        if self.tc["drift_extrapolation"] and self.t_prev_fix is not None and t > self.t_fix:
+            v_obs = (c_new - self.c) / (t - self.t_fix)
+            a_ = self.tc["drift_rate_smoothing"]
+            self.v = (1 - a_) * self.v + a_ * v_obs
+        self.t_prev_fix = self.t_fix
+        self.c, self.t_fix = c_new, t
         self.sigma = float(max(np.sqrt(var), self.tc["min_sigma_m"]))
         self.fixes += 1

@@ -74,3 +74,20 @@ def test_raycast_does_not_tunnel_through_ridge():
     r = g.raycast(np.array([[3600.0, 4000.0, 1600.0]]), d, 5000)[0]   # flat ground would be hit at x=4524
     hit_x = 3600 + r * d[0, 0]
     assert 4180 < hit_x < 4201                                          # on the wall's bilinear ramp
+
+
+def test_raycast_fast_matches_safe_on_smooth_terrain():
+    from trn.terrain.grid import raycast_fast, raycast1
+    n, dx = 400, 30.0
+    x = np.arange(n) * dx; y = (n - 1 - np.arange(n)) * dx
+    X, Y = np.meshgrid(x, y)
+    Z = 500 + 200 * np.sin(X / 900) * np.cos(Y / 1300)
+    g = Grid(Z, 0.0, (n - 1) * dx, dx)
+    rng = np.random.default_rng(3)
+    for _ in range(200):
+        th, az = math.radians(rng.uniform(0, 35)), rng.uniform(0, 2 * math.pi)
+        u = (math.sin(th) * math.cos(az), math.sin(th) * math.sin(az), -math.cos(th))
+        p = (rng.uniform(4000, 8000), rng.uniform(4000, 8000), rng.uniform(1500, 4000))
+        a = raycast1(g.z, g.x0, g.y0, g.dx, g.slope_bound(), *p, *u, 6000.0, 0.5, 0.02)
+        b = raycast_fast(g.z, g.x0, g.y0, g.dx, g.slope_bound(), *p, *u, 6000.0, 0.5, 0.02)
+        assert b == pytest.approx(a, abs=0.1)

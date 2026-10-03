@@ -23,7 +23,7 @@ from trn.filters.likelihoods import loglik_baseline, loglik_proposed
 from trn.filters.resampling import roughen, systematic_resample
 from trn.ins.error_model import ErrorModel
 from trn.laser.sensor_model import beam_body_vectors, p_detect
-from trn.terrain.grid import interp1, raycast1
+from trn.terrain.grid import interp1, raycast_fast
 from trn.terrain.onboard_map import OnboardMap
 
 
@@ -39,7 +39,7 @@ def predict_ranges(z, x0, y0, dx, smax, slope, ins_pos, xi, dirs, rmax, mstep, t
         pz = ins_pos[2] - xi[i, 2]
         for b in range(B):
             ux, uy, uz = dirs[b, 0], dirs[b, 1], dirs[b, 2]
-            r = raycast1(z, x0, y0, dx, smax, px, py, pz, ux, uy, uz, rmax * 1.2, mstep, tol)
+            r = raycast_fast(z, x0, y0, dx, smax, px, py, pz, ux, uy, uz, rmax * 1.2, mstep, tol)
             rho[i, b] = r
             if np.isnan(r):
                 sig[i, b] = 1.0
@@ -116,9 +116,10 @@ class MarginalizedPF(NavFilter):
         pred = self.xi @ Axx.T + self.xl @ An.T
         xi_new = pred + self.rng.standard_normal((self.N, 3)) @ Lc.T
         z = xi_new - self.xi @ Axx.T
-        L = Al @ P @ An.T @ np.linalg.inv(Nm)
+        Nk = An @ P @ An.T + Qn * float(self.fc["pseudo_meas_inflation"])   # KF view of the increment noise
+        L = Al @ P @ An.T @ np.linalg.inv(Nk)
         self.xl = self.xl @ Al.T + self.xi @ Alx.T + (z - self.xl @ An.T) @ L.T
-        P = Al @ P @ Al.T + Ql - L @ Nm @ L.T
+        P = Al @ P @ Al.T + Ql - L @ Nk @ L.T
         self.P = 0.5 * (P + P.T)
         self.xi = xi_new
 

@@ -2,7 +2,7 @@ name: m6_altitude
 description: M6 - constant-AGL altitude sweep 1-4 km AGL (route A excluded - 5500 m MSL ceiling), 30 % cloud.
 routes: [B_coastal_plain, C_foothills]
 filters: [mpf_baseline, mpf_proposed]
-runs: 30
+runs: 20
 quick_runs: 4
 overrides:
   atmosphere.enabled: true

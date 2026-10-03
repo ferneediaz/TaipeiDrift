@@ -3,9 +3,10 @@ common:
   init_sigma_horiz_m: 500.0
   init_sigma_vert_m: 30.0
   init_proposal_inflation: 1.5  # sample initial particles from an inflated prior (importance-weighted)
-  decorrelation_length_m: 100.0 # map errors are correlated along track: likelihood exponent = v*dt/L (<=1)
+  decorrelation_length_m: 100.0 # tuned (results/tune): 100 m beats 50 m # map errors are correlated along track: likelihood exponent = v*dt/L (<=1)
   resample_neff_frac: 0.5
   roughening_K: 0.2
+  pseudo_meas_inflation: 50.0   # tuned (results/tune2); inflate the particle-increment pseudo-measurement noise in the KF (>1 keeps P realistic)
   linear_roughening_h: 0.3       # after resampling jitter linear-state means by h*chol(P) (keeps diversity)
   tempering:                    # progressive correction: never let one update collapse N_eff
     enabled: true
@@ -21,7 +22,7 @@ common:
     reinit_sigma_m: 800.0
     cooldown_s: 60.0
 tercom:
-  profile_length_m: 6000.0
+  profile_length_m: 2000.0      # 2 km: longer profiles are distorted by tactical-grade velocity drift
   min_valid_frac: 0.7
   metric: msd                   # msd | mad
   search_sigma_mult: 3.0
@@ -29,6 +30,8 @@ tercom:
   max_search_radius_m: 3000.0
   corr_length_m: 150.0          # for effective number of independent samples
   sigma_growth_mps: 1.0
+  drift_extrapolation: true     # extrapolate the correction with the drift rate between fixes
+  drift_rate_smoothing: 0.5     # weight of the newest drift-rate estimate
   min_sigma_m: 15.0
 mpf_baseline:
   gate: null                    # null = Gaussian on last echo, no gating (Carroll & Canciani style)

@@ -178,3 +178,40 @@ def raycast_many(z, x0, y0, dx, smax, o, d, rmax, min_step, tol, out):
     for k in prange(o.shape[0]):
         out[k] = raycast1(z, x0, y0, dx, smax, o[k, 0], o[k, 1], o[k, 2], d[k, 0], d[k, 1], d[k, 2],
                           rmax, min_step, tol)
+
+
+@njit(cache=True)
+def raycast_fast(z, x0, y0, dx, smax, px, py, pz, ux, uy, uz, rmax, min_step, tol):
+    """Fast ray-terrain range for downward-looking beams (secant iteration on g(r) = z_ray - h).
+
+    Converges in a few interpolations for near-nadir/slant beams; falls back to the safe
+    :func:`raycast1` march when it does not converge or the beam is too shallow. Used for particle
+    predictions on the (smooth) onboard map; the truth simulator always uses :func:`raycast1`.
+    """
+    if uz > -0.3:
+        return raycast1(z, x0, y0, dx, smax, px, py, pz, ux, uy, uz, rmax, min_step, tol)
+    h0 = interp1(z, x0, y0, dx, px, py)
+    if np.isnan(h0):
+        return np.nan
+    if pz - h0 <= 0.0:
+        return 0.0
+    ra = (pz - h0) / (-uz)
+    ga = pz + uz * ra - interp1(z, x0, y0, dx, px + ux * ra, py + uy * ra)
+    if np.isnan(ga):
+        return raycast1(z, x0, y0, dx, smax, px, py, pz, ux, uy, uz, rmax, min_step, tol)
+    rb = ra + ga / (-uz)
+    for _ in range(15):
+        hb = interp1(z, x0, y0, dx, px + ux * rb, py + uy * rb)
+        if np.isnan(hb):
+            break
+        gb = pz + uz * rb - hb
+        if abs(gb) < tol:
+            if rb < 0.0 or rb > rmax:
+                return np.nan
+            return rb
+        den = gb - ga
+        if den == 0.0:
+            break
+        rn = rb - gb * (rb - ra) / den
+        ra, ga, rb = rb, gb, rn
+    return raycast1(z, x0, y0, dx, smax, px, py, pz, ux, uy, uz, rmax, min_step, tol)

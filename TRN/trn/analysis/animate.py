@@ -58,13 +58,15 @@ def main() -> None:
     hs = hillshade(z, g.dx)
     lab, rng_ = rd.laser.labels[:, 0, :], rd.laser.ranges[:, 0, :]
     d0 = np.einsum("nij,j->ni", rd.traj.C[ins.idx], rd.laser.beams_body[0])
-    fig = plt.figure(figsize=(11, 5.6))
-    gs = fig.add_gridspec(2, 2, width_ratios=[1, 1.35], hspace=0.35, wspace=0.18)
+    fig = plt.figure(figsize=(10.5, 5.2))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1, 1.15], hspace=0.42, wspace=0.16, left=0.02, right=0.98,
+                          top=0.9, bottom=0.1)
     axm, axp, axe = fig.add_subplot(gs[:, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[1, 1])
     writer = PillowWriter(fps=6)
     out = project_path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    with writer.saving(fig, str(out), dpi=80):
+    axi = None
+    with writer.saving(fig, str(out), dpi=72):
         for k, snap in frames:
             for ax in (axm, axp, axe):
                 ax.cla()
@@ -88,6 +90,19 @@ def main() -> None:
             axm.set_xticks([]); axm.set_yticks([])
             axm.set_title(f"{ROUTE_LABELS[a.route]}  t = {rd.t[k]/60:4.1f} min\nparticles on onboard map (±{W/1000:.1f} km)")
             axm.legend(loc="lower left", fontsize=6.5, framealpha=0.8, frameon=True)
+            # zoom inset (+-200 m around truth) so a converged cloud stays visible
+            if axi is not None:
+                axi.remove()
+            axi = axm.inset_axes([0.62, 0.62, 0.36, 0.36])
+            Z = 200.0
+            for n in names:
+                p, est = snap[n]
+                axi.scatter(p[:, 0], p[:, 1], s=3, color=COLORS[n], alpha=0.4)
+                axi.plot(*est, "o", ms=6, mfc="none", mec=COLORS[n], mew=1.5)
+            axi.plot(*c, "k*", ms=10)
+            axi.set_xlim(c[0] - Z, c[0] + Z); axi.set_ylim(c[1] - Z, c[1] + Z)
+            axi.set_xticks([]); axi.set_yticks([]); axi.set_facecolor("#f4f4f4")
+            axi.set_title("zoom ±200 m", fontsize=7, pad=2)
             # echo profile (last 60 s)
             j0 = max(0, k - 600)
             ss = rd.t[j0:k + 1] - rd.t[k]
@@ -112,7 +127,23 @@ def main() -> None:
             axe.set_xlabel("time [min]"); axe.set_ylabel("horizontal error [m]")
             axe.legend(loc="upper right", fontsize=6.5)
             writer.grab_frame()
-    print(f"wrote {out} ({len(frames)} frames)")
+    _shrink_gif(out)
+    print(f"wrote {out} ({len(frames)} frames, {out.stat().st_size/1e6:.1f} MB)")
+
+
+def _shrink_gif(path) -> None:
+    """Re-encode with a shared 128-colour palette (built from several frames) to keep the GIF small."""
+    from PIL import Image, ImageSequence
+    im = Image.open(path)
+    dur = im.info.get("duration", 160)
+    frames = [f.convert("RGB") for f in ImageSequence.Iterator(im)]
+    sample = frames[:: max(1, len(frames) // 8)]
+    mosaic = Image.new("RGB", (sample[0].width, sample[0].height * len(sample)))
+    for i, f in enumerate(sample):
+        mosaic.paste(f, (0, i * f.height))
+    pal = mosaic.quantize(colors=128, method=Image.Quantize.MAXCOVERAGE)
+    q = [f.quantize(palette=pal, dither=Image.Dither.NONE) for f in frames]
+    q[0].save(path, save_all=True, append_images=q[1:], duration=dur, loop=0, optimize=True)
 
 
 if __name__ == "__main__":
