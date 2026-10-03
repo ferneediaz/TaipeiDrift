@@ -1,10 +1,10 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 13:05.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 13:15.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
-The core system works on real data from two countries. The test on data it was never tuned on exposed one weakness: wrong position fixes slip through. The new checks cut them from about 12 per flight to 0 to 2, on the flight where they were developed (UAV-VisLoc 03). The clean final test on two flights never looked at (01 and 04) is the next step.
+The system works on real data from two countries, and we now know how well. On the flights it was developed on, it holds about 30 m where the camera alone drifts 470 to 820 m. On flights it never saw, the fixes cut the drift by 40 percent (ALTO, 219 to 131 m, Ilhan's test at 13:00) to tenfold (UAV-VisLoc 04, 675 to 60 m); where the ground was rebuilt since the map (UAV-VisLoc 01) they do not help. Fielded systems claim 15 to 20 m. **Section 2 explains in detail what the system does and what it gives a user.** The three parts of the team (our map fixes, Alessandro's IMU filter, Ilhan's checks and simulator patch) are not combined in code yet; they can only run together in the simulator, which is the next job.
 
 **The new checks, on the development flight** (UAV-VisLoc 03, 74 km without GNSS, median over 3 seeds; "all clear while wrong" = the share of the flight where the navigator's stated bound is within 50 m but the true error is above it):
 
@@ -37,6 +37,19 @@ What it says:
 - **Why flight 01 fails:** it runs through a fast-growing area along the Yangtze. Bare construction sites in the 2018 photos are high-rise estates on the 2023 map; no matcher can recognise that ground. Raptor's documentation and the UASTHN paper name the same limit: a map older than the change on the ground.
 - **The sun sensor helps here** where the compass is the weak part: median 177 instead of 306 m on flight 01, 90 percent below 1,206 instead of 1,723 m on flight 04.
 
+**Ilhan's held-out test on ALTO, without the leak** (pushed 13:00, branch `research/offline-nav-evidence`, script `experiments/w_dustin_heldout.py`). Our navigator as of this morning (commit 83adc59, before the new checks), frozen, on the 8 ALTO Round 2 sections it never saw (37.4 km). It first reproduced our validation numbers exactly.
+
+| Fixes | Validation section (ours) | 8 unseen sections: median of the section medians (range) | Fixes used, of them wrong | Error within the stated 3 sigma (median section, worst) |
+|---|---|---|---|---|
+| None (camera alone) | 472 m | 219 m (68 to 420) | | 100%, 75% |
+| Every 300 m, score check | 31 m | 131 m (26 to 1,135) | 47, 6 wrong (76 refused) | 70%, 15% |
+| Every 1,000 m, score check | 56 m | 98 m (43 to 783) | 16, 3 wrong | 82%, 24% |
+| Every 100 m, no check | 25 m | 50 m (17 to 437) | 289, 95 wrong | 39%, 9% |
+
+- Our 31 m on ALTO is the section it was tuned on. Across unseen sections the result runs from 26 to 1,135 m, median 131 m: the fixes cut the error by 40 percent, and the stated uncertainty is too small in some sections. Two thirds of the fix attempts are refused.
+- Ilhan's suspect from last night: the zoom, learned from three fixes, goes wrong when the helicopter changes height. A height sensor (barometer) would set it.
+- The new checks (confirmation of large jumps, search cap, camera-motion floor) were developed on UAV-VisLoc and have not run on these sections yet; asked of Ilhan.
+
 **How the plan changed this morning**
 
 | Before | Now | Why |
@@ -54,7 +67,7 @@ What it says:
 
 **Achieved**
 
-- **USA (ALTO, real helicopter flight):** camera alone ends 472 m off (median); with map fixes 31 m. A flaw in our test (the search knew the true path) was found and removed; the numbers did not change.
+- **USA (ALTO, real helicopter flight):** camera alone ends 472 m off (median); with map fixes 31 m. A flaw in our test (the search knew the true path) was found and removed; the numbers did not change. On the 8 unseen ALTO sections (Ilhan): 219 m to 131 m.
 - **China (real drone photos against a map 2.5 years older):** the matcher, unchanged, finds 80 percent of the photos within 30 m.
 - **74 km without GNSS:** median 27 m, against 1,041 m without fixes. But about 11 wrong fixes slipped through and the drone got lost in stretches: our honest weakness. Ilhan found the same independently on unseen ALTO data (94 m instead of 31 m).
 - Built against it: confirmation of large jumps by the next fix, Ilhan's quarters check, the fix offset in the drone's own frame (fix error 19 to 13 m), compass and sun-sensor models, the aviation integrity measure.
@@ -96,16 +109,20 @@ What the jury scores (the challenge brief), and how we answer each point:
 
 | The brief scores | Our answer | State |
 |---|---|---|
-| Reduction in positioning error | Camera alone drifts to 472 m (median) on ALTO; with map fixes 31 m | Measured |
-| Technical validity | Tested on flights we never tuned on, from another country, camera and map source | Running now |
-| Noise tolerance | Error as the picture gets darker, blurred, hazy, and as the heading sensor gets worse | This afternoon |
-| Computing and integration | One fix takes about 0.1 s on one laptop core; output is a position with an uncertainty, the form an autopilot takes | Timing this afternoon |
+| Reduction in positioning error | Where developed: 472 → 31 m (ALTO), 822 → 28 m (UAV-VisLoc 03). Never seen: 219 → 131 m (ALTO, 8 sections), 675 → 60 m (UAV-VisLoc 04); no gain where the ground changed (01) | Measured |
+| Technical validity | Tested on flights we never tuned on, from another country, camera and map source | Done: UAV-VisLoc 01 and 04 (ours), ALTO Round 2 (Ilhan) |
+| Noise tolerance | Error as the picture gets darker, blurred, hazy, and as the heading sensor gets worse | Done: light, blur, haze (top of page); compass against sun sensor |
+| Computing and integration | One fix takes about 0.1 s on one laptop core; output is a position with an uncertainty, the form an autopilot takes | Timing open |
 | Deployment feasibility | Free maps (Taiwan's government orthophotos), an ordinary camera, no GPU | Slide |
 | The user | Operators of small drones near Taiwan's coast and islands, where GNSS is jammed | Slide |
 
 The required parts of the brief: a dead-reckoning baseline, at least one correction, plots of estimated against true path and of error over time, and the limits. We have all four on ALTO; the held-out test adds them on a second dataset.
 
-## 2. The system, layer by layer
+## 2. The system in detail: what it does, and what it gives the user
+
+Written at 13:10 so that everyone on the team can explain the system in their own words. Every number below is a setting the code really uses (`baseline/configs/`, `baseline/src/estimation/`) or a measured result from this page.
+
+**In one picture**
 
 ```
  heading sensor  ─┐
@@ -119,11 +136,98 @@ The required parts of the brief: a dead-reckoning baseline, at least one correct
                                                    large jump confirmed by the next fix?
 ```
 
-1. **Dead reckoning.** The image slides through the camera as the drone flies; that motion, added up, carries the position forward. It drifts by about 10 percent of the distance flown.
-2. **Heading.** To add up the motion in the right direction through turns, the navigator needs the drone's heading. Every drone has one from its compass (magnetometer); the mentor's sun sensor would give a better one.
-3. **Position fixes.** Every few hundred metres the camera frame is compared with the satellite map in a circle around the estimate. The best match is a candidate position.
-4. **The check.** A candidate is used only if its match score is high enough and it lies within the stated uncertainty of the estimate. New today: a candidate that would move the estimate far, out of a wide search, must be confirmed by the next fix over different ground.
-5. **Stated uncertainty and status.** The navigator always reports how sure it is. Without fixes the uncertainty grows; at a fix it shrinks. The status follows from it.
+### 2.1 The user and the problem
+
+- **The user:** anyone who flies small, cheap drones where GNSS is jammed or spoofed. In Taiwan: around the outlying islands, where interference is reported regularly, and in any conflict. Examples: coast and island surveillance, disaster response, military reconnaissance.
+- **The problem:** without GNSS the drone has only its own sensors, and they drift. On our data the camera alone ends up 472 m off on ALTO and 822 m off on UAV-VisLoc flight 03 (median); the IMU alone 338 to 912 m after 83 s on Mid-Air (Alessandro). The drone cannot hold its route, find its target or come home, and nobody tells the operator how far off it is.
+- **What the drone already carries:** a camera, a compass, a barometer, an IMU, a small computer. What it lacks is a position it can trust.
+
+### 2.2 One flight, step by step
+
+**Before take-off.** The drone stores an aerial or satellite image of the area as its map, in grey, at about 1 m per pixel. The size, counted from zero: 1 km² at 1 m per pixel is 1,000 × 1,000 pixels, which is 1 MB. A route corridor 100 km long and 2 km wide is 200 MB. All of Taiwan, about 36,000 km², is 36 GB before compression; it fits on a memory card.
+
+**While GNSS still works** (the first 300 m on ALTO, 1,000 m on UAV-VisLoc), the system learns four things by comparing the camera with GNSS. Nothing is calibrated by hand.
+
+1. *How a slide of the picture becomes metres.* If the picture slides 10 pixels while GNSS says the drone flew 5 m north, one pixel of slide is 0.5 m. The system learns this as a small 2 × 2 table, which also holds how the camera is turned against the drone.
+2. *How the map must be zoomed and turned* to look like the camera picture. The zoom depends on the height.
+3. *The fix offset:* where a matched position lies compared with the GNSS position. On UAV-VisLoc it is about 13 m ahead of the drone (camera tilt, trigger timing). It is learned in the drone's own frame (forward, right), so it turns with the drone.
+4. *The cruising speed,* for the last case below.
+
+**GNSS is lost. Every camera frame: dead reckoning.**
+
+- The system measures how far the picture slid since the last frame, turns that into metres with the table, turns it to north and east with the heading (compass or sun sensor), and adds it to the position.
+- Every step carries a small error, and the errors add up: about 10 percent of the distance flown.
+- The system says so. Next to the position it keeps σ (sigma), its own statement of how far off it may be, in metres. If σ is honest, the true error stays below 3σ almost always; our tables check exactly that ("error within the stated 3 sigma").
+- How σ grows, from zero. Independent errors add as squares. Right after a fix σ is about 13 m. After 300 m more, the dead reckoning has added 10 percent of 300 m, which is 30 m. The new σ is √(13² + 30²) = √(169 + 900) = 33 m.
+
+**Every 300 m: a position fix.**
+
+- The camera picture is compared with the map in a circle around the current estimate. The radius is 3σ, at least 60 m and at most 600 m: with σ = 33 m it is 99 m.
+- The comparison slides the picture over every position in the circle and scores how well the pattern of light and dark agrees (normalised correlation). The score ignores how bright the picture is and how strong its contrast is. Three pixels in a row as an example: 10, 20, 30 against 110, 120, 130 score 1.0 (the same pattern, only brighter); against 30, 20, 10 they score −1 (the pattern reversed). A few zooms and angles around the learned ones are tried. The best place is the candidate fix.
+- **Three checks.** The candidate is used only if
+  1. its score is at least 0.33;
+  2. it lies within 3σ of the estimate (99 m in the example);
+  3. when it comes from a wide search (radius over 150 m) and would move the estimate by more than 30 m, the next fix, 300 m later over different ground, agrees with it. "Agrees" means the two fixes lie as far apart as the dead reckoning says, within 3 × √(15² + 15² + 30²) = 110 m: the error of each fix, 15 m, and of the dead reckoning between them, 30 m. A look-alike place rarely has a matching look-alike 300 m further on.
+
+**Using a fix.** A fix has its own uncertainty, σ = 15 m. The estimate moves towards the fix by how unsure it is compared with the fix. Estimate σ = 30 m (squared: 900), fix σ = 15 m (squared: 225): the estimate moves 900 / (900 + 225) = 80 percent of the way, and its new σ is √(0.2 × 900) = 13.4 m. A fix that waited for confirmation is used first, then the one that confirmed it.
+
+**What it reports, every frame:** a position (north and east), σ, and a status.
+
+| Status | When | With a fix every 300 m |
+|---|---|---|
+| TRACKING | σ up to 30 m | From each fix (13 m) until about 270 m later |
+| DEGRADED | σ from 30 to 100 m | The last 30 m before each fix; after one missed fix σ is 62 m |
+| LOST | σ above 100 m | After about 1 km without an accepted fix |
+
+A position with its uncertainty is the form in which an autopilot takes a position from an outside source. The link to a real autopilot is not built.
+
+**When the camera stops seeing the motion** (dark, hazy or blurred picture). If a frame's step is shorter than 30 percent of the cruising step learned with GNSS (say the drone cruises 10 m between frames and the camera reports less than 3 m), the camera is not believed. The system flies on at cruising speed in the last good direction, and σ grows three times faster (30 percent of the distance). It never stands still while claiming to be sure.
+
+### 2.3 What it gives the user, and the evidence
+
+| The user gets | Evidence (median error) | The honest limit |
+|---|---|---|
+| A position within tens of metres where the ground matches the map | Developed on: ALTO 472 → 31 m; UAV-VisLoc 03 (74 km) 822 → 28 m | The settings were chosen on these flights |
+| On flights it never saw, a drift cut by 40 percent to tenfold | ALTO, 8 sections (Ilhan): 219 → 131 m; UAV-VisLoc 04 (83 km): 675 → 60 m | Wrong fixes still pass: 18 to 32 on flight 04 |
+| Nothing where the ground has changed since the map | UAV-VisLoc 01: no gain over dead reckoning | Needs a fresher map, as Eagle Eyes has |
+| A warning when it is unsure | Share of the flight with "all clear" while more than 50 m off: 0.0 percent on flight 03, 0.9 to 3.2 on unseen 01 and 04 | On unseen ALTO the stated bound held in 70 percent of frames (older version, before the new checks) |
+| A safe reaction when the camera goes blind | Haze with 10 percent of the contrast left: 1,640 m and "sure" before the change; 54 m and LOST after it | Blur of 4 m still fools the camera's motion |
+| A better heading from the sun | Unseen flight 01: 306 → 177 m with the sun sensor instead of the compass | Useless around midday in Taiwan's summer, when the sun is overhead |
+| No vendor, nothing to jam or to detect | Free aerial images, an ordinary camera, no radio emission | Daylight and land only |
+
+### 2.4 What it costs the user
+
+- **Sensors:** a downward camera; a heading from the compass every drone has, or a sun sensor (35 g, 0.2 W, Fan et al. 2016); GNSS for the first few hundred metres.
+- **Map:** free aerial images, about 1 MB per km² before compression.
+- **Computing:** one fix in about 0.1 s on one laptop core, no graphics processor. Not yet timed on a drone's small computer.
+- **Setup:** none by hand; it calibrates itself while GNSS works. That also means a drone jammed from take-off is not covered.
+
+### 2.5 What it does not do yet, and what would close each gap
+
+| Gap | What would close it | State |
+|---|---|---|
+| Changed ground | A fresher map: recent reconnaissance or the drone's own earlier flights (Eagle Eyes) | To show in the simulator: the same flight with the 2020 and the 2018 image as the map |
+| Wrong zoom when the height changes | Set the zoom from the barometer's height (Ilhan's finding on ALTO) | The simulator has a barometer |
+| Wrong fixes that still pass | A second motion source to cross-check (Alessandro's IMU filter); a forecast of where the map has look-alikes | Open |
+| Night | An infrared camera against the same map, as Raptor does | Not started |
+| Water, the Strait | Nothing to match; IMU and camera dead reckoning with the sun heading | Alessandro's filter; not combined |
+| Forest, 76 percent of Taiwan | Terrain navigation (Felix) | Separate |
+| Jammed from take-off | A start without GNSS | Not covered |
+
+### 2.6 Against what a buyer can get today
+
+Sources in [landscape.md](landscape.md).
+
+| | Ours (weekend prototype) | AIDC AIxVNAV (Vantor's Raptor inside) | Eagle Eyes (Ukraine) | Osiris (Greece) |
+|---|---|---|---|---|
+| Map | Free aerial images | Vantor's licensed 3D data | Own recent reconnaissance flights | Preloaded satellite images |
+| Hardware | Ordinary camera, one CPU core | Camera and a graphics processor | Not public | Module under 300 g, 25 W |
+| Accuracy | 28 to 31 m where developed; 60 to 131 m on unseen flights | Raptor: 12 m mean in one published test | Not public | 15 m CEP (maker) |
+| Says when unsure | σ and status every frame, and we measure how often it is wrong while saying "all clear" | A confidence from 0 to 1 per frame | Not public | Not public |
+| Night | No | With an infrared camera | Not public | Daytime figure |
+| Maturity | Recorded flights | Flight-tested in Taiwan, 2026 | In combat since 2023 | About 3,000 km of trials in Ukraine |
+
+**In one sentence for a customer:** for cheap drones where GNSS is jammed, it turns "the drone is lost" into "the drone knows where it is, to within tens of metres where the map matches and 60 to 130 m on flights it never saw, and says when it is not sure", with the camera it already has and a free map. A buyer who needs accuracy or night flight today buys a fielded system; ours is the open, low-cost prototype with measured limits.
 
 ## 3. What we did this morning, and why
 
@@ -201,7 +305,7 @@ Read on Saturday at 12:40 from branch `mid-air-vio` (commits 4d60f38 and 7773c95
 | Error over time | Grows: 13 to 33 m after 83 s | Bounded where the ground matches the map; fails where it changed |
 | Sensors | IMU, forward and down camera, barometer | Down camera, a map, a heading |
 | Data | Mid-Air: synthetic, low, short flights, no map | ALTO and UAV-VisLoc: real, 400 to 550 m high, 4 to 83 km, no IMU |
-| Stated uncertainty | 2 to 5 times too small | Holds in 97 percent of frames on development data, 77 to 98 on held-out |
+| Stated uncertainty | 2 to 5 times too small | Holds in 97 percent of frames on development data, 77 to 98 on held-out UAV-VisLoc, 70 on unseen ALTO (older version) |
 | Wrong inputs | 99 percent Mahalanobis gate | Score, distance gate, confirmation by the next fix |
 
 **Where they combine:**
@@ -219,7 +323,7 @@ Read on Saturday at 12:40 from branch `mid-air-vio` (commits 4d60f38 and 7773c95
 | Works | Evidence |
 |---|---|
 | Matching camera frames against an aerial map by correlation of brightness patterns | About 14 to 16 m per fix on ALTO (USA) and UAV-VisLoc (China) |
-| A stated uncertainty that holds when the system works | Error within 3 sigma in 97 to 100 percent of frames on ALTO |
+| A stated uncertainty that holds when the system works | Error within 3 sigma in 97 to 100 percent of frames on the ALTO validation section and UAV-VisLoc 03 |
 | A search sized by the uncertainty | Recovers after 1,000 m without fixes on ALTO |
 
 | Does not work | Evidence |
@@ -228,6 +332,7 @@ Read on Saturday at 12:40 from branch `mid-air-vio` (commits 4d60f38 and 7773c95
 | Agreement of frames 14 m apart | They see the same ground and agree on the same wrong place |
 | The score threshold alone, on unseen data | About 11 wrong fixes used on UAV-VisLoc flight 03 |
 | Any check against a map that is wrong as a whole | Two fixes then agree on the same wrong place; needs a second source (documented as a test) |
+| The stated uncertainty on unseen ALTO sections | Holds in 70 percent of frames, 15 in the worst section (Ilhan, version before the new checks) |
 
 ## 7. What is done, what is left, and who does it
 
@@ -245,18 +350,22 @@ Code freeze Sunday 10:00, demo 13:00. Updated 13:15.
 | **Demo clips**: ALTO and unseen flight 04 | `outputs/replay/` |
 | Comparison with Alessandro's visual-inertial odometry | section 5a |
 | The mentor's phone sun compass: code ready, waiting for photos | `baseline/scripts/phone_sun_compass.py` |
+| Eagle Eyes and the other fielded systems compared with ours | [landscape.md](landscape.md#eagle-eyes-and-the-systems-fielded-in-ukraine), top of page |
+| The system in detail: what it does, step by step, and what it gives the user | section 2 |
 
 **Left:**
 
 | What | Who | State |
 |---|---|---|
-| **Simulator demo:** Dan's simulator with Ilhan's patch (GNSS cut, recorder, IMU leak fixed), the real Wufeng 2020 aerial image as the ground, a flight along the motorway corridor; our navigator searches the 2018 image of the same place. One flight with IMU, camera, barometer and a map: where our fixes and Alessandro's filter can meet | Claude | Started 12:40, branch `sim-demo` (from Dan's `simulations`) |
+| **1. One branch with everything, `integration`:** ours, Alessandro's `mid-air-vio`, Dan's simulator with Ilhan's patch (`sim-demo`), Ilhan's research, Felix's TRN from `main`. A trial merge shows small conflicts only: `.gitignore`, `pyproject.toml`, the handoff note, and the Mid-Air baseline files that Alessandro and we both fixed on Friday. `main` stays untouched for the team to decide | Claude | Started 13:20, locally; pushed once it runs |
+| **2. The fused navigator:** Alessandro's IMU filter as the core. Our map fixes go in as position measurements (15 m) behind his 99 percent gate and our confirmation of large jumps; the barometer sets the matcher's zoom (Ilhan's finding); the filter's heading turns the frame for the search; Ilhan's quarters rule stays an option | Claude | After step 1 |
+| **3. The simulator demo:** Dan's simulator with Ilhan's patch (GNSS cut, recorder, IMU leak fixed), the real Wufeng 2020 aerial image as the ground, a flight along the motorway corridor. Four runs on the same flight: our camera navigator alone, Alessandro's filter alone, the two fused, and the fused one with the fresh 2020 image as the map (the price of an old map) | Claude | After step 2; branch `sim-demo` started 12:40 |
 | Computing time per fix and per frame, map storage per square kilometre | Claude | Open |
 | README for the submission (one sentence, headline number, how to run, limits, each part, data and licences) | Claude | Open |
 | Fold today's numbers into `findings.md` | Claude | Open |
 | Slides and the one story | Dustin and team | Open; charts from Claude |
 | Which branches go into `main` | team | Open |
-| Rerun the ALTO Train test with the map search (`search: area`) | Ilhan | Asked |
+| ~~Rerun the ALTO Train test with the map search~~ Done at 13:00: 131 m (top of page). Next: the same test with the current navigator (new checks), and the zoom from the height | Ilhan | Asked |
 | The heading drift of the visual-inertial odometry; fix the term he flagged; who adds the fix input to his filter | Alessandro | Asked |
 | One slide on terrain navigation for forest and night | Felix | Asked |
 | Phone photos for the sun compass, while the sun is high | anyone with an iPhone | Asked |
@@ -266,6 +375,7 @@ Code freeze Sunday 10:00, demo 13:00. Updated 13:15.
 ## 8. What we will not claim
 
 - Better accuracy than Raptor or VNS01.
+- 31 m as our accuracy in general: it is the ALTO section we tuned on. On unseen flights: 60 to 131 m.
 - Night, fog or flight over water.
 - Real-time on drone hardware: measured on a laptop only.
 - Real dead reckoning on UAV-VisLoc: it is simulated there; real on ALTO.
