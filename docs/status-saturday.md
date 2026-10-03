@@ -86,20 +86,17 @@ What it says:
 
 **Asks to the team**
 
-- **Ilhan:** rerun the ALTO Train test with the map search (`search: area`); your quarters rule is in the shared code.
-- **Alessandro:** the heading error of the visual-inertial odometry after 30, 60 and 80 s without GNSS; it becomes our compass model.
+- **Ilhan:** ~~rerun the ALTO Train test with the map search~~ done at 13:00 (131 m). Next: the same with the current navigator, and the zoom from the height.
+- **Alessandro:** the heading error of the visual-inertial odometry after 30, 60 and 80 s without GNSS; it becomes our compass model. And what the "graph-map layer" in your architecture sketch is, before anyone builds it.
 - **Felix:** one slide on terrain navigation for forest and night (forest is 76 percent of Taiwan, where camera fixes fail).
-- **Dan:** can the simulator show a flight for the demo by 18:00? Yes or no by 14:00.
-- **Anyone with an iPhone, before about 13:00 while the sun is high:** the mentor's sun-compass test (steps below).
+- **Anyone with an iPhone, today until 14:30 or tomorrow 09:00 to 09:45:** the mentor's sun-compass test (below).
 - **Dustin:** the story and slides; ask the organisers what the brief's "suggested dataset" is.
 
-**The mentor's sun-compass test with an iPhone** (code ready: `baseline/scripts/phone_sun_compass.py`)
+**The mentor's sun-compass test with an iPhone** (code ready: `baseline/scripts/phone_sun_compass.py`). The full plan for the teammate, with steps, timing and how the number feeds into the navigator, is on a separate page that Dustin shares. Two corrections to the steps written this morning:
 
-1. Settings, Camera: location on. Back camera at 1x.
-2. Show `data/raw/phone_sun/chessboard_9x6_inner_corners.png` full-screen on a laptop; take 15 to 20 photos of it from different angles and distances, filling much of the frame. Put them in `data/raw/phone_sun/chessboard/`.
-3. Lay the phone screen down on a level table in the sun (check with the Measure app's Level), back camera looking up, exposure turned all the way down. Shoot with the volume button.
-4. Take 8 photos, turning the phone in 90-degree steps along a table edge (0, 90, 180, 270, twice). Note what the Compass app shows for each. Put them in `data/raw/phone_sun/sun/`.
-5. Run `python baseline/scripts/phone_sun_compass.py`: the scatter of the measured turns around the 90-degree steps is the sun compass's error.
+- **Use the 0.5x camera, for the chessboard photos too.** Lying flat, the 1x camera only sees about 35° from straight up, so the sun is in the picture only around noon; the 0.5x reaches about 50°.
+- **The sun must stand above about 40°:** at NTU today until about 14:30, tomorrow from 09:00. Tomorrow's window ends with the code freeze.
+- The script now reports the error of one heading reading (the spread of the eight readings around their 90-degree steps); before, it counted the first photo's error twice.
 
 ## 1. The goal for Sunday
 
