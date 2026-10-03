@@ -60,7 +60,7 @@ navigator:                # the settings frozen for the UAV-VisLoc held-out test
   # The zooms searched after the jam must cover the heights flown too (the defaults, 0.60 to 1.10, miss the 65 m
   # flight's 0.51: after 400 m without a fix it searched only wrong scales). And a jump from a search wider than
   # 100 m (default 150 m) waits for the next fix to confirm it: the 65 m flight has a look-alike 74 m off at
-  # 1.32 km, found by a 134 m search and accepted before. Kept at 17:00: every development flight works
+  # 1.32 km, found by a 134 m search and accepted before. Kept at 16:50: every development flight works
   # (no wrong fix, bound held 99 percent, never "within 50 m" while further off); the price is fewer fixes used
   # and a median 4 to 10 m higher.
   wide_zooms: [0.45, 1.05]
@@ -68,7 +68,7 @@ navigator:                # the settings frozen for the UAV-VisLoc held-out test
   confirm_above_radius_m: 100.0
 
 heading:                  # src/sensors/heading.py and sun_sensor.py; choose with source (sim_dev_check.py --heading)
-  source: sun_digital     # compass, sun_digital or sun_photodiode. The sun since 17:30 (save point 4): on every
+  source: sun_digital     # compass, sun_digital or sun_photodiode. The sun since 17:00 (save point 4): on every
   # development flight better than the compass (2018 map median 22.0 -> 16.5 m, 34.4 -> 32.3, 30.3 -> 18.0) and
   # every flight still works; the photodiode sensor is about as good as the compass and fails the 120 m flight
   when: "2026-10-04T13:00:00+08:00"   # the flight's date and time, for the sun: the demo, sun at about 56 degrees
