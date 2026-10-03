@@ -97,7 +97,8 @@ The Gazebo window appears in the browser tab. Launch options:
 | `stereo_baseline_m` | `0.30` | Stereo camera offset along body -Y (right), used when `stereo:=true` |
 | `gui` | `true` | `false` runs Gazebo without its window |
 | `world` | `terrain` | A world file in `worlds/`: `terrain` (fields and woods), `islands` (two islands and open sea), `strait` (the islands with warships that transmit AIS) or `city` (roads and buildings) |
-| `demo` | `false` | `true` flies circles (in `islands` and `strait`: from island to island; in `city`: a loop through the streets) and opens the camera view and the sensor monitor |
+| `demo` | `false` | `true` flies circles (in `islands` and `strait`: from island to island; in `city`: a loop through the streets) and opens the camera view and the navigation dashboard (see `monitor`) |
+| `monitor` | `window` | with `demo`: `window` opens the navigation dashboard, `terminal` the same information in a terminal |
 | `ships` | `auto` | `true` sails AIS-transmitting ships and runs the drone's AIS receiver (see below); `auto` means on in `strait` only |
 | `wind` | `none` | `SPEED,FROM` in m/s and degrees, e.g. `6,20`: wind from the north-north-east with gusts; the drone leans into it |
 
@@ -276,7 +277,7 @@ The browser desktop shows:
 - **Gazebo window, main view:** the chase camera behind the drone.
 - **Gazebo window, right-hand panels:** an overview from a fixed camera high in the south, showing the islands and all three ships, and the drone's down camera. A red ball floats 30 m above the drone so it can be found in the overview. It is only a visual, and the down camera does not see it.
 - **Top right:** the RF navigation display (see [RF_README.md](RF_README.md), section 4).
-- **Bottom right:** the sensor monitor.
+- **Bottom right:** the navigation dashboard (`nodes/nav_dashboard.py`): tabs Overview (GNSS state; each estimator's position error, 2σ bound and whether the error is within it, heading and height error; sensor health), Navigation, Sensors and AIS. `monitor:=terminal` shows the same information in a terminal instead (`nodes/sensor_monitor.py`).
 
 `worlds/strait.sdf` is the islands world with three warships at full size. The scenery is the same, and the `islands` world itself has no ships. Each ship patrols a box at one corner of a triangle around the drone's route, so the drone always hears them from three well-separated directions:
 
@@ -346,7 +347,7 @@ The strait world also runs the ESKF estimator (`nodes/eskf_ros_adapter.py`, from
 
 While GNSS is available, both get a velocity update from a robust least-squares line through the last 8 s of fixes (`nodes/gnss_velocity_fit.py`, settings `velocity_*` under `sim_gnss` in `vio/configs/midair_eskf.yaml`), on non-overlapping windows. With `rf_fix`, each `/rf_nav/odom` message that carries a new bearing (its covariance shrank) becomes a horizontal position update and a heading update, with rf_nav's own covariance. Unlike GNSS, no velocity is taken from the RF fixes: the RF error wanders slowly, and differences 5 s apart were off by about 10 m/s. If the gate rejects several fixes in a row, the ESKF has drifted and its position is reset to the fix. The settings are under `eskf_rf_fix` in `config/rf.yaml`. Without GNSS at all (`gps:=false`) the ESKF starts from the first RF fix.
 
-`check_rf_nav.py` scores all three, over the whole run and after the cutoff, and draws them on one map. The sensor monitor's NAVIGATION table shows the same comparison live: each estimate's distance from the truth, its own 2σ, the RMS since the cutoff, height and heading errors, and which updates it fused.
+`check_rf_nav.py` scores all three, over the whole run and after the cutoff, and draws them on one map. The navigation dashboard (Overview and Navigation tabs) and the terminal monitor's NAVIGATION table show the same comparison live: each estimate's distance from the truth, its own 2σ, the RMS since the cutoff, height and heading errors, and which updates it fused.
 
 ## Frames
 
@@ -371,6 +372,7 @@ config/sensor_noise.yaml    IMU noise bounds, barometer drift
 nodes/sensor_noise.py       Mid-Air IMU noise model, barometer drift and attitude zeroing
 nodes/gnss_gate.py          GNSS cutoff, counted from the first fix
 nodes/recorder.py           common replay-format recorder
+nodes/nav_dashboard.py      the navigation dashboard window: the same information as sensor_monitor.py, in tabs
 nodes/sensor_monitor.py     live sensor values in the terminal, and the NAVIGATION comparison of the estimates
 nodes/demo_flight.py        demo flights (circles, island to island, or a survey of the islands) and the chase camera
 nodes/record_midair.py      records a flight in the Mid-Air dataset format

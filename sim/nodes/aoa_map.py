@@ -65,6 +65,7 @@ ELLIPSE_95 = chi2.ppf(0.95, 2)  # squared Mahalanobis radius of the 95 % ellipse
 COLOURS = ["tab:blue", "tab:orange", "tab:green", "tab:purple", "tab:brown"]
 EST, TRUE, SNAP = "tab:red", "gold", "0.3"
 WINDOW = (720, 470)       # width and height of the window, in the browser desktop's top-right corner
+PLACE_DRAWS = 8           # place it on each of the first draws (0.5 s apart)
 
 
 def yaw_of(q):
@@ -110,7 +111,7 @@ class AoaMap(Node):
         self.key = self.fig.add_subplot(left[1])         # the legend, under the map so it covers nothing
         self.zoom = self.fig.add_subplot(right[0])       # close-up around the drone
         self.panel = self.fig.add_subplot(right[1])      # the numbers in words
-        self.placed = False
+        self.placed = 0           # draws so far that placed the window
         try:
             self.fig.canvas.manager.set_window_title("RF Navigation: AIS angle of arrival")
         except AttributeError:
@@ -316,12 +317,15 @@ class AoaMap(Node):
     def show(self):
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
-        if not self.placed:  # after the first draw, or the window manager and the canvas resize it again
-            self.placed = True
+        if self.placed < PLACE_DRAWS:  # the first draws: the window manager may move the window after it appears
+            self.placed += 1
             try:  # the top-right corner of the browser desktop, whatever the window manager adds around it
                 w = self.fig.canvas.manager.window
+                screen = w.screen().availableGeometry()
+                # never larger than the screen: a maximise once asked Qt for a 65535 x 65535 canvas (17 GB)
+                w.setMaximumSize(screen.width(), screen.height())
                 w.resize(*WINDOW)
-                frame, screen = w.frameGeometry(), w.screen().availableGeometry()
+                frame = w.frameGeometry()
                 w.move(screen.right() - frame.width() + 1, screen.top())
             except AttributeError:
                 pass

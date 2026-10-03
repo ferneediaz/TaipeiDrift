@@ -22,7 +22,7 @@ docker compose exec sim bash -ic "python3 sim/scripts/check_rf.py"           # c
 | Gazebo window, main view | the drone from behind (3rd person) |
 | Gazebo window, right-hand panels | overview of the ships (red ball = drone), the drone's down camera |
 | Top right | the RF navigation display: rf_nav's estimate, its 95 % region, the lines of position and a readout |
-| Bottom right | the sensor monitor: the NAVIGATION table (RF (AoA), ESKF, ESKF + RF, each against the truth), the sensors, each ship's angle of arrival (AoA) and its error |
+| Bottom right | the navigation dashboard: Overview (GNSS state, each estimator's position error, 2σ bound, heading and height error, sensor health), Navigation, Sensors, AIS (each ship's range, angle of arrival and its error, packets) |
 
 ## 1. The radio: AIS
 

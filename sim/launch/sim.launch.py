@@ -20,7 +20,9 @@ ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_tra
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
          the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera is then a panel
          in the Gazebo window)
-         and a terminal with the live sensor monitor (nodes/sensor_monitor.py) on the desktop
+         and the navigation dashboard (nodes/nav_dashboard.py) on the desktop
+monitor  with demo: window (default) opens the navigation dashboard; terminal opens the same information in a
+         terminal (nodes/sensor_monitor.py)
 gnss_cutoff_s     seconds after the first raw GPS fix when the GNSS gate closes (nodes/gnss_gate.py); negative: never
 gnss_cut_s        legacy spelling for gnss_cutoff_s
 record_mode       light records sensor and pose topics to outputs/sim_runs/<run>/rosbag2; full also the images;
@@ -331,6 +333,9 @@ def setup(context):
     gui = LaunchConfiguration("gui").perform(context).lower() == "true"
     world = SIM / "worlds" / f"{LaunchConfiguration('world').perform(context)}.sdf"
     demo = LaunchConfiguration("demo").perform(context).lower() == "true"
+    monitor = LaunchConfiguration("monitor").perform(context).lower()
+    if monitor not in ("window", "terminal"):
+        sys.exit("monitor must be window or terminal")
     stereo = LaunchConfiguration("stereo").perform(context).lower() == "true"
     stereo_baseline_m = float(LaunchConfiguration("stereo_baseline_m").perform(context))
     ships = LaunchConfiguration("ships").perform(context).lower()
@@ -498,9 +503,12 @@ def setup(context):
             # down camera is a panel in the Gazebo window and this slot shows the RF navigation display.
             TimerAction(period=20.0, actions=[
                 ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem],
-                               output="screen") if ships else
+                               output="screen", respawn=True, respawn_delay=2.0) if ships else
                 Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
-            # the lower-right corner of the 1920 x 1080 desktop, under the RF navigation display (-0-0: right, bottom)
+            # the lower-right corner of the 1920 x 1080 desktop, under the RF navigation display: the navigation
+            # dashboard window (monitor:=window) or the same information in a terminal (-0-0: right, bottom)
+            ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/nav_dashboard.py"), "--world", world.stem],
+                           output="screen", respawn=True, respawn_delay=2.0) if monitor == "window" else
             ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "118x42-0-0", "-fa", "Monospace", "-fs", "8",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
                                 str(SIM / "nodes/sensor_monitor.py"), "--world", world.stem]),
@@ -516,6 +524,7 @@ def generate_launch_description():
         DeclareLaunchArgument("gui", default_value="true"),
         DeclareLaunchArgument("world", default_value="terrain"),
         DeclareLaunchArgument("demo", default_value="false"),
+        DeclareLaunchArgument("monitor", default_value="window", description="with demo: the dashboard window, or terminal"),
         DeclareLaunchArgument("stereo", default_value="false"),
         DeclareLaunchArgument("stereo_baseline_m", default_value="0.30"),
         DeclareLaunchArgument("wind", default_value="none"),
