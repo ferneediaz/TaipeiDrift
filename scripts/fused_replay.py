@@ -153,7 +153,8 @@ def soft_update(f: ESKF, residual: np.ndarray, rows: np.ndarray, noise: np.ndarr
 def run_filter(rec: dict, eskf_cfg: dict, start_yaw_rad: float, gnss_until_s: float = math.inf, sample_times: np.ndarray | None = None,
                camera: dict | None = None, yaw_sigma_deg: float = 1.5, speed_sigma_mps: float = 1.0, gate_prob: float = 0.99,
                fixes: dict | None = None, motion_floor: float | None = 0.3, drift_rate: float = 0.10, reanchor_after: int = 3,
-               speed_gate_prob: float | None = None, soft_limit: float | None = 9.21, use_speed: bool = True) -> dict:
+               speed_gate_prob: float | None = None, soft_limit: float | None = 9.21, use_speed: bool = True,
+               start_sigma_m: float = 0.0) -> dict:
     """Run the ESKF over one recording and return its state at ``sample_times`` (default: every tenth IMU sample).
 
     GNSS position fixes (and Alessandro's velocity fit over 8 s of fixes) are used up to ``gnss_until_s``.
@@ -175,6 +176,10 @@ def run_filter(rec: dict, eskf_cfg: dict, start_yaw_rad: float, gnss_until_s: fl
     it means in the navigator, the horizontal position's uncertainty also grows as the navigator's does: by
     ``drift_rate`` of the distance flown since the last fix (the filter's own grows far too slowly: it takes the
     camera's speed errors for random, and they are mostly a scale and a heading that are a little off).
+
+    ``start_sigma_m`` is added to the horizontal position's uncertainty once, when GNSS is lost: the navigator's
+    ``start_sigma_m``. With GNSS the filter states about 1 m; measured on the development flights its error is then
+    up to 5 m, and it carries that error into the flight without GNSS.
     """
     gnss_cfg, baro_cfg = eskf_cfg["sim_gnss"], eskf_cfg["barometer"]
     n = gnss_cfg["attitude_init_samples"]
@@ -209,6 +214,7 @@ def run_filter(rec: dict, eskf_cfg: dict, start_yaw_rad: float, gnss_until_s: fl
     counts = {"yaw_used": 0, "yaw_rejected": 0, "speed_used": 0, "speed_rejected": 0, "speed_too_short": 0,
               "fixes_used": 0, "fixes_rejected": 0, "reanchored": 0}
     next_map_fix, rejected_in_row = 0, 0
+    start_added = False
     since_fix = 0.0  # metres flown since GNSS or the last map fix, by the filter's own estimate
     position_rows = np.zeros((2, 15))
     position_rows[:, P_.start:P_.start + 2] = np.eye(2)
@@ -268,6 +274,9 @@ def run_filter(rec: dict, eskf_cfg: dict, start_yaw_rad: float, gnss_until_s: fl
             result = f.update(np.array([innovation]), yaw_row, np.array([[math.radians(yaw_sigma_deg) ** 2]]), gate_prob)
             counts["yaw_used" if result.accepted else "yaw_rejected"] += 1
             offset, frame_dt = camera_offset(), camera["t"][j] - camera["t"][j - 1] if j > 0 else math.nan
+            if camera["t"][j] > gnss_until_s and not start_added:
+                f.P[P_.start:P_.start + 2, P_.start:P_.start + 2] += np.eye(2) * start_sigma_m ** 2
+                start_added = True
             if camera["t"][j] > gnss_until_s and looked_at is not None and frame_dt > 0 and use_speed:
                 raw = camera["step_ne"][j][::-1]
                 if motion_floor is not None and np.linalg.norm(raw) < motion_floor * camera["cruise_mps"] * frame_dt:
@@ -327,7 +336,7 @@ def against_truth(rec: dict, run: dict) -> dict:
 
 def one_flight(job: tuple) -> dict:
     """Steps 3 and 4 for one development flight, camera and draw of the heading sensor, against the frozen navigator."""
-    flight_name, camera_model, seed, heading_source, yaw_sigma_deg = job
+    flight_name, camera_model, seed, heading_source, yaw_sigma_deg, start_sigma = job
     cfg = yaml.safe_load((REPO / "baseline" / "configs" / "sim_navigator.yaml").read_text())
     eskf_cfg = yaml.safe_load((REPO / "vio" / "configs" / "midair_eskf.yaml").read_text())
     rec = load_recording(REPO / "recordings" / flight_name)
@@ -344,7 +353,7 @@ def one_flight(job: tuple) -> dict:
     out["camera_steps"] = {"median": float(np.median(e)), "p90": float(np.percentile(e, 90)), "worst": float(e.max())}
     for label, with_fixes in (("filter", None), ("filter_and_fixes", fixes)):
         run = run_filter(rec, eskf_cfg, start_yaw, gnss_until_s=camera["jam_s"], camera=camera, fixes=with_fixes, sample_times=frame_t,
-                         yaw_sigma_deg=yaw_sigma_deg)
+                         yaw_sigma_deg=yaw_sigma_deg, start_sigma_m=start_sigma)
         scored = against_truth(rec, run)
         error = scored["horizontal"]
         after = run["t"] > camera["jam_s"]
@@ -357,15 +366,16 @@ def one_flight(job: tuple) -> dict:
 
 
 def all_flights(camera_model: str, workers: int, heading_source: str | None = None, yaw_sigma_deg: float = 1.5,
-                role: str = "development") -> int:
+                role: str = "development", start_sigma: float = 0.0) -> int:
     cfg = yaml.safe_load((REPO / "baseline" / "configs" / "sim_navigator.yaml").read_text())
-    jobs = [(name, camera_model, seed, heading_source, yaw_sigma_deg) for name in cfg["flights"][role] for seed in cfg["seeds"]]
+    jobs = [(name, camera_model, seed, heading_source, yaw_sigma_deg, start_sigma) for name in cfg["flights"][role] for seed in cfg["seeds"]]
     with ProcessPoolExecutor(max_workers=workers) as pool:
         rows = list(pool.map(one_flight, jobs))
     (REPO / "outputs").mkdir(exist_ok=True)
     source = heading_source or cfg["heading"].get("source", "compass")
-    (REPO / "outputs" / f"fused_replay_{role}_{camera_model}_{source}.json").write_text(json.dumps(rows, indent=1))
-    print(f"{role} flights, camera {camera_model}, heading from {source}, GNSS lost after 450 m; medians over the draws {cfg['seeds']} (metres)")
+    (REPO / "outputs" / f"fused_replay_{role}_{camera_model}_{source}_start{start_sigma:g}.json").write_text(json.dumps(rows, indent=1))
+    print(f"{role} flights, camera {camera_model}, heading from {source}, start uncertainty {start_sigma:g} m, GNSS lost after 450 m; "
+          f"medians over the draws {cfg['seeds']} (metres)")
     for name in cfg["flights"][role]:
         mine = [r for r in rows if r["flight"] == name]
         med = lambda part, key: float(np.median([r[part][key] for r in mine]))  # noqa: E731
@@ -402,11 +412,13 @@ def main() -> int:
     p.add_argument("--yaw-sigma", type=float, default=1.5, help="degrees, noise the filter assumes for the heading sensor")
     p.add_argument("--no-speed", action="store_true", help="fuse the heading only, not the camera's ground speed")
     p.add_argument("--sealed", action="store_true", help="the declared run on the two sealed flights (docs/simulation-results.md): once")
+    p.add_argument("--start-sigma", type=float, default=0.0,
+                   help="m, added to the position's uncertainty when GNSS is lost; the navigator's start_sigma_m is 3 (default 0: as at the fused freeze)")
     args = p.parse_args()
     if args.sealed:
-        return all_flights(args.camera_model, args.workers, role="sealed")
+        return all_flights(args.camera_model, args.workers, role="sealed", start_sigma=args.start_sigma)
     if args.all:
-        return all_flights(args.camera_model, args.workers, args.heading_source, args.yaw_sigma)
+        return all_flights(args.camera_model, args.workers, args.heading_source, args.yaw_sigma, start_sigma=args.start_sigma)
 
     cfg = yaml.safe_load((REPO / "baseline" / "configs" / "sim_navigator.yaml").read_text())
     if args.flight not in cfg["flights"]["development"]:
@@ -430,7 +442,7 @@ def main() -> int:
     run = run_filter(rec, eskf_cfg, start_yaw, gnss_until_s=jam_s if args.cut else math.inf, camera=camera,
                      speed_sigma_mps=args.speed_sigma, fixes=fixes, motion_floor=None if args.no_floor else 0.3,
                      speed_gate_prob=args.speed_gate, soft_limit=None if args.hard else 9.21, use_speed=not args.no_speed,
-                     yaw_sigma_deg=args.yaw_sigma)
+                     yaw_sigma_deg=args.yaw_sigma, start_sigma_m=args.start_sigma)
     error = against_truth(rec, run)
     print(f"{args.flight}: filter started at {run['start_s']:.1f} s; the camera flight runs from {frame_t[0]:.0f} to {frame_t[-1]:.0f} s; "
           f"GNSS {'lost at ' + format(jam_s, '.0f') + ' s' if args.cut else 'all the way'}; "
