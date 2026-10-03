@@ -92,7 +92,7 @@ What it says:
 - **Anyone with an iPhone, today until 14:30 or tomorrow 09:00 to 09:45:** the mentor's sun-compass test (below).
 - **Dustin:** the story and slides; ask the organisers what the brief's "suggested dataset" is.
 
-**The mentor's sun-compass test with an iPhone** (code ready: `baseline/scripts/phone_sun_compass.py`). The full plan for the teammate, with steps, timing and how the number feeds into the navigator, is on a separate page that Dustin shares. Two corrections to the steps written this morning:
+**The mentor's sun-compass test with an iPhone** (code ready: `baseline/scripts/phone_sun_compass.py`). The full plan for the teammate, with steps, timing and how the number feeds into the navigator: [phone-sun-test.md](phone-sun-test.md). Two corrections to the steps written this morning:
 
 - **Use the 0.5x camera, for the chessboard photos too.** Lying flat, the 1x camera only sees about 35° from straight up, so the sun is in the picture only around noon; the 0.5x reaches about 50°.
 - **The sun must stand above about 40°:** at NTU today until about 14:30, tomorrow from 09:00. Tomorrow's window ends with the code freeze.
