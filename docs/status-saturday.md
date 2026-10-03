@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 12:20.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 12:45.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
@@ -167,7 +167,34 @@ On a drone the sensor's own 0.1 degrees hardly matter; the tilt the IMU reports 
 
 ## 5. The clean test
 
-To keep the held-out test honest, we fixed the test flights **before** looking at them: UAV-VisLoc flights 01 (Changjiang, 817 photos) and 04 (Taizhou, 738 photos), downloaded and set aside. Flight 10 was meant to be the third; Google Drive throttles its download. We develop only on ALTO and flight 03. Once the method is frozen, it runs once on 01 and 04, and we report what comes out, good or bad.
+To keep the held-out test honest, we fixed the test flights **before** looking at them: UAV-VisLoc flights 01 (Changjiang, 817 photos) and 04 (Taizhou, 738 photos), downloaded and set aside. Flight 10 was meant to be the third; Google Drive throttles its download. We develop only on ALTO and flight 03. Once the method is frozen, it runs once on 01 and 04, and we report what comes out, good or bad. Done at 12:20; the result is at the top of this page.
+
+## 5a. Alessandro's visual-inertial odometry and our map fixes: how they fit together
+
+Read on Saturday at 12:40 from branch `mid-air-vio` (commits 4d60f38 and 7773c95, `vio/README.md`).
+
+**What he built.** An error-state Kalman filter on Mid-Air (synthetic flights about 15 m above hilly ground, about 90 s each). The IMU drives it at 100 Hz; three measurements correct it, each behind a 99 percent Mahalanobis gate: the barometer (height), the forward camera (how much the drone turned between two moments, which makes the gyroscope's error observable, including its drift in heading) and the down camera (speed over ground from optical flow, scaled by the height). On three flights it was not tuned on, the position is 13 to 33 m off after 83 s without GNSS, against 114 to 441 m for IMU and barometer and 338 to 912 m for the IMU alone. On Saturday morning he added a benchmark over all flights, a filter for the gyroscope's error alone, and a sun detector (work in progress).
+
+**His own caveats, which matter before his numbers go on a slide:** the filter states an uncertainty 2 to 5 times too small (NEES 15 to 42 against an expected 9), so it cannot serve as an integrity bound yet; and his README notes that the filter's uncertainty propagation misses one term for Mid-Air's world-frame gyroscope, "to be fixed before the ESKF results are trusted".
+
+| | Alessandro: visual-inertial odometry | Ours: map fixes with checks |
+|---|---|---|
+| Answers | How far and in which direction has the drone moved? | Where is the drone? |
+| Error over time | Grows: 13 to 33 m after 83 s | Bounded where the ground matches the map; fails where it changed |
+| Sensors | IMU, forward and down camera, barometer | Down camera, a map, a heading |
+| Data | Mid-Air: synthetic, low, short flights, no map | ALTO and UAV-VisLoc: real, 400 to 550 m high, 4 to 83 km, no IMU |
+| Stated uncertainty | 2 to 5 times too small | Holds in 97 percent of frames on development data, 77 to 98 on held-out |
+| Wrong inputs | 99 percent Mahalanobis gate | Score, distance gate, confirmation by the next fix |
+
+**Where they combine:**
+
+1. **Our fixes go into his filter as position measurements.** His filter has a generic update with a gate; a fix is a measurement of north and east with an accuracy of 15 m. That is about 20 lines. It is how Raptor and VNS01 work too: the fix goes into the drone's own estimator.
+2. **His filter is our heading source between fixes.** The forward camera makes the heading drift observable. His final attitude errors after 83 s, 1.9 to 5.3 degrees, are what our compass model assumes (an offset of about 4 degrees), so our compass runs stand for his heading. The sun sensor would be the step beyond.
+3. **His barometer height can set our matcher's zoom.** Ilhan found the zoom to be the main cause of failure on ALTO Train; the height from the barometer predicts it.
+4. **One sun detector, not two.** His detector (round, blooming, next to the sky) is more careful than ours (largest bright patch); the phone test should use his.
+5. **Before fusing:** his filter's stated uncertainty has to be made honest first. A filter that is too sure of itself refuses right fixes as "too far away" and can stay lost.
+
+**What cannot be shown today:** both on one flight. No dataset we have holds an IMU, a down camera and a map together: Mid-Air has no map, ALTO's sample and UAV-VisLoc have no IMU. The places where they can meet: Dan's simulator with a real aerial image as the ground, or a map built from Mid-Air's own down-camera images of another flight over the same terrain.
 
 ## 6. Synthesis: what works and what does not
 
