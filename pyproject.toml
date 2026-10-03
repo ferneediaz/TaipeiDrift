@@ -26,5 +26,5 @@ dependencies = [
 package = false
 
 [tool.pytest.ini_options]
-testpaths = ["baseline/tests"]
-pythonpath = ["baseline"]
+testpaths = ["baseline/tests", "vio/tests"]
+pythonpath = ["baseline", "."]
