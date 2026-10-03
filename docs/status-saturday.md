@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 14:15.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch **`integration`**, which holds every team branch and is up for merging into `main` as [pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2); the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 14:55.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. **Since 14:49 all team work is merged into `main`** ([pull request 2](https://github.com/dwn97/TaipeiDrift/pull/2)); every team branch on GitHub is fully contained in it. Start new work from `main` and bring it back by pull request; ours goes through branch `integration`. Every number comes from a script in this repository; the details are in [findings.md](findings.md).
 
 ## Save points: how we build from here
 

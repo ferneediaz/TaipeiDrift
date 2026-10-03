@@ -1,12 +1,12 @@
 # Handoff
 
-Last updated: Saturday 3 October 2026, 14:45. Code freeze Sunday 10:00, demo 13:00.
+Last updated: Saturday 3 October 2026, 14:55. Code freeze Sunday 10:00, demo 13:00.
 
 ## Resume here
 
 **Where the work lives (read this first).**
 
-- **Work on branch `integration`** in **`~/Projects/DefenseHackathon-sim`** (a git worktree outside iCloud). It holds every team branch (ours, Alessandro's `mid-air-vio`, `main` with Felix's TRN and Dan's simulator, Ilhan's patch and research, the DenseUAV review); 297 tests pass. It is up for merging into `main` as pull request 2 (https://github.com/dwn97/TaipeiDrift/pull/2); the team merges it, never us. `alto-navigator` was fast-forwarded to the same commit (90b863a) so old links still show the current docs; keep pushing both, or only `integration`.
+- **`main` holds everything since 14:49** (pull request 2 merged by Dustin's decision, merge commit 3854c7c); every team branch on GitHub is fully contained in it, `sim-demo` was deleted. **Work on branch `integration`** in **`~/Projects/DefenseHackathon-sim`** (a git worktree outside iCloud), started from `main`; bring work back to `main` by pull request (never push to `main`). `alto-navigator` is kept at the same commit as `integration` so old links show the current docs.
 - `~/Projects/DefenseHackathon` (branch `alto-navigator`) is the older checkout; `~/Desktop/DefenseHackathon` is stale (iCloud).
 - Python: `~/.venvs/defensehackathon/bin/python` (`.venv` links to it). Run from outside the iCloud folder.
 - Data: `~/Desktop/DefenseHackathon/data/raw.nosync` and `processed.nosync`, linked as `data/raw` and `data/processed` in both checkouts. Simulator recordings in `recordings/` (ignored by git), outputs in `outputs/`.
@@ -24,7 +24,8 @@ Last updated: Saturday 3 October 2026, 14:45. Code freeze Sunday 10:00, demo 13:
 
 **The risks from the review (14:40) and what we do** (an independent review of the repo, checked):
 
-- Dustin, today: download the organisers' suggested dataset (brief: IMU, speed, heading, reference position; link on the members-only page) into `data/raw/organiser/`, then we run a baseline and a correction on it; merge pull request 2; back up `outputs/replay` off the laptop; decide whether the repo goes public (then remove the two arXiv PDFs in `research/`, `docs/brief.md`, the mentor table in `docs/PLAN.md`, and Ilhan's DeepSeek line at `docs/research/overnight-synthesis.md:173`).
+- Done 14:50: the two arXiv PDFs removed (linked in `research/README.md`; still in the git history); pull request 2 merged. The only dataset the organisers sent is ATREIDES, a maritime-domain-awareness sample (one CSV, `MDA Sensor Mini Sample_APRIL_26.csv`, 2.4 MB) for another challenge; its WeTransfer link expired at 14:04 today. It is almost certainly not Challenge 2's suggested dataset; Dustin can ask the organisers whether Challenge 2 has one.
+- Dustin, today: back up `outputs/replay` off the laptop; decide whether the repo goes public (then also `docs/brief.md`, the mentor table in `docs/PLAN.md`, Ilhan's DeepSeek line at `docs/research/overnight-synthesis.md:173`, and a history rewrite for the PDFs).
 - Claude, save point 2 (after the flight-2 test): the README with every headline number as median, 90 percent and worst, labelled real or simulated; UAV-VisLoc steps in `data/README.md`; `sim/README.md` still says `git checkout simulations`; `docs/findings.md` still says 134 tests; final figures into `docs/figures/`; credits (OpenAerialMap CC BY 4.0, Google Earth through UAV-VisLoc) in README and video titles; hedge the NLSC free-maps claim (offline rights unconfirmed); the sun-sensor model gets a fixed per-flight error like the compass (now only random noise, which flatters it), rerun the UAV-VisLoc sun runs and report both; re-time the widest fix (11 zooms after 400 m without a fix, about 4 to 5 s, not 2 s), labelled Intel emulation; call the 2020 map an ideal bound (it is the ground itself); one consistency pass in the status doc (27 vs 41 m for flight 03, the wrong-fix threshold 25 vs 50 m, blur 8 and 16 m also let wrong fixes through).
 - Accepted and said in the pitch: wrong fixes on look-alike ground (flight 04, whose 90 percent and worst values are worse with fixes), no gain on changed ground (flight 01), GNSS needed before the jam, no autopilot link (a MAVLink GPS_INPUT adapter only if time is left), Alessandro's VIO numbers rerunnable only with his Mid-Air downloads.
 
