@@ -17,9 +17,8 @@ pre-cut calibration, the simulated barometer, and scoring, all in the parent pro
 
   calibrate   pre-cut noise model (odometry, fallback, fix) per ground config -> calibration_<tag>.json
   run         seeds x heading x ground x mode (loop | dr) -> runs/<tag>/<mode>_<heading>_<ground>_s<seed>.csv
-  summarize   per-run and pooled metrics + pass criteria -> summary_<tag>_runs.csv, summary_<tag>.json
-  figure      error vs time for a few seeds -> fig_error_vs_time_<tag>.png (no photo pixels)
-  prepare-map reproject any GeoTIFF (e.g. the OpenDroneMap orthophoto) to EPSG:3826 north-up at --res
+  prepare-map reproject an orthophoto GeoTIFF (e.g. OpenDroneMap) to EPSG:3826 north-up at 0.5 m/px
+  Metrics, pass criteria and figure: experiments/x5_tuniu_l2_report.py (summarize | figure).
 
 Swappable map and terrain (e.g. OpenDroneMap products):
   --map main | <EPSG:3826 GeoTIFF>      --map-offset stage1 | calib | <de,dn>
@@ -28,7 +27,11 @@ Swappable map and terrain (e.g. OpenDroneMap products):
 Examples:
   .venv/bin/python experiments/x5_tuniu_closed_loop.py calibrate
   .venv/bin/python experiments/x5_tuniu_closed_loop.py run --mode loop --heading dji --ground dem_lifted --seeds 0 1
-  .venv/bin/python experiments/x5_tuniu_closed_loop.py summarize
+  .venv/bin/python experiments/x5_tuniu_closed_loop.py prepare-map odm_orthophoto.tif data/processed/x_tuniu_l2/maps/odm_0.5m.tif
+  .venv/bin/python experiments/x5_tuniu_closed_loop.py calibrate --map data/processed/x_tuniu_l2/maps/odm_0.5m.tif \
+      --terrain odm_dem/dsm.tif --tag odm
+  .venv/bin/python experiments/x5_tuniu_closed_loop.py run --map data/processed/x_tuniu_l2/maps/odm_0.5m.tif \
+      --map-offset calib --terrain odm_dem/dsm.tif --calib-tag odm --tag odm
 """
 from __future__ import annotations
 
@@ -393,9 +396,10 @@ def cmd_run(args):
         for u, rows in zip(units, pool.imap(run_sequence, units, chunksize=1)):
             df = score(rows, u)
             df.to_csv(run_path(args.tag, u["mode"], u["heading"], u["ground"], u["seed"]), index=False)
+            acc = int((df.fix_status == "accepted").sum()) if "fix_status" in df else 0
             print(f"  {u['mode']} {u['heading']} {u['ground']} seed {u['seed']}: median {df.err_m.median():.1f} m, "
-                  f"max {df.err_m.max():.1f} m, LoL photos {int(df.lol.sum())}, "
-                  f"accepted {int((df.get('fix_status') == 'accepted').sum())}, {time.time() - t0:.0f} s", flush=True)
+                  f"max {df.err_m.max():.1f} m, LoL photos {int(df.lol.sum())}, accepted {acc}, "
+                  f"{time.time() - t0:.0f} s", flush=True)
 
 
 # ----------------------------------------------------------------------------- calibration (pre-cut only)
@@ -499,6 +503,28 @@ def cmd_calibrate(args):
     print(f"wrote {OUT / f'calibration_{args.tag}.json'}")
 
 
+def cmd_prepare_map(args):
+    """Reproject an orthophoto GeoTIFF (any CRS, RGB or RGBA, e.g. OpenDroneMap odm_orthophoto.tif) to a
+    north-up EPSG:3826 RGBA raster at RES m/px, usable as --map."""
+    import rasterio
+    from rasterio.warp import Resampling, calculate_default_transform, reproject
+    with rasterio.open(args.src) as src:
+        tf, w, h = calculate_default_transform(src.crs, "EPSG:3826", src.width, src.height, *src.bounds,
+                                               resolution=RES)
+        prof = dict(driver="GTiff", crs="EPSG:3826", transform=tf, width=w, height=h, count=4, dtype="uint8",
+                    compress="deflate", tiled=True)
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        with rasterio.open(args.out, "w", **prof) as dst:
+            for b in (1, 2, 3):
+                reproject(rasterio.band(src, b), rasterio.band(dst, b), resampling=Resampling.average)
+            alpha = np.zeros((h, w), np.uint8)
+            mask = src.read(4) if src.count >= 4 else src.dataset_mask()
+            reproject(mask, alpha, src_transform=src.transform, src_crs=src.crs, dst_transform=tf,
+                      dst_crs="EPSG:3826", resampling=Resampling.min)
+            dst.write(alpha, 4)
+    print(f"wrote {args.out} ({w} x {h} px at {RES} m/px, EPSG:3826)")
+
+
 # ----------------------------------------------------------------------------- main
 
 def add_inputs(p):
@@ -524,8 +550,11 @@ def main():
     r.add_argument("--ground", nargs="+", choices=["dem_prior", "dem_lifted"], default=["dem_lifted"])
     r.add_argument("--seeds", nargs="+", type=int, default=list(range(20)))
     r.add_argument("--workers", type=int, default=2)
+    pm = sub.add_parser("prepare-map")
+    pm.add_argument("src")
+    pm.add_argument("out")
     args = ap.parse_args()
-    {"calibrate": cmd_calibrate, "run": cmd_run}[args.cmd](args)
+    {"calibrate": cmd_calibrate, "run": cmd_run, "prepare-map": cmd_prepare_map}[args.cmd](args)
 
 
 if __name__ == "__main__":
