@@ -1,0 +1,13 @@
+name: tune5
+description: Linear-state regularisation (chol_p random walk vs Liu-West) x pseudo-measurement inflation; both IMU grades (separate seeds).
+routes: [A_mountain_crossing, C_foothills]
+filters: [mpf_proposed]
+runs: 6
+overrides:
+  montecarlo.base_seed: 781
+  atmosphere.enabled: true
+sweep:
+  filters.common.linear_roughening.mode: [chol_p, liu_west]
+  filters.common.pseudo_meas_inflation: [1.0, 10.0, 50.0]
+  imu.grade: [navigation, tactical]
+  atmosphere.cloud_fraction: [0.0, 0.3]

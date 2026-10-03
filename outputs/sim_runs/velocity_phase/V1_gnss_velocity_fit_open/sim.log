@@ -1,0 +1,17 @@
+Run city_20261003_102726; launch logs are emitted by ros2 launch.
+sim_t=0.10s gnss_available=True gt_enu=(0.0,0.0,0.0) csv_rows=1
+sim_t=10.00s gnss_available=True gt_enu=(0.0,0.0,0.0) csv_rows=100
+sim_t=20.00s gnss_available=True gt_enu=(0.4,0.0,17.5) csv_rows=200
+sim_t=30.00s gnss_available=True gt_enu=(1.0,0.0,47.5) csv_rows=300
+sim_t=40.00s gnss_available=True gt_enu=(1.6,0.0,77.4) csv_rows=400
+sim_t=50.00s gnss_available=True gt_enu=(59.9,0.4,78.8) csv_rows=500
+sim_t=60.00s gnss_available=True gt_enu=(135.9,0.5,78.7) csv_rows=600
+sim_t=70.00s gnss_available=True gt_enu=(173.6,23.0,78.0) csv_rows=700
+sim_t=80.00s gnss_available=True gt_enu=(174.0,99.1,78.7) csv_rows=800
+sim_t=90.00s gnss_available=True gt_enu=(161.9,148.6,78.1) csv_rows=900
+sim_t=100.00s gnss_available=True gt_enu=(87.5,149.5,78.7) csv_rows=1000
+sim_t=110.00s gnss_available=True gt_enu=(71.7,105.6,78.7) csv_rows=1100
+sim_t=120.00s gnss_available=True gt_enu=(71.7,29.6,78.7) csv_rows=1200
+sim_t=130.00s gnss_available=True gt_enu=(71.5,-46.4,78.7) csv_rows=1300
+sim_t=140.00s gnss_available=True gt_enu=(70.8,-122.4,78.7) csv_rows=1400
+sim_t=150.00s gnss_available=True gt_enu=(35.8,-149.0,78.4) csv_rows=1500

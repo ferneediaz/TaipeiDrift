@@ -1,0 +1,46 @@
+# Camera navigator on UAV-VisLoc: real drone photos from 2018 against a satellite map from 2021-2023.
+# Relative paths are resolved from the repository root. Command-line flags override these values.
+#
+# The fixes are real: real photos matched against the real map. The dead reckoning between photos,
+# which are 95 m apart, is simulated with the error measured on ALTO plus the error of the chosen
+# heading sensor (src/sensors). See docs/findings.md, section 3.9.
+
+output_dir: outputs/visloc_navigator
+data_root: data/raw/uav_visloc
+cache_dir: data/processed
+flights: ["03"]          # 03 is where the method was developed; 01 and 04 are held out (--flights 01 04)
+seeds: [1, 2, 3]         # each seed draws its own heading sensor error and dead-reckoning error
+alert_limit_m: 50.0      # for the integrity diagram: the largest error the mission tolerates
+time_zone_hours: 8       # the photo times are taken as China Standard Time, for the sun's elevation
+plot: [first_version, confirm_body, sun_confirm_body]   # drawn for the first seed
+
+navigator:               # the ALTO settings, except GNSS for the first 1,000 m (about 10 photos)
+  jam_after_m: 1000.0
+  search: area
+  fix_every_m: 300.0
+  min_score: 0.33
+  fix_sigma_m: 15.0
+  drift_rate: 0.10
+  gate_sigmas: 3.0
+  min_search_radius_m: 60.0
+
+dead_reckoning:          # src/sensors/dead_reckoning.py
+  scale_offset_sd: 0.03
+  scale_walk_per_sqrt_km: 0.03
+  noise_m_per_sqrt_100m: 1.0
+
+heading:                 # src/sensors/heading.py
+  compass: {offset_sd_deg: 4.0, noise_sd_deg: 1.0}
+  sun: {sensor_sd_deg: 0.1, tilt_sd_deg: 1.0}
+
+# Each run picks a heading sensor and overrides navigator settings.
+#   confirm_jumps: a large jump out of a wide search waits for the next fix to agree
+#   offset_frame: body learns the fix offset in the drone's forward and right directions
+#   max_search_radius_m: the search circle never grows beyond this (a compute budget; wide searches meet look-alikes)
+runs:
+  dead_reckoning:        {heading: compass, fix_every_m: null}
+  first_version:         {heading: compass}                     # as on ALTO, unchanged
+  confirm:               {heading: compass, confirm_jumps: true, max_search_radius_m: 600.0}
+  confirm_body:          {heading: compass, confirm_jumps: true, offset_frame: body, max_search_radius_m: 600.0}
+  sun_confirm_body:      {heading: sun, confirm_jumps: true, offset_frame: body, max_search_radius_m: 600.0}
+  sun_confirm_body_1000: {heading: sun, confirm_jumps: true, offset_frame: body, fix_every_m: 1000.0, max_search_radius_m: 600.0}

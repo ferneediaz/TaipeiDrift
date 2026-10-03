@@ -1,0 +1,4 @@
+.venv/
+output/
+*.mov
+__pycache__/

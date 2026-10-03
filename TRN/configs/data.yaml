@@ -1,0 +1,8 @@
+# The ONLY file with absolute paths. Raw rasters are read-only.
+dsm_path: /Users/felixzukunft/TaipeiDefence/TaipeiDrift/TRN/Data/DSM/DSMg_tawiwan_20m_20240627_g14.tif
+dem_path: /Users/felixzukunft/TaipeiDefence/TaipeiDrift/TRN/Data/DEM/DEM_tawiwan_V2025.tif
+crs: EPSG:3826            # TWD97 / TM2 zone 121 (evidence in PLAN.md §1.2)
+processed_dir: data/processed
+results_dir: results
+tile_margin_m: 20000      # margin around each route's bounding box
+read_strip_rows: 1024     # windowed-read strip height

@@ -1,0 +1,37 @@
+{
+  "run_id": "V1_gnss_velocity_fit_open",
+  "cutoff_sim_time_s": null,
+  "position_error": {
+    "final_3d_m": 3.2423641923752324,
+    "max_3d_m": 6.301296871329496,
+    "final_horizontal_m": 1.0429838041683404,
+    "final_vertical_m": 3.0700342571768857
+  },
+  "velocity_milestones": {},
+  "gnss_velocity_fit": {
+    "measurement_count": 18,
+    "accepted": 11,
+    "rejected": 7,
+    "vector_error_median_mps": 0.8802220890436003,
+    "vector_error_p90_mps": 5.982539406639666,
+    "speed_error_median_mps": 0.6036055875103779,
+    "speed_error_p90_mps": 2.930574013168382,
+    "direction_error_median_deg": 5.711032017073537,
+    "direction_error_p90_deg": 66.24097467673701,
+    "fit_sample_count_median": 8.0,
+    "fit_residual_rms_m_median": 1.9094544671790836,
+    "low_speed_fit_count": 4,
+    "low_speed_gt_horizontal_median_mps": 0.05844281019663029,
+    "low_speed_fitted_horizontal_median_mps": 0.2956172639350595,
+    "low_speed_fitted_horizontal_p90_mps": 0.33193185375686635,
+    "low_speed_fitted_horizontal_max_mps": 0.3443290536784067,
+    "post_cutoff_error_decomposition": {
+      "samples": 0,
+      "speed_error_median_mps": null,
+      "speed_error_p90_mps": null,
+      "direction_only_equivalent_median_mps": null,
+      "direction_only_equivalent_p90_mps": null,
+      "speed_error_larger_fraction": null
+    }
+  }
+}

@@ -1,0 +1,10 @@
+services:
+  sim:
+    build: docker
+    image: taipeidrift-sim
+    container_name: taipeidrift-sim
+    ports:
+      - "${PORT:-6080}:6080"   # Gazebo desktop in the browser: http://localhost:6080 (PORT=6081 to change)
+    volumes:
+      - ..:/ws/TaipeiDrift
+    shm_size: 2g

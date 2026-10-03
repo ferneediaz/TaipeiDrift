@@ -1,0 +1,12 @@
+runs: 100
+quick_runs: 10
+processes: 7
+base_seed: 20261003
+output_rate_hz: 1.0
+metrics:
+  burn_in_s: 300.0              # CEP / RMSE_post computed after this
+  converge_threshold_m: 100.0
+  converge_hold_s: 60.0
+  false_fix_sigma: 3.0
+  false_fix_duration_s: 30.0
+  divergence_error_m: 1000.0

@@ -1,0 +1,9 @@
+name: tune2
+description: Tuning of the pseudo-measurement inflation (separate seed). Clear air, tactical IMU.
+routes: [A_mountain_crossing, C_foothills]
+filters: [mpf_gated, mpf_proposed]
+runs: 8
+overrides:
+  montecarlo.base_seed: 778
+sweep:
+  filters.common.pseudo_meas_inflation: [1.0, 10.0, 50.0]

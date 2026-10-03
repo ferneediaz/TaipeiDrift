@@ -1,0 +1,14 @@
+# Window layout of the browser desktop (1920 x 1080), used by the demo:
+# Gazebo on the left, the down camera top right, the sensor monitor bottom right.
+[app] (title=Gazebo Sim.*)
+  [Position] (UPPERLEFT) {0 0}
+  [Dimensions] {1200 1050}
+[end]
+[app] (title=rqt_image_view.*)
+  [Position] (UPPERLEFT) {1200 0}
+  [Dimensions] {720 500}
+[end]
+[app] (title=Sensor monitor)
+  [Position] (UPPERLEFT) {1200 500}
+  [Dimensions] {720 550}
+[end]

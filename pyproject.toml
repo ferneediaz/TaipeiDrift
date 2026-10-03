@@ -40,3 +40,7 @@ package = false
 
 [tool.uv.sources]
 romatch = { git = "https://github.com/Parskatt/RoMa" }
+
+[tool.pytest.ini_options]
+testpaths = ["baseline/tests", "vio/tests"]
+pythonpath = ["baseline", "."]

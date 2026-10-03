@@ -1,6 +1,6 @@
-# Findings from Friday night
+# Findings
 
-What we measured on Friday 2 October between 21:00 and 22:40, on the data we now have on disk. Every number on this page comes from a script in `experiments/`; the list is at the end. Read this before the team decides how to go on.
+What we measured on Friday 2 October between 21:00 and 22:40, and on Saturday 3 October (sections 2.6 and 3.6 to 3.8), on the data we have on disk. Every number on this page comes from a script in `experiments/` or from the shared code in `baseline/`; the list is at the end. Read this before the team decides how to go on.
 
 The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 says what they change.
 
@@ -14,6 +14,17 @@ The current [PLAN.md](PLAN.md) was written before these measurements. Section 6 
 6. **Fixes have a cliff, and we know where it is.** Once the drift since the last fix is larger than the area that is searched, the match lands in a wrong place and is accepted. This happens between 300 and 400 m of flight, and the run then ends further off than with no fixes at all. Two additions repair it: a minimum match score, and a search area that grows with the uncertainty. With both, fixes 1,000 m apart give a median error of 56 m.
 7. **Plain brightness matching is enough to start.** Keypoint matching fails completely on these images. Sliding the camera frame over the reference image works, at about 14 m per fix. The pretrained DenseUAV model is not needed for a first version.
 8. **Proposal.** Mid-Air keeps the IMU baseline. Camera speed, position fixes, the integrity check and the drift budget move to ALTO. The simulator is where all sensors run in one flight.
+
+Added on Saturday:
+
+9. **The camera navigator is shared code now** (branch `alto-navigator`, one command, 91 tests). It reproduces every number of section 3.4 exactly, and it states its own uncertainty. When it breaks at the cliff, its error is larger than 3 times the uncertainty it states in 76 percent of frames; when it works, in 0 to 3 percent (section 3.6).
+10. **Agreement of nearby frames does not catch wrong fixes here.** Frames 14 m apart see almost the same ground and land on the same wrong place. The score check stays (section 3.6).
+11. **Visual-inertial odometry on Mid-Air works** (Alessandro, branch `mid-air-vio`): 13 to 33 m after 83 s without GNSS on three flights it was not tuned on, against 338 to 912 m for the IMU alone (section 2.6). It is the missing layer between our fixes.
+12. **The test on the ALTO training section is blocked.** Dropbox has disabled the dataset link for the day. The images are on disk, but the files with the positions are in the part that did not arrive (section 3.7).
+13. **A mistake found and repaired: our search knew the true path.** ALTO's reference images are centred on the true path, so every fix landed near it. The navigator now searches one map of the area in a circle around its own estimate. The results stay within half a metre of the earlier ones, so they hold; the cliff at 400 m disappears (section 3.8).
+14. **A second dataset, from China, never tuned on** (UAV-VisLoc: real drone photos from 2018 against satellite maps from 2021 to 2023). The matcher, unchanged, finds 80 percent of the photos within 30 m. On the development flight (03) the first version used about 12 wrong fixes per flight; with two new checks, 0 to 2 (section 3.9).
+15. **The held-out result is mixed, and we report it as it is.** On flight 04 (83 km) the typical error falls from 675 m without fixes to 60 m with them, but 18 to 32 wrong fixes still pass. On flight 01 (66 km) the ground has changed since the map was made (bare land became high-rise estates) and map fixes do not beat dead reckoning (section 3.9).
+16. **The limits of the camera picture, and a dangerous failure closed.** Down to 1/64 of the light the error stays at 31 m. When the picture is so poor that the camera cannot see the motion, the estimate used to stand still while claiming a few metres of uncertainty, 1 to 2 km off; now the navigator flies on at cruising speed and says LOST (section 3.10).
 
 ## What the team has to decide
 
@@ -156,6 +167,24 @@ Limits of this test: two flights, a simple measurement of image motion with no c
 
 What follows: on Mid-Air, camera speed needs another source of scale, which is the hard part of full visual-inertial odometry. On data where the aircraft flies high above the ground, the problem is much smaller. See section 3.3.
 
+### 2.6 Visual-inertial odometry on Mid-Air (Alessandro, branch `mid-air-vio`)
+
+Pushed on Saturday at 08:14; the numbers below are copied from `vio/README.md` on that branch and were not re-run here. An error-state Kalman filter estimates position, speed, attitude and both IMU offsets. It takes three kinds of updates: a barometer (simulated from the true altitude with noise and a drifting offset), the turn measured by the forward camera, and the speed measured by the downward camera, whose size the filter trusts only loosely because of the height problem of section 2.5. Settings were tuned on flight 0001 only.
+
+GNSS is lost after 5 s, then about 83 s follow without it. Position error at the end of the flight, in metres:
+
+| Flight | IMU only | IMU + barometer | + both cameras |
+|---|---|---|---|
+| sunny 0000 | 684 | 114 | 12.7 |
+| sunny 0001 (used for tuning) | 381 | 145 | 12.6 |
+| cloudy 3000 | 912 | 441 | 33.1 |
+| cloudy 3001 | 338 | 116 | 17.3 |
+
+- On the three flights not used for tuning, both cameras together bring the error to 13 to 33 m, 4 to 9 times lower than IMU and barometer.
+- The downward camera alone helps the position but loses the heading, which flow cannot observe, and the filter then claims far more certainty than it has.
+- The error still grows. Absolute fixes stay necessary, which is the part section 3 covers.
+- Caveats from the branch itself: the barometer is simulated, four flights, one of them used for tuning.
+
 ## 3. ALTO
 
 ### 3.1 What the data is
@@ -274,6 +303,114 @@ The idea: the zoom of a match measures the height above ground. Altitude minus t
 
 The test: the zoom does follow the height, but loosely. The correlation is 0.64, and on frames not used for fitting the zoom misses the prediction by 32 m of height in the median. That is too imprecise for a check. The test seemed to work, catching 58 of 60 wrong fixes, but for another reason: wrong matches prefer the smallest zoom (section 3.2). We keep the score check and drop this idea.
 
+### 3.6 The navigator as shared code (Saturday)
+
+The chain of section 3.4 now lives in `baseline/` on branch `alto-navigator`: `python baseline/scripts/run_alto_navigator.py`, about a minute for the validation section. It reproduces all seven runs that section 3.4 reports with the score check or the sized search, and the cliff, to the tenth of a metre; `baseline/tests/test_alto_navigator.py` checks that whenever the data is present.
+
+**The navigator states its own uncertainty.** For every frame it gives sigma: 3 m at the jam, growing by 10 percent of the distance flown since the last fix, shrinking at every fix it uses. A status follows from it: tracking up to 30 m, degraded up to 100 m, lost above. How often the true error stays within 3 sigma:
+
+| Run | Median error | Frames with error within 3 sigma |
+|---|---|---|
+| Camera alone | 472 m | 89% |
+| Fix every 100 m | 26 m | 90% |
+| Fix every 300 m | 31 m | 97% |
+| Fix every 300 m, sized search, score check | 31 m | 100% |
+| Fix every 1,000 m, sized search, score check | 56 m | 100% |
+| Fix every 400 m, no check (the cliff) | 285 m | 24% |
+
+When the navigator works, its stated uncertainty holds. When it breaks, it is badly overconfident, and that is exactly the case an integrity check has to catch.
+
+**A limit, found by a test.** We gave the navigator a map whose coordinates are 200 m off, on the generated test flight. The first five fixes were rejected for lying too far from the estimate. After 600 m without a fix the allowed distance had grown to 189 m, and a sixth fix, with a confident score, landed 187 m away and was used. The distance check alone cannot catch a wrong place that lies inside the stated uncertainty. The test stays in the suite to document this.
+
+**Agreement of three frames, the rule of the Tomahawk camera fix** (Irani and Christ 1994, see `docs/reading-notes.md`). Each fix is matched in three frames about 14 m apart; it counts only if at least two land within 10 m of each other after removing the dead-reckoned motion between them. Tomahawk is not a GNSS-denied design: its camera fixes followed GPS or terrain-matching updates, and it checked the frames against an accurate inertial system. Here the motion between frames comes from the camera itself. Tested without the score check, to see whether it could replace the tuned threshold of 0.33:
+
+| Run | Median error, worst | Fixes used, wrong among them |
+|---|---|---|
+| Fix every 300 m, score check 0.33 | 31 m, 73 m | 12, 0 |
+| Fix every 300 m, agreement instead | 31 m, 74 m | 13, 0 |
+| Fix every 300 m, 7 nearest images, agreement instead | 139 m, 522 m | 8, 5 |
+| Fix every 400 m, 7 nearest images, agreement instead | 241 m, 589 m | 3, 2 |
+| Fix every 1,000 m, 7 nearest images, agreement instead | 424 m, 783 m | 3, 3 |
+
+It does not work in this form. Frames 14 m apart share most of their ground, so a wrong place that fits one frame fits the next as well. All wrong fixes that got through had scores between 0.16 and 0.26, so the score check of 0.33 would have stopped them. The agreement check stays in the code as an option, switched off. Frames further apart, 100 m or more, would see different ground; that is untested.
+
+### 3.7 The training section: a first look, without positions
+
+The training section of the same flight was downloaded on Friday night and stopped at 10.25 of about 10.66 GB. The archive stores the three files with the positions at its very end, so they are missing. The images are complete and readable from the partial file:
+
+- 10,436 camera frames and 2,853 reference images on the route: 28.5 km, six times the validation section.
+- Ground: fields with forest edges, long stretches of dark forest, single houses, a large industrial site, villages and a dense town centre.
+- Exposure swings strongly: average brightness per frame from 20 to 183 (on a 0 to 255 scale). About 16 percent of sampled frames have very low contrast, in stretches of up to roughly 760 m, mostly forest.
+- In the town, the streets in the camera frame are rotated against the reference image by much more than the 14 degrees of the validation section. The heading probably changes along the route, which the rotation learned before the jam does not follow.
+
+Dropbox has disabled the dataset link for the day ("downloaded too many times in a day"), and the GitHub pages of the dataset do not carry the position files. The test waits until the link opens again; only the last 0.42 GB are needed.
+
+### 3.8 The search no longer knows the true path (Saturday morning)
+
+**The mistake.** The reference images we searched (folder `offset_0_None`) are centred on the true flight path: image 0 has the same coordinates as camera frame 0, and all 459 lie within 2.8 m of the path. Inside one reference image a template can slide only about 48 m from its centre (a 340-pixel template in a 500-pixel image, at 0.6 m per pixel). So every fix landed within about 48 m of the true path, wherever the estimate was. The search used knowledge that a drone does not have.
+
+**The repair.** One map, built from all five reference folders: the route itself and 20 and 40 m north and south of it, 2,295 images. They are crops of the same aerial photos and agree with their coordinates to within 0.9 pixels (0.5 m), measured by phase correlation of overlapping images. The map is 8,024 by 1,969 pixels; 36 percent of it holds imagery, a strip about 380 m wide along the route. The navigator now searches a circle around its own estimate, with a radius of 60 m or 3 sigma, whichever is larger, and only at places where the whole frame lies on imagery. One search takes about 0.13 s on one laptop core.
+
+| Fixes | Score check | Reference images on the true path | One map, circle around the estimate |
+|---|---|---|---|
+| Every 100 m | no | 25.5 m median, 50.3 m worst | 25.2 m, 49.9 m |
+| Every 300 m | yes | 30.9 m, 72.8 m | 31.1 m, 72.9 m |
+| Every 400 m | no | 285.1 m, 897.9 m (7 nearest images, 5 wrong fixes used) | 36.0 m, 279.9 m (1 wrong fix used) |
+| Every 1,000 m | yes | 56.3 m, 278.1 m (sized search) | 56.1 m, 278.1 m |
+
+What this means:
+
+- **The results of sections 3.4 and 3.6 hold.** They did not depend on knowing the path: between fixes the estimate stayed close enough for the true place to lie inside the search.
+- **The cliff at 400 m belonged to the small search of 7 images.** With a circle sized by the uncertainty and no score check, fixes every 400 m give a median of 36 m, with one wrong fix used.
+- **What is still easier than reality:** the map is a strip 380 m wide around the flown route, so a wide search meets fewer look-alike places than it would on a full map. The next test, on UAV-VisLoc with full satellite maps, removes that.
+- The runs on the reference images stay in `baseline/configs/alto_navigator.yaml` for comparison. The map runs are the ones to report.
+
+### 3.9 A second dataset, held out: UAV-VisLoc (Saturday)
+
+**Data.** UAV-VisLoc (Xu et al. 2024): real drone photos looking straight down, one every 95 m, 400 to 550 m above ground, with GPS, height, heading (`Phi1`, where the nose points) and course (`Phi2`) per photo, and a Google Earth satellite map at 0.3 m taken 2.5 to 5 years after the photos. No IMU, no video, no forward camera. Flight 03 (Taizhou, 74 km) was used to develop; flights 01 (Changjiang, 66 km) and 04 (Taizhou, 83 km) were chosen as held out before they were looked at.
+
+**What is real and what is simulated.** The fixes are real: real photos against the real map, searched around the estimate (`search: area`, map resampled to 1 m per pixel). The photos are too far apart for optical flow, so the dead reckoning between them is simulated: the true step, turned by the error of a heading sensor model, with a slowly wandering scale error and noise (`baseline/src/sensors/`). GNSS is lost after 1 km. Three seeds per run, each drawing its own heading and dead-reckoning errors.
+
+**Facts measured on flight 03.** 80 percent of the photos are found within 30 m of the truth when searched around it (median 16 m). The matched position lies about 13 m ahead of the recorded one along the flight direction on every leg; learned in the drone's own frame (forward, right) instead of north and east, the median fix error falls from 18.6 to 13.1 m. The camera points along `Phi1`, which differs from the course by the crab angle against the wind, 4 to 13 degrees.
+
+**Why the first version failed on unseen data.** After a few rightly refused fixes the stated uncertainty grows, the search widens to 300 to 450 m, and a look-alike place with a borderline score is found there and believed, although the estimate was right to within 13 to 33 m. Two checks were added: a fix out of a search wider than 150 m that would move the estimate by more than 30 m is held until the next fix, over different ground, agrees with it (both are then used); and the search is capped at 600 m. Ilhan's quarters rule (four quarters of the frame must land where the whole frame did) was also implemented; it refuses too many right fixes on ALTO and is off.
+
+**Results** (median over 3 seeds; "all clear while wrong": the share of the flight where the stated bound is within 50 m but the error is above it):
+
+| Flight | Run | Median | 90% below | Worst | Wrong fixes used, per seed | Error within 3 sigma | All clear while wrong |
+|---|---|---|---|---|---|---|---|
+| 03 (development) | Dead reckoning only | 822 m | 1,391 m | 1,571 m | | 100% | 0% |
+| | First version | 41 m | 427 m | 1,301 m | 11, 12, 12 | 73% | 2.5% |
+| | New checks, compass | 28 m | 180 m | 368 m | 0, 0, 2 | 97% | 0.0% |
+| 01 (held out) | Dead reckoning only | 227 m | 596 m | 973 m | | 100% | 0% |
+| | First version | 474 m | 1,604 m | 2,051 m | 17, 18, 24 | 48% | 3.1% |
+| | New checks, compass | 306 m | 851 m | 1,493 m | 6, 7, 4 | 97% | 0.9% |
+| | New checks, sun sensor | 177 m | 556 m | 1,514 m | 5, 6, 3 | 98% | 1.0% |
+| 04 (held out) | Dead reckoning only | 675 m | 1,235 m | 1,805 m | | 100% | 0% |
+| | First version | 285 m | 1,592 m | 2,244 m | 37, 31, 53 | 39% | 6.5% |
+| | New checks, compass | 60 m | 1,723 m | 2,620 m | 18, 27, 32 | 77% | 3.0% |
+| | New checks, sun sensor | 64 m | 1,206 m | 1,860 m | 17, 29, 35 | 76% | 3.2% |
+
+What it says: the new checks cut wrong fixes by a third to three quarters on unseen flights and make the stated uncertainty far more honest, but they are not safe enough yet. Flight 01 crosses an area that was built up between the photos and the map: bare land in 2018, high-rise estates in 2023; no matcher can recognise that ground. The sun sensor helps where the compass is the weak part (flight 01). Independently, Ilhan's held-out test on ALTO Round 2 Train found the same weakness (94 m per section instead of 31 m), with the zoom as the main cause there (branch `research/offline-nav-evidence`).
+
+### 3.10 The limits: a worse camera picture (Saturday)
+
+On the ALTO validation flight every frame after the jam was made worse in one of three ways, five levels each (`baseline/src/data/degrade.py`): less light (sensor noise of a camera that turns its gain up), blur (Gaussian, in metres on the ground) and haze (a bright veil leaving a share of the contrast, plus sensor noise). Fixes every 300 m, map search (`baseline/scripts/run_limits.py`).
+
+- **It holds** down to 1/64 of the light (31 m, no wrong fix), blur up to 2 m and haze down to half the contrast. Worse pictures make the check refuse fixes; across all fifteen levels one wrong fix passed.
+- **A dangerous failure.** When the picture is bad enough that the camera cannot see the motion (blur from 4 m, haze below 25 percent), the dead reckoning reported no motion: the estimate stood still, its stated uncertainty stopped growing because it was tied to the distance the camera measured, and no fixes were tried. The navigator reported tracking, sure to a few metres, while 1 to 2 km off; the bound held in 0 percent of the frames.
+- **The repair** (`camera_motion_floor: 0.3`): while GNSS works the navigator learns the cruising speed. A camera step shorter than 30 percent of the cruising step is not believed; the navigator flies on at cruising speed along the last good direction, and its uncertainty grows by 30 instead of 10 percent of the distance. Clean frames are unchanged.
+
+| Picture after the jam | Without the repair | With it |
+|---|---|---|
+| Haze, 10 percent of the contrast left | 1,640 m, bound held 0% | 54 m, status LOST, bound held 100% |
+| Haze, 2 percent | 2,045 m, 0% | 93 m, 100% |
+| Blur 16 m | 2,048 m, 0% | 42 m, 91% |
+| 1/1024 of the light | 556 m, 30% | 530 m, 59% |
+| Blur 4 m | 1,091 m, 1% | 897 m, 1%, 4 wrong fixes used |
+
+The last row is the blind spot that remains: the camera's motion is wrong but looks plausible, so the check rarely triggers. Catching it needs a second source of motion to cross-check, as Alessandro's IMU filter does. The fallback direction is the last good one, which suits a straight flight; through turns it needs a heading sensor.
+
 ## 4. How this compares with existing products
 
 Both product pages describe the same building blocks.
@@ -312,9 +449,9 @@ Neither page shows what happens between fixes or when a fix is wrong. More in [l
 
 | Result | Data | State | Owner |
 |---|---|---|---|
-| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Product code with loader, metrics, plots and tests is on branch `mid-air-baseline-fix`, which is `mid-air-baseline` plus the gyroscope rule from 2.2. Needs merging into `main` | |
-| 2. Camera dead reckoning plus position fixes | ALTO | Experiment done (3.4). Needs a held-out test, turns, and a cleaner filter | |
-| 3. Integrity check and drift budget | ALTO | First version done (3.4). Needs degraded images: blur, darkness, haze | |
+| 1. IMU-only baseline and its drift | Mid-Air | Experiment done (2.4). Product code on branch `mid-air-baseline-fix`; Alessandro's branch `mid-air-vio` carries the same gyroscope rule and adds visual-inertial odometry (2.6). The team has to pick which reaches `main` | |
+| 2. Camera dead reckoning plus position fixes | ALTO | Shared code on branch `alto-navigator`, reproducing 3.4 (3.6). Held-out test blocked by the download (3.7). Turns still open | |
+| 3. Integrity check and drift budget | ALTO | In the shared code: score check, distance check, stated uncertainty and status (3.6). Agreement of nearby frames tested and dropped. Needs degraded images: blur, darkness, haze | |
 | All sensors in one flight, and the demo view | Simulator | Needs the GNSS cut, recording and export | |
 
 Changes against the current plan:
@@ -330,9 +467,10 @@ Changes against the current plan:
 ## 7. Limits of these findings
 
 - ALTO: one section of 4.6 km of one flight, in daylight, in summer, over rural land, on a nearly straight course.
+- UAV-VisLoc: the fixes are real, the dead reckoning between photos is simulated (section 3.9). Two held-out flights, three seeds each.
 - The settings for ALTO were chosen while looking at this same section: the zoom and rotation ranges, the score threshold of 0.33, the assumed drift of 10 percent and the fix accuracy of 15 m. Nothing has been tested on data we did not tune on.
-- The reference images exist only along the flown route. Places that look alike elsewhere cannot confuse the match, so this is easier than a map of an area.
-- The rotation is learned once before the jam and kept. That works on a straight course. Turns need a heading from a gyroscope, or a search over rotation at every fix.
+- The map covers only a strip about 380 m wide around the flown route (section 3.8). Places that look alike further away cannot confuse the match, so a wide search is easier than on a map of a whole area.
+- The rotation is learned once before the jam and kept. That works on a straight course, and the validation section is one: its course stays between 77 and 84 degrees. Turns need a heading from the drone's own attitude, or a search over rotation at every fix.
 - Mid-Air: the IMU baseline uses the 30 sunny flights. The scale test uses two flights.
 - Computing time was measured only as a whole on a laptop. Nothing has run on drone hardware.
 - Night, fog, rain and water are untested.
@@ -352,5 +490,10 @@ Run from the repository root after `uv sync`. The data has to be in `data/raw/` 
 | `experiments/h_alto_end_to_end.py` | The full chain on ALTO, with figure | 3.4 | 90 s |
 | `experiments/l_alto_cost_and_drift.py` | Computing time of one fix at three image sizes, and the sources of camera-only drift | 3.4 | 10 s |
 | `experiments/m_alto_orientation.py` | What the orientation values in ALTO mean: heading, and how far the camera looks away from straight down | 3.1 | 5 s |
+| `baseline/scripts/run_alto_navigator.py` (branch `alto-navigator`) | The navigator as shared code: the runs of 3.4 with stated uncertainty, every fix and why it was used or not, figure | 3.6 | 1 min |
+| `baseline/scripts/run_visloc_navigator.py` (`--flights 01 04` for the held-out run) | UAV-VisLoc runs with heading sensors, simulated dead reckoning and the integrity regions | 3.9 | 4 to 14 min |
+| `baseline/scripts/run_limits.py` (`--floor 0.3` with the repair) | The camera picture made worse after the jam; chart and example frames | 3.10 | 3 min |
+| `baseline/scripts/make_replay.py alto` or `visloc --flight 04` | The demo videos | | 1 to 5 min |
+| `python -m pytest` (branch `alto-navigator`) | 134 tests, including the regressions on ALTO, the limit of the distance check and the camera losing track | 3.6 | 1.5 min |
 
 `e` takes the path of another sensor file as its argument, for example the foggy one. `i` fetches a small piece of the Copernicus elevation model on its first run.

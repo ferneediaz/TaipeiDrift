@@ -1,0 +1,58 @@
+# Camera navigator on ALTO: GNSS for the first stretch, then the camera alone.
+# Relative paths are resolved from the repository root. Command-line flags override these values.
+
+output_dir: outputs/alto_navigator   # one subfolder per run, not committed
+shift_cache_dir: data/processed      # image shifts are stored here, one file per flight
+map_cache_dir: data/processed        # the map built from all reference images is kept here
+error_distances_m: [300, 500, 1000, 2000]   # report the error this far after the jam
+plot: [camera_only, map_every_1000, map_every_300]   # runs drawn in the figure; fixes are shown for the last
+
+alto:
+  data_root: data/raw/alto
+  section: Val                       # Val or Train
+
+synthetic:                           # used with --synthetic, no download needed
+  length_m: 900.0
+  zoom: 0.85
+  rotation_deg: 15.0
+  seed: 0
+
+# Settings shared by all runs. Values measured in experiments/h_alto_end_to_end.py and
+# experiments/i_alto_zoom_check.py on the validation section; see docs/findings.md, section 3.
+navigator:
+  jam_after_m: 300.0       # GNSS is lost after this distance
+  fix_sigma_m: 15.0        # accuracy of one fix
+  drift_rate: 0.10         # dead reckoning error as a share of the distance since the last fix
+  gate_sigmas: 3.0         # a fix further from the estimate than this many sigmas is not used
+  nearest_images: 7
+  min_search_radius_m: 60.0
+
+# Each run overrides the shared settings.
+#   fix_every_m: estimated distance between fixes; null means no fixes
+#   search: area    one map of the whole area, searched in a circle of max(60 m, 3 sigma) around the estimate
+#           nearest the 7 reference images of the dataset closest to the estimate
+#           sized   all reference images within max(60 m, 3 sigma) of the estimate
+#   min_score: a fix with a lower matching score is not used; 0 switches the score check off
+#   camera_motion_floor: a camera step shorter than this share of the cruising step is not believed; the
+#           navigator flies on at cruising speed and its uncertainty grows faster (outputs of run_limits.py)
+#
+# The map runs are the ones to report. ALTO's reference images are centred on the true path, so
+# the nearest and sized searches know where the path runs (findings, section 3.8). They are kept
+# to show that removing this changes the results by less than half a metre.
+runs:
+  camera_only:            {fix_every_m: null}
+  map_every_100:          {fix_every_m: 100.0,  search: area, min_score: 0.0,  camera_motion_floor: 0.3}
+  map_every_300:          {fix_every_m: 300.0,  search: area, min_score: 0.33, camera_motion_floor: 0.3}
+  map_every_400_no_check: {fix_every_m: 400.0,  search: area, min_score: 0.0,  camera_motion_floor: 0.3}   # one wrong fix gets used
+  map_every_1000:         {fix_every_m: 1000.0, search: area, min_score: 0.33, camera_motion_floor: 0.3}
+  map_every_300_confirm:  {fix_every_m: 300.0,  search: area, min_score: 0.33, confirm_jumps: true}   # a large jump from a wide search waits for the next fix
+  map_every_1000_confirm: {fix_every_m: 1000.0, search: area, min_score: 0.33, confirm_jumps: true}
+  map_every_300_quad:     {fix_every_m: 300.0,  search: area, min_score: 0.0,  quad_check: true}    # Ilhan's rule instead of a score threshold
+  map_every_1000_quad:    {fix_every_m: 1000.0, search: area, min_score: 0.0,  quad_check: true}
+  map_every_300_quad_score: {fix_every_m: 300.0, search: area, min_score: 0.33, quad_check: true}
+  map_every_1000_both:    {fix_every_m: 1000.0, search: area, min_score: 0.33, quad_check: true, confirm_jumps: true}
+  every_100:          {fix_every_m: 100.0,  search: nearest, min_score: 0.0}
+  every_300:          {fix_every_m: 300.0,  search: sized,   min_score: 0.33}
+  every_400_no_check: {fix_every_m: 400.0,  search: nearest, min_score: 0.0}   # the 7 images no longer reach the true place
+  every_1000_nearest: {fix_every_m: 1000.0, search: nearest, min_score: 0.33}  # the check refuses every fix
+  every_1000_sized:   {fix_every_m: 1000.0, search: sized,   min_score: 0.33}

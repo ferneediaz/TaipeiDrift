@@ -1,0 +1,7 @@
+name: m4_baselines
+description: M4 - all filters in clear air on all routes (tactical IMU, nadir beam, baro on).
+routes: [A_mountain_crossing, B_coastal_plain, C_foothills]
+filters: [tercom, mpf_baseline, mpf_gated, mpf_proposed]
+runs: 50
+quick_runs: 10
+overrides: {}

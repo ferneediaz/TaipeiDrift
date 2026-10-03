@@ -1,0 +1,109 @@
+# Ships that transmit AIS, and the drone's AIS receiver with a direction finder.
+# Read by sim/nodes/ship_traffic.py, sim/nodes/rf_sensor.py and the launch file (plain YAML, not ROS parameters,
+# because the ship list is nested). The model is described in sim/nodes/rf_model.py.
+#
+# AIS is the GMSK radio every large ship carries (ITU-R M.1371-5; receivers: IEC 61993-2).
+# GMSK has no spreading factor (that is LoRa); its settings are the bit rate, BT and the bandwidth below.
+
+seed: -1                       # -1: new draw every run; >= 0: repeatable run
+sea_level_z: -4.0              # world z of the sea surface (islands world)
+
+ais:
+  channels_hz: [161975000, 162025000]   # AIS 1 and AIS 2; a ship alternates between them
+  bit_rate: 9600                        # bit/s
+  bandwidth_hz: 25000                   # channel
+  bt: 0.4                               # Gaussian filter bandwidth x bit time (transmitter, ITU-R M.1371)
+  ber_alpha: 0.75                       # GMSK BER factor for BT 0.4: 0.68 at BT 0.25, 0.85 for MSK (Rappaport)
+  packet_bits: 256                      # one slot: 26.67 ms, ramp + training + flags + 168 data bits + CRC + buffer
+  report_jitter: 0.1                    # +-10 % on the nominal reporting interval
+  class_power_dbm: {A: 41.0, B: 33.0}   # 12.5 W and 2 W
+  position_sigma_m: 3.0                 # error of the position a ship reports (its own GNSS), per axis
+  start_after_s: 20.0                   # sim time when the ships start transmitting (0: from the start)
+
+propagation:
+  sea_reflection: -0.9         # calm sea, VHF, grazing angle
+  shadowing_db: 3.0            # log-normal sigma per packet (RFComms default is 10 dB, an indoor value)
+
+receiver:                      # on the drone
+  antenna_gain_db: -5.0        # a helical VHF stub ("rubber duck", 17 cm) of the direction-finding array; the
+                               # packets are decoded through the array, as in the pseudo-Doppler UAS of Gerhard and
+                               # Tokekar (arXiv 2003.00386), so there is no separate whip
+  noise_figure_db: 6.0
+  sensitivity_dbm: -110.0      # at 20 % packet error rate; IEC 61993-2 minimum is -107 dBm
+  per_at_sensitivity: 0.2
+  rssi_noise_db: 1.0           # reported RSSI = true power + N(0, this), rounded to 1 dB
+
+direction_finder:              # bearing in the drone's body frame: a pseudo-Doppler array (RF_README section 2)
+  sigma_floor_deg: 3.0         # calibration and multipath, at any SNR
+  sigma_at_ref_deg: 8.0        # noise term at the reference SNR; halves for every 6 dB more
+  snr_ref_db: 10.0
+  bias_sigma_deg: 1.0          # mounting error, drawn once per run
+  # Four fixed stubs on the rotor arms, sampled one after another by an RF switch into one receiver: the phase of the
+  # received signal then moves like that of one antenna circling at the switching rate, and the phase of that
+  # Doppler tone against the switching is the bearing. No moving parts. Two rules, checked by rf_sensor.py:
+  # the square's side under 0.35 wavelength (above it the bearing is ambiguous; 0.22 works best, Gerhard and
+  # Tokekar), and enough
+  # electronic rotations within one AIS packet (packet_bits / bit_rate) to measure the tone's phase.
+  elements: 4
+  array_radius_m: 0.095        # from the drone's centre, along each rotor arm, inboard of the propeller discs:
+                               # side 0.13 m = 0.07 wavelength
+  rotation_hz: 1000.0          # electronic: the switch steps through the four stubs 1000 times a second
+  min_rotations_per_packet: 10 # 26.7 at 1000 Hz
+  element_length_m: 0.17       # helical stub
+
+receivers:                     # drones that listen
+  - name: midair_quad
+    odom_topic: /ground_truth/odom
+
+# Ships of the strait world (worlds/strait.sdf): three warships, each patrolling a box at one corner of a triangle
+# around the drone's route (helipad A at the origin to helipad B at 480, 110), so the drone always sees them in
+# three well-separated directions, which is the best geometry for triangulation. Waypoints are world metres, ENU,
+# sailed in a loop; each ship starts at its first waypoint.
+# Warships at full size, all transmitting AIS Class A. kind sets the shape the launch file draws (carrier, destroyer
+# or frigate). antenna_xy_m is where the AIS mast stands on the ship (forward, left of the ship's centre, m);
+# antenna_height_m is its top above the sea. MMSIs use Taiwan's country code 416; the ships are fictional.
+ships:
+  - name: carrier_tai_shan
+    kind: carrier
+    mmsi: 416000101
+    ais_class: A
+    length_m: 330.0
+    beam_m: 77.0
+    antenna_xy_m: [20.0, -28.0]       # mast on the island, on the starboard side
+    antenna_height_m: 60.0
+    cable_loss_db: 2.0
+    antenna_gain_db: 2.15
+    speed_kn: 15.0
+    waypoints: [[-50.0, 700.0], [450.0, 700.0], [450.0, 850.0], [-50.0, 850.0]]   # north corner
+  - name: destroyer_chi_lung
+    kind: destroyer
+    mmsi: 416000202
+    ais_class: A
+    length_m: 155.0
+    beam_m: 20.0
+    antenna_xy_m: [5.0, 0.0]
+    antenna_height_m: 40.0
+    cable_loss_db: 2.0
+    antenna_gain_db: 2.15
+    speed_kn: 18.0
+    waypoints: [[-250.0, -350.0], [-650.0, -350.0], [-650.0, -550.0], [-250.0, -550.0]]   # south-west corner
+  - name: frigate_cheng_kung
+    kind: frigate
+    mmsi: 416000303
+    ais_class: A
+    length_m: 138.0
+    beam_m: 14.0
+    antenna_xy_m: [5.0, 0.0]
+    antenna_height_m: 35.0
+    cable_loss_db: 2.0
+    antenna_gain_db: 2.15
+    speed_kn: 10.0
+    waypoints: [[700.0, -350.0], [1100.0, -350.0], [1100.0, -550.0], [700.0, -550.0]]   # south-east corner
+
+# The ESKF's use of the RF fix (sim/nodes/eskf_ros_adapter.py with rf_fix:=true, the /nav_rf/odom instance)
+eskf_rf_fix:
+  gate_prob: 0.999             # Mahalanobis gate for the RF position and heading updates, as for GNSS
+  reanchor_after: 3            # RF fixes rejected in a row before the ESKF's horizontal position is reset to the fix
+  reanchor_velocity_sigma_mps: 2.0   # velocity uncertainty added at a reset: the drift came with a wrong velocity
+  start_height_m: 0.0          # height of the take-off pad when starting without GNSS (world origin: helipad A)
+  start_height_sigma_m: 1.0    # also the height uncertainty kept at a reset; the barometer carries the height

@@ -1,0 +1,22 @@
+{
+  "file": "islands_dem.tif",
+  "values": "float32, metres above the sea surface (negative: depth below it)",
+  "world_z": "value - 4",
+  "resolution_m": 1.0,
+  "size_px": [
+    1069,
+    699
+  ],
+  "image_top": "north (+y)",
+  "pixel_centres_world_m": {
+    "x_first": -275.0,
+    "x_last": 793.0,
+    "y_top": 383.0,
+    "y_bottom": -315.0
+  },
+  "world_origin": {
+    "latitude_deg": 23.65,
+    "longitude_deg": 119.85,
+    "note": "helipad A, x east, y north (ENU)"
+  }
+}
