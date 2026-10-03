@@ -33,7 +33,7 @@ ODM = ROOT / "data/processed/x_tuniu_survey_odm"
 SRC = ODM / "odm_texturing_25d"
 OBJ = "odm_textured_model_geo.obj"
 MTL = "odm_textured_model_geo.mtl"
-OUT = ODM / "viewer"
+OUT = ODM / "viewer"          # set from --dir in main(): one folder per texture size
 TRUTH = ROOT / "data/processed/t_replay/tuniu_tw_1/truth.csv"
 ATT = ROOT / "data/processed/t_replay/tuniu_tw_1/attitude.csv"
 
@@ -87,9 +87,13 @@ def cmd_view(args) -> None:
         prop.SetAmbient(0.0)
         prop.SetDiffuse(1.0)
         prop.SetSpecular(0.0)
-    pl.set_background("#202833")
+    pl.set_background("#c9dcef", top="#4f7fb5")   # sky gradient
+    pl.enable_anti_aliasing("ssaa")
     fl = pd.read_csv(OUT / "april_flight_mesh_frame.csv")
     cams = fl[["x", "y", "z"]].to_numpy()
+    if args.no_flight:
+        _finish(pl, cams, args)
+        return
     pl.add_mesh(pv.lines_from_points(cams), color="white", line_width=3, label="April 2019 flight (RTK)")
     # where each photo centre hits the ground, 30 deg ahead of nadir (display only: ground assumed 90 m below)
     h = np.full(len(cams), 90.0)
@@ -101,6 +105,10 @@ def cmd_view(args) -> None:
     pl.add_legend(bcolor=(0.1, 0.1, 0.1), size=(0.5, 0.1), loc="lower right")
     pl.add_text("Tuniu River, OpenDroneMap 3D (survey 2019-09-16)\nleft drag rotate | wheel zoom | shift+drag pan | "
                 "f fly to point | r reset | q quit", font_size=10, color="white")
+    _finish(pl, cams, args)
+
+
+def _finish(pl, cams, args) -> None:
     pl.enable_terrain_style(mouse_wheel_zooms=True)
     c = cams.mean(0)
     pl.camera_position = [(c[0] - 250, c[1] - 450, c[2] + 250), (c[0], c[1], c[2] - 90), (0, 0, 1)]
@@ -114,12 +122,19 @@ def cmd_view(args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("prepare")
-    p.add_argument("--tex-px", type=int, default=2048)
-    v = sub.add_parser("view")
-    v.add_argument("--shot", help="save a screenshot to this path")
-    v.add_argument("--off-screen", action="store_true")
+    for name in ("prepare", "view"):
+        s = sub.add_parser(name)
+        s.add_argument("--dir", default="viewer",
+                       help="display folder under data/processed/x_tuniu_survey_odm (e.g. viewer_4096)")
+        if name == "prepare":
+            s.add_argument("--tex-px", type=int, default=2048)
+        else:
+            s.add_argument("--shot", help="save a screenshot to this path")
+            s.add_argument("--off-screen", action="store_true")
+            s.add_argument("--no-flight", action="store_true", help="hide the April flight overlay")
     a = ap.parse_args()
+    global OUT
+    OUT = ODM / a.dir
     {"prepare": cmd_prepare, "view": cmd_view}[a.cmd](a)
 
 
