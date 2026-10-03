@@ -17,6 +17,8 @@ LOW_SCORE = "LOW_SCORE"
 DISAGREES_WITH_ESTIMATE = "DISAGREES_WITH_ESTIMATE"
 FRAMES_DISAGREE = "FRAMES_DISAGREE"
 OFF_MAP = "OFF_MAP"  # the search circle holds no place where the frame lies fully on the map
+UNCONFIRMED = "UNCONFIRMED"  # a large jump, held until the next fix agrees with it
+QUARTERS_DISAGREE = "QUARTERS_DISAGREE"  # fewer than three quarters of the frame land with the whole
 
 # what the navigator reports about itself, see ``status``
 TRACKING = "TRACKING"
@@ -136,6 +138,31 @@ def agreeing_fixes(positions: np.ndarray, radius: float, needed: int) -> np.ndar
         if len(group) > len(best) and all(close[i, j] for i in group for j in group):
             best = group
     return np.array(best) if len(best) >= needed else None
+
+
+def fixes_agree(
+    earlier: np.ndarray,
+    later: np.ndarray,
+    moved: np.ndarray,
+    distance_between: float,
+    fix_variance: float,
+    drift_rate: float,
+    gate_sigmas: float = 3.0,
+) -> bool:
+    """Do two fixes agree, once the earlier one is carried forward by the motion in between?
+
+    Each fix has its own error, and the dead-reckoned motion between them drifts. So the gap
+    allowed between the later fix and the carried-forward earlier one is
+
+        gate_sigmas * sqrt(2 * fix_variance + (drift_rate * distance_between)^2)
+
+    Example: fixes accurate to 15 m (variance 225), 300 m apart, 10 percent drift: the gap may be
+    3 * sqrt(2 * 225 + 30^2) = 3 * 36.7 = 110 m. Two fixes at different ground 300 m apart that
+    both point to the same wrong place are rare; one look-alike place is not.
+    """
+    limit = gate_sigmas * np.sqrt(2.0 * fix_variance + (drift_rate * distance_between) ** 2)
+    gap = np.asarray(later, dtype=float) - (np.asarray(earlier, dtype=float) + np.asarray(moved, dtype=float))
+    return bool(np.linalg.norm(gap) <= limit)
 
 
 def status(sigma: float, degraded_above: float = 30.0, lost_above: float = 100.0) -> str:

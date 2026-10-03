@@ -87,6 +87,50 @@ def summarize_navigation(
     )
 
 
+@dataclass
+class IntegritySummary:
+    """Share of frames in each region of the Stanford-ESA integrity diagram (Zhu et al. 2022, eq. 8 and 9).
+
+    The protection level is the bound the navigator states, 3 sigma. The alert limit is the largest
+    error the mission tolerates. Every frame falls into one of four regions:
+
+    - nominal: protection level within the alert limit, and the error within the protection level.
+    - misleading: protection level within the alert limit, the error above the protection level,
+      but still within the alert limit. The bound was wrong, without harm yet.
+    - hazardous: protection level within the alert limit, but the error above the alert limit. The
+      navigator says all is well while it is too far off. This is the case that must be rare.
+    - unavailable: the protection level is above the alert limit, so the navigator warns. Safe, but
+      the position cannot be used for the mission.
+
+    Example with an alert limit of 50 m: error 20 m with sigma 10 m (protection level 30 m) is
+    nominal; error 40 m with sigma 10 m is misleading; error 80 m with sigma 10 m is hazardous;
+    any frame with sigma 20 m (protection level 60 m) is unavailable.
+    """
+
+    alert_limit_m: float
+    nominal: float
+    misleading: float
+    hazardous: float
+    unavailable: float
+
+    def as_dict(self) -> dict[str, float]:
+        return asdict(self)
+
+
+def integrity_summary(errors: NavigationErrors, alert_limit_m: float, sigmas: float = 3.0) -> IntegritySummary:
+    """Classify every frame against the alert limit; see ``IntegritySummary``."""
+    protection = sigmas * errors.sigma
+    e = errors.error
+    available = protection <= alert_limit_m
+    return IntegritySummary(
+        alert_limit_m=alert_limit_m,
+        nominal=float(np.mean(available & (e <= protection))),
+        misleading=float(np.mean(available & (e > protection) & (e <= alert_limit_m))),
+        hazardous=float(np.mean(available & (e > alert_limit_m))),
+        unavailable=float(np.mean(~available)),
+    )
+
+
 def error_at_distances(errors: NavigationErrors, distances: list[float]) -> dict[float, float | None]:
     """Position error at fixed distances after the jam. Beyond the end of the flight: ``None``."""
     out: dict[float, float | None] = {}

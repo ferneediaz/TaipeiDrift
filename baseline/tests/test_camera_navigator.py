@@ -6,9 +6,9 @@ import pytest
 
 from src.data.camera_flight import CameraFlight, ReferenceMap
 from src.data.synthetic_camera import make_synthetic_camera_flight
-from src.estimation.camera_navigator import NavigatorConfig, calibrate, jam_index, navigate, run_camera_navigator
+from src.estimation.camera_navigator import Calibration, NavigatorConfig, calibrate, jam_index, navigate, run_camera_navigator
 from src.estimation.image_motion import shifts_for_flight
-from src.estimation.navigator_core import DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE, LOW_SCORE, OFF_MAP, OK
+from src.estimation.navigator_core import DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE, LOW_SCORE, OFF_MAP, OK, UNCONFIRMED
 from src.evaluation.navigation_metrics import error_at_distances, fix_errors, navigation_errors, summarize_navigation
 
 CFG = NavigatorConfig(jam_after_m=300.0, fix_every_m=100.0)
@@ -196,6 +196,56 @@ def test_area_search_refuses_a_map_with_wrong_coordinates(flight, shifts, area_c
     result = navigate(wrong, shifts, area_calibration, AREA)
     assert result.fixes and not any(f.used for f in result.fixes)
     assert {f.reason for f in result.fixes} <= {DISAGREES_WITH_ESTIMATE, LOW_SCORE, OFF_MAP}
+
+
+def test_offset_in_the_drones_frame_example():
+    c = Calibration(0, np.eye(2), 0.85, 0.0, np.array([10.0, 0.0]), offset_frame="body")
+    np.testing.assert_allclose(c.offset_at(0.0), [10.0, 0.0], atol=1e-9)  # 10 m forward heading north
+    np.testing.assert_allclose(c.offset_at(90.0), [0.0, 10.0], atol=1e-9)  # ... and heading east
+    assert np.array_equal(replace(c, offset_frame="world").offset_at(90.0), [10.0, 0.0])
+
+
+def test_body_offset_needs_a_heading(flight, shifts):
+    with pytest.raises(ValueError):
+        calibrate(flight, shifts, replace(AREA, offset_frame="body"))
+    headed = replace(flight, heading_deg=np.zeros(len(flight)))
+    c = calibrate(headed, shifts, replace(AREA, offset_frame="body"))
+    assert c.offset_frame == "body" and np.linalg.norm(c.fix_offset) < 2.0
+
+
+WIDE = replace(AREA, fix_every_m=500.0, confirm_above_radius_m=100.0)  # one wide search after the jam
+
+
+def _look_alike(flight, frame, metres_back):
+    """The flight, with one frame replaced by the frame of a place ``metres_back`` behind it."""
+    back = int(round(metres_back / 3.0))  # the generated flight takes a frame every 3 m
+    original = flight.load_frame
+    return replace(flight, load_frame=lambda i: original(i - back) if i == frame else original(i))
+
+
+def test_confirmation_holds_a_large_jump(flight, shifts, area_calibration):
+    first = navigate(flight, shifts, area_calibration, WIDE).fixes[0]
+    assert first.used and first.search_radius_m > 100.0
+    fooled = _look_alike(flight, first.frame, 100.0)
+    without = navigate(fooled, shifts, area_calibration, WIDE).fixes[0]
+    assert without.used and np.linalg.norm(without.position - flight.position_gt[first.frame]) > 80.0  # a wrong fix believed
+    held = navigate(fooled, shifts, area_calibration, replace(WIDE, confirm_jumps=True)).fixes[0]
+    assert not held.used and held.reason == UNCONFIRMED
+
+
+def test_known_limit_confirmation_cannot_catch_a_map_that_is_wrong_as_a_whole(flight, shifts, area_calibration):
+    """Every fix points the same 120 m off, so the next fix agrees with the held one, and both are used.
+
+    Confirmation guards against a single look-alike place. A map whose coordinates are wrong as a
+    whole fools every fix alike; only a second, independent source of position could tell.
+    """
+    ground = flight.ground_map
+    shifted = replace(flight, ground_map=replace(ground, origin=ground.origin + np.array([120.0, 0.0]), _prepared=None))
+    result = navigate(shifted, shifts, area_calibration, replace(AREA, fix_every_m=100.0, confirm_jumps=True, confirm_above_radius_m=0.0))
+    reasons = [f.reason for f in result.fixes]
+    assert UNCONFIRMED in reasons
+    held = reasons.index(UNCONFIRMED)
+    assert any(f.used and f.distance > 90.0 for f in result.fixes[held + 1 :])  # confirmed by the next one, and believed
 
 
 def test_area_search_off_the_map_is_reported(flight, shifts, area_calibration):

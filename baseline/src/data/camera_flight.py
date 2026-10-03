@@ -66,6 +66,7 @@ class CameraFlight:
     reference: ReferenceMap
     metadata: dict[str, Any] = field(default_factory=dict)
     ground_map: GroundMap | None = None  # one map of the whole area, for the search around the estimate
+    heading_deg: np.ndarray | None = None  # (N,) heading from the drone's own sensor (bearing from north), not the truth
 
     def __post_init__(self) -> None:
         self.timestamp = np.asarray(self.timestamp, dtype=float)

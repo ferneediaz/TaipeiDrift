@@ -43,6 +43,12 @@ runs:
   map_every_300:          {fix_every_m: 300.0,  search: area, min_score: 0.33}
   map_every_400_no_check: {fix_every_m: 400.0,  search: area, min_score: 0.0}   # one wrong fix gets used
   map_every_1000:         {fix_every_m: 1000.0, search: area, min_score: 0.33}
+  map_every_300_confirm:  {fix_every_m: 300.0,  search: area, min_score: 0.33, confirm_jumps: true}   # a large jump from a wide search waits for the next fix
+  map_every_1000_confirm: {fix_every_m: 1000.0, search: area, min_score: 0.33, confirm_jumps: true}
+  map_every_300_quad:     {fix_every_m: 300.0,  search: area, min_score: 0.0,  quad_check: true}    # Ilhan's rule instead of a score threshold
+  map_every_1000_quad:    {fix_every_m: 1000.0, search: area, min_score: 0.0,  quad_check: true}
+  map_every_300_quad_score: {fix_every_m: 300.0, search: area, min_score: 0.33, quad_check: true}
+  map_every_1000_both:    {fix_every_m: 1000.0, search: area, min_score: 0.33, quad_check: true, confirm_jumps: true}
   every_100:          {fix_every_m: 100.0,  search: nearest, min_score: 0.0}
   every_300:          {fix_every_m: 300.0,  search: sized,   min_score: 0.33}
   every_400_no_check: {fix_every_m: 400.0,  search: nearest, min_score: 0.0}   # the 7 images no longer reach the true place

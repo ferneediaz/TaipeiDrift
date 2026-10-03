@@ -28,10 +28,13 @@ import numpy as np
 from src.data.camera_flight import CameraFlight, prepare
 from src.estimation.image_motion import shifts_for_flight
 from src.data.ground_map import GroundMap
-from src.estimation.map_matching import KEEP, Match, match, search_area
+from src.estimation.map_matching import KEEP, Match, match, quad_agreement, search_area
 from src.estimation.navigator_core import (
     FRAMES_DISAGREE,
     OFF_MAP,
+    QUARTERS_DISAGREE,
+    UNCONFIRMED,
+    fixes_agree,
     agreeing_fixes,
     allowed_distance,
     blend,
@@ -53,6 +56,15 @@ class NavigatorConfig:
     nearest_images: int = 7
     min_search_radius_m: float = 60.0  # sized and area search: within max(this, 3 sigma)
     calibration_radius_m: float = 60.0  # area search before the jam: around the GNSS position
+    offset_frame: str = "world"  # "world": the fix offset is learned in north and east; "body": in the drone's
+    # forward and right directions, turned with the heading sensor (needs flight.heading_deg)
+    confirm_jumps: bool = False  # a fix from a wide search that would move the estimate by more than
+    # jump_limit_m is held until the next attempt, over different ground, agrees with it; then both are used
+    jump_limit_m: float = 30.0  # twice the accuracy of one fix: a wrong fix closer than this does little harm
+    confirm_above_radius_m: float = 150.0  # only searches wider than this need confirming: look-alikes come from wide searches
+    quad_check: bool = False  # area search: the four quarters of the frame, searched alone, must land with the whole
+    quad_needed: int = 3  # this many of the four quarters (Ilhan's rule "quad >= 3")
+    quad_tolerance_share: float = 4.0 / 56.0  # Ilhan's 4 pixels on 56-pixel quarters, as a share of the quarter
     min_score: float = 0.0  # a fix with a lower matching score is not used
     fix_sigma_m: float = 15.0  # accuracy of one fix
     drift_rate: float = 0.10  # dead reckoning error as a share of the distance since the last fix
@@ -83,7 +95,20 @@ class Calibration:
     motion_matrix: np.ndarray  # (2, 2); image shift in pixels @ matrix = ground step (north, east) in m
     zoom: float
     angle: float  # degrees
-    fix_offset: np.ndarray  # (2,) north, east in m; a fix lands this far from the true position
+    fix_offset: np.ndarray  # (2,) a fix lands this far from the true position: north, east in m, or
+    # forward, right in m when offset_frame is "body"
+    offset_frame: str = "world"
+
+    def offset_at(self, heading_deg: float | None) -> np.ndarray:
+        """The fix offset in north and east at a heading (bearing from north, degrees).
+
+        Example: an offset of 10 m forward is 10 m north at heading 0 and 10 m east at heading 90.
+        """
+        if self.offset_frame == "world":
+            return self.fix_offset
+        a = np.radians(heading_deg)
+        forward, right = self.fix_offset
+        return np.array([forward * np.cos(a) - right * np.sin(a), forward * np.sin(a) + right * np.cos(a)])
 
 
 @dataclass
@@ -103,6 +128,7 @@ class FixRecord:
     reason: str  # OK, LOW_SCORE, DISAGREES_WITH_ESTIMATE, FRAMES_DISAGREE or OFF_MAP
     frames_agreeing: int = 1  # with the agreement check: how many of the matched frames agreed
     search_radius_m: float = 0.0  # sized and area search: radius of the search around the estimate
+    quarters_agreeing: int = -1  # with the quad check: how many quarters of the frame agreed; -1 if not checked
 
 
 @dataclass
@@ -146,13 +172,28 @@ def calibrate(flight: CameraFlight, shifts: np.ndarray, cfg: NavigatorConfig) ->
             match(prepare(flight.frame(k)), flight.reference, flight.reference.nearest(truth[k], cfg.nearest_images), zooms, angles, cfg.keep)
             for k in frames
         ]
+    offsets = np.array([f.position - truth[k] for f, k in zip(fixes, frames)])
+    if cfg.offset_frame == "body":
+        heading = _heading(flight)
+        a = np.radians(heading[list(frames)])
+        # north, east to forward, right: the inverse of Calibration.offset_at
+        offsets = np.column_stack([offsets[:, 0] * np.cos(a) + offsets[:, 1] * np.sin(a), -offsets[:, 0] * np.sin(a) + offsets[:, 1] * np.cos(a)])
+    elif cfg.offset_frame != "world":
+        raise ValueError(f"unknown offset frame {cfg.offset_frame!r}")
     return Calibration(
         jam_index=jam,
         motion_matrix=matrix,
         zoom=float(np.median([f.zoom for f in fixes])),
         angle=float(np.median([f.angle for f in fixes])),
-        fix_offset=np.median([f.position - truth[k] for f, k in zip(fixes, frames)], axis=0),
+        fix_offset=np.median(offsets, axis=0),
+        offset_frame=cfg.offset_frame,
     )
+
+
+def _heading(flight: CameraFlight) -> np.ndarray:
+    if flight.heading_deg is None:
+        raise ValueError(f"offset_frame 'body' needs the drone's heading; flight {flight.name} has none")
+    return np.asarray(flight.heading_deg, dtype=float)
 
 
 def _ground_map(flight: CameraFlight) -> GroundMap:
@@ -168,6 +209,10 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
     jam = calibration.jam_index
     reference = flight.reference
     ground = _ground_map(flight) if cfg.search == "area" else None
+    heading = _heading(flight) if calibration.offset_frame == "body" else None
+
+    def offset(j: int) -> np.ndarray:
+        return calibration.offset_at(None if heading is None else heading[j])
     fix_variance = cfg.fix_sigma_m**2
 
     estimate = flight.position_gt[jam].copy()  # the last position GNSS gave
@@ -177,6 +222,9 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
     zoom = calibration.zoom
     scale = 1.0  # change of the height above ground since the calibration, read from the zoom
 
+    pending: tuple[np.ndarray, int] | None = None  # a large jump waiting for the next fix: position, frame
+    since_pending = 0.0
+
     path = [estimate.copy()]
     sigma = [float(np.sqrt(variance))]
     fixes: list[FixRecord] = []
@@ -185,6 +233,7 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
         estimate = estimate + step
         since_fix += float(np.linalg.norm(step))
         since_try += float(np.linalg.norm(step))
+        since_pending += float(np.linalg.norm(step))
 
         if cfg.fix_every_m and since_try >= cfg.fix_every_m:
             since_try = 0.0
@@ -219,12 +268,13 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
                     continue
                 found_all.append(found_j)
                 matched.append(j)
-                moved.append(found_j.position - calibration.fix_offset + (estimate - path[j - jam]) if j < k else found_j.position - calibration.fix_offset)
+                moved.append(found_j.position - offset(j) + (estimate - path[j - jam]) if j < k else found_j.position - offset(j))
             allowed = allowed_distance(predicted, fix_variance, cfg.gate_sigmas)
             searched = radius if cfg.search != "nearest" else 0.0
             if not matched or matched[-1] != k:
                 nothing = np.full(2, np.nan)
                 fixes.append(FixRecord(k, float("nan"), nothing, float("nan"), float("nan"), -1, 0, float("nan"), allowed, False, OFF_MAP, 0, searched))
+                pending = None
                 path.append(estimate.copy())
                 sigma.append(float(np.sqrt(predicted_variance(variance, since_fix, cfg.drift_rate))))
                 continue
@@ -246,10 +296,29 @@ def navigate(flight: CameraFlight, shifts: np.ndarray, calibration: Calibration,
                 use, reason = fix_decision(score, distance, allowed, cfg.min_score)
             else:
                 use, reason = False, FRAMES_DISAGREE
+            # the four quarters of the frame, each searched alone, must land where the whole frame did
+            quarters = -1
+            if use and cfg.quad_check and ground is not None:
+                quarters = quad_agreement(prepare(flight.frame(k)), ground, found, estimate, radius, cfg.keep, cfg.quad_tolerance_share)
+                if quarters < cfg.quad_needed:
+                    use, reason = False, QUARTERS_DISAGREE
+            # a large jump out of a wide search needs the next fix, over different ground, to point the same way
+            earlier = None  # a held fix that this one confirms: (its position carried to now, its variance now)
+            if use and cfg.confirm_jumps and distance > cfg.jump_limit_m and radius > cfg.confirm_above_radius_m:
+                if pending is not None:
+                    carried = pending[0] + (estimate - path[pending[1] - jam])
+                    if fixes_agree(pending[0], position, estimate - path[pending[1] - jam], since_pending, fix_variance, cfg.drift_rate, cfg.gate_sigmas):
+                        earlier = (carried, fix_variance + (cfg.drift_rate * since_pending) ** 2)
+                if earlier is None:
+                    use, reason = False, UNCONFIRMED
+            pending = (position.copy(), k) if reason == UNCONFIRMED else None
+            since_pending = 0.0
             fixes.append(
-                FixRecord(k, score, position, found.zoom, found.angle, found.reference_index, len(candidates), distance, allowed, use, reason, agreeing, searched)
+                FixRecord(k, score, position, found.zoom, found.angle, found.reference_index, len(candidates), distance, allowed, use, reason, agreeing, searched, quarters)
             )
             if use:
+                if earlier is not None:  # the confirmed earlier fix counts too
+                    estimate, predicted, _ = blend(estimate, predicted, earlier[0], earlier[1])
                 estimate, variance, _ = blend(estimate, predicted, position, fix_variance)
                 zoom = found.zoom
                 scale = zoom / calibration.zoom

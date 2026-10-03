@@ -14,6 +14,7 @@ from src.estimation.navigator_core import (
     blend,
     fit_motion_matrix,
     fix_decision,
+    fixes_agree,
     predicted_variance,
     status,
 )
@@ -88,6 +89,13 @@ def test_agreeing_fixes_needs_enough_frames():
     # every member of the group has to be close to every other, not only to one of them
     chain = np.array([[0.0, 0.0], [8.0, 0.0], [16.0, 0.0]])
     assert len(agreeing_fixes(chain, radius=10.0, needed=2)) == 2
+
+
+def test_fixes_agree_example_from_the_docstring():
+    # 15 m fixes, 300 m apart, 10 % drift: the gap may be 3 * sqrt(2 * 225 + 30^2) = 110 m
+    earlier, moved = np.array([0.0, 0.0]), np.array([300.0, 0.0])
+    assert fixes_agree(earlier, np.array([300.0, 100.0]), moved, 300.0, 225.0, 0.10)
+    assert not fixes_agree(earlier, np.array([300.0, 120.0]), moved, 300.0, 225.0, 0.10)
 
 
 def test_status_follows_the_uncertainty():

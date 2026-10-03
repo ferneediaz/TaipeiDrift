@@ -71,3 +71,15 @@ def test_inscribed_template_has_no_black_corners():
     np.testing.assert_array_equal(  # at small angles nothing changes
         make_template(bright, 0.85, 10.0, 160, keep=0.8, inscribed=True), make_template(bright, 0.85, 10.0, 160, keep=0.8)
     )
+
+
+def test_quarters_agree_at_the_true_place_and_not_at_a_look_alike(flight):
+    from src.estimation.map_matching import quad_agreement
+
+    k = 60
+    frame = prepare(flight.frame(k))
+    right = search_area(frame, flight.ground_map, flight.position_gt[k], 60.0, [0.85], [15.0])
+    assert quad_agreement(frame, flight.ground_map, right, flight.position_gt[k], 60.0) == 4
+    elsewhere = prepare(flight.frame(k + 80))  # a frame 240 m further on, searched here
+    wrong = search_area(elsewhere, flight.ground_map, flight.position_gt[k], 60.0, [0.85], [15.0])
+    assert quad_agreement(elsewhere, flight.ground_map, wrong, flight.position_gt[k], 60.0) <= 2

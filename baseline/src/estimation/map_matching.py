@@ -106,6 +106,58 @@ def match(
     return best
 
 
+def quad_agreement(
+    frame: np.ndarray,
+    ground: GroundMap,
+    found: Match,
+    centre: np.ndarray,
+    radius_m: float,
+    keep: float = KEEP,
+    tolerance_share: float = 4.0 / 56.0,
+) -> int:
+    """How many quarters of the frame, searched on their own, land where the whole frame put them.
+
+    The rule "quad >= 3" of Ilhan's overnight benchmark (branch ``research/offline-nav-evidence``,
+    ``docs/research/map-localization.md``): the template of the best match is cut into four
+    disjoint quarters, each quarter is searched in the same circle, and a quarter agrees if its best
+    place lies within ``tolerance_share`` of a quarter's side of where it sits inside the whole match.
+    Ilhan's quarters were 56 pixels with a tolerance of 4 pixels; the share 4/56 keeps the rule the
+    same for larger templates, where a small error of zoom or angle moves a quarter more pixels. At the right place
+    all quarters agree; a look-alike place resembles the frame as a whole, rarely each quarter.
+
+    Example: a 340-pixel template found with its centre at pixel (1000, 500). Its top-left quarter,
+    170 pixels wide, should land with its centre at (915, 415); the tolerance is 170 * 4/56 = 12
+    pixels. If it lands at (920, 409), 7.8 pixels off, it agrees.
+    """
+    image = ground.prepared()
+    template = make_template(frame, found.zoom, found.angle, ground.zoom_unit_px, keep, inscribed=True)
+    th, tw = template.shape
+    hh, hw = th // 2, tw // 2
+    cx, cy = ground.to_pixel(found.position)  # centre of the whole match
+    ex, ey = ground.to_pixel(centre)
+    reach = radius_m / ground.metres_per_pixel
+    left = max(0, int(np.floor(ex - reach - tw / 2)))
+    top = max(0, int(np.floor(ey - reach - th / 2)))
+    right = min(image.shape[1], int(np.ceil(ex + reach + tw / 2)) + 1)
+    bottom = min(image.shape[0], int(np.ceil(ey + reach + th / 2)) + 1)
+    if right - left < tw or bottom - top < th:
+        return 0
+    window = image[top:bottom, left:right]
+    agreeing = 0
+    for row in (0, 1):
+        for col in (0, 1):
+            quarter = template[row * hh : (row + 1) * hh, col * hw : (col + 1) * hw]
+            # where this quarter's centre sits when the whole template is centred at (cx, cy)
+            qx = cx - tw / 2 + col * hw + hw / 2
+            qy = cy - th / 2 + row * hh + hh / 2
+            scores = cv2.matchTemplate(window, quarter, cv2.TM_CCOEFF_NORMED)
+            scores = np.where(np.isfinite(scores), scores, -np.inf)
+            iy, ix = np.unravel_index(int(np.argmax(scores)), scores.shape)
+            if np.hypot(left + ix + hw / 2 - qx, top + iy + hh / 2 - qy) <= tolerance_share * min(hh, hw):
+                agreeing += 1
+    return agreeing
+
+
 def search_area(
     frame: np.ndarray,
     ground: GroundMap,

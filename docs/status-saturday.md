@@ -1,0 +1,152 @@
+# Where we stand: Saturday 3 October, 11:00
+
+For the team. What we are building, what we tested this morning and why, what we expect from the tests that are running, and what is left until the code freeze on Sunday at 10:00. Every number here comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+
+## 1. The goal for Sunday
+
+**One sentence:** a small drone that loses GNSS keeps its position with its own downward camera and a free satellite map, and it says honestly when it is not sure.
+
+What the jury scores (the challenge brief), and how we answer each point:
+
+| The brief scores | Our answer | State |
+|---|---|---|
+| Reduction in positioning error | Camera alone drifts to 472 m (median) on ALTO; with map fixes 31 m | Measured |
+| Technical validity | Tested on flights we never tuned on, from another country, camera and map source | Running now |
+| Noise tolerance | Error as the picture gets darker, blurred, hazy, and as the heading sensor gets worse | This afternoon |
+| Computing and integration | One fix takes about 0.1 s on one laptop core; output is a position with an uncertainty, the form an autopilot takes | Timing this afternoon |
+| Deployment feasibility | Free maps (Taiwan's government orthophotos), an ordinary camera, no GPU | Slide |
+| The user | Operators of small drones near Taiwan's coast and islands, where GNSS is jammed | Slide |
+
+The required parts of the brief: a dead-reckoning baseline, at least one correction, plots of estimated against true path and of error over time, and the limits. We have all four on ALTO; the held-out test adds them on a second dataset.
+
+## 2. The system, layer by layer
+
+```
+ heading sensor  ─┐
+ (compass or sun) │
+                  ▼
+ camera motion ──► dead reckoning ──► estimate + stated uncertainty ──► status: TRACKING / DEGRADED / LOST
+ (or VIO)          (drifts ~10 %)          ▲
+                                           │ used only if it passes the check
+ camera frame ──► search the map around ───┘
+                  the estimate (a fix)      check: score high enough? close enough to the estimate?
+                                                   large jump confirmed by the next fix?
+```
+
+1. **Dead reckoning.** The image slides through the camera as the drone flies; that motion, added up, carries the position forward. It drifts by about 10 percent of the distance flown.
+2. **Heading.** To add up the motion in the right direction through turns, the navigator needs the drone's heading. Every drone has one from its compass (magnetometer); the mentor's sun sensor would give a better one.
+3. **Position fixes.** Every few hundred metres the camera frame is compared with the satellite map in a circle around the estimate. The best match is a candidate position.
+4. **The check.** A candidate is used only if its match score is high enough and it lies within the stated uncertainty of the estimate. New today: a candidate that would move the estimate far, out of a wide search, must be confirmed by the next fix over different ground.
+5. **Stated uncertainty and status.** The navigator always reports how sure it is. Without fixes the uncertainty grows; at a fix it shrinks. The status follows from it.
+
+## 3. What we did this morning, and why
+
+**A. We checked our own work for mistakes before building more on it.**
+
+- All seven numbers in our docs reproduce exactly, and all tests pass.
+- **Mistake found and repaired:** ALTO's reference images are centred on the *true* flight path. Searching them told the navigator where the path was. We now build one map from all reference images and search it around the navigator's own estimate. The results changed by less than half a metre, so they hold (findings 3.8).
+- **Gap found:** the ALTO validation flight is a straight line. Our navigator had no heading input and would have failed at the first turn. Every real mission has turns.
+- **Weakness known:** all settings were chosen on the same 4.6 km that we reported on.
+
+**B. We added a second, very different dataset to test on: UAV-VisLoc** (Xu et al. 2024, from the Chinese papers we found).
+
+- Real drone photos over China, taken in 2018, matched against a Google Earth satellite map taken 2.5 to 5 years later. Fields, villages and roads have changed in between. This is the realistic case: a map is always older than the flight.
+- Each flight is up to 80 km long, with many turns, and gives the heading for every photo.
+- Why it matters: "technical validity" means showing that the method works on data it was not tuned on. Dropbox blocks the rest of ALTO today, and this is a stronger test anyway: another country, camera and map source.
+- What is real and what is simulated: **the fixes are real** (real photos against the real map). The photos are 95 m apart, too far for our camera motion, so the **dead reckoning between photos is simulated** with the error we measured on ALTO plus the error of the heading sensor. We say this on the slide.
+
+**C. What the first test on that dataset showed (flight 03, 74 km)**
+
+- **The matcher transfers.** Without changing anything, 80 percent of the photos are found within 30 m of the truth, median error 16 m.
+- **The navigator works most of the time:** median error 27 m over 73 km without GNSS, against 1,041 m for dead reckoning alone.
+- **But the check let about 11 wrong fixes through**, and after each the navigator stayed lost for kilometres (90 percent of the time below 356 m, worst 1,301 m). We traced why: after a few rightly refused fixes, the uncertainty grows, the search widens to 300 to 450 m, and in that wide area a look-alike place with a borderline score is found and believed. This is the most important finding of the day. It is what a held-out test is for.
+
+**D. Two findings that need the heading**
+
+- **The fix offset turns with the drone.** The matched position lies about 13 m ahead of the recorded one in the direction of flight, on every leg. Learned in the drone's own frame (forward, right) instead of north and east, the median fix error falls from 18.6 to 13.1 m.
+- **The camera points along the drone's nose, which differs from the direction of travel by the wind's crab angle (up to 13 degrees).** A heading sensor measures the nose direction, which is the one we need.
+
+**E. Ilhan's overnight research** (branch `research/offline-nav-evidence`, pushed at 10:50, summary in French in `docs/research/overnight-synthesis.md`). It reaches the same conclusion by another route:
+
+- **Held-out ALTO test done.** He downloaded ALTO Round 2 Train (37.4 km, with positions) through the second Dropbox link. With our navigator frozen and fixes every 300 m, the median error per section is 94 m (20 to 339 m), against 31 m on the validation section; only 3 of 8 sections reproduce it. His runs still used the search that knew the true path; they need repeating with the map search, which on the validation section changed nothing.
+- **Main cause there: the zoom** (image scale), learned from three fixes, goes wrong when the helicopter's height changes. With a better zoom, right fixes rise from 21 to 43 percent to 86 to 100 percent in three sections.
+- **His integrity rule "quad ≥ 3":** cut the frame into four quarters; at least three must land where the whole frame landed. On 300 real ALTO frames: 44 accepted, 0 wrong. Learned matchers (XFeat) failed on real aerial images; matching OpenStreetMap roads, magnetic anomalies and a shadow compass were tried and dropped.
+- **Taiwan:** forest covers 76 percent of the island, where map fixes are unlikely; there, terrain navigation (Felix) carries the load.
+
+Two independent held-out tests, his on ALTO and ours on UAV-VisLoc, say the same: the first version does not carry over to unseen flights, and the score threshold is its weak point.
+
+## 4. What we are testing now, and what we expect
+
+| Method | What it does | Why | What we expect | State |
+|---|---|---|---|---|
+| Map search around the estimate | Search one map in a circle of 60 m or 3 sigma around the estimate | Removes the knowledge of the true path | Same results as before | **Done**, confirmed on ALTO |
+| Confirmation of large jumps | A fix that would move the estimate far, out of a wide search, is held until the next fix over different ground agrees; then both are used | A single look-alike place rarely repeats 300 m later | On UAV-VisLoc: far fewer wrong fixes used, no more long lost stretches. On ALTO: little or no cost | **Testing now** |
+| Offset in the drone's frame | Learn the fix offset in forward/right, turned with the heading | The camera's tilt or trigger delay is fixed to the drone | Fix error about 13 m instead of 19 m | Built, testing now |
+| Heading sensor: compass | Recorded heading plus a fixed offset (about 4 degrees) and noise | What every drone has | The baseline for turns | Built |
+| Heading sensor: sun (Fan et al. 2016, the mentor's paper) | Heading error from the sun's elevation: 0.1 degree sensor, 1 degree tilt | Better heading, no magnetic disturbance | Less sideways drift between fixes; useless when the sun is overhead | Built |
+| Quarters must agree (Ilhan's "quad ≥ 3") | The four quarters of the frame, searched alone, must land with the whole | No tuned threshold; 0 wrong on his benchmark | Fewer wrong fixes, but also fewer fixes | **On ALTO too strict:** at 300 m spacing it refuses 6 right fixes and the worst error rises from 73 to 344 m; at 1,000 m it refuses all |
+| Integrity measures (Zhu et al. 2022) | Share of the flight where the navigator says "tracking" while the error is above the alert limit (50 m) | The aviation standard for "knows when it is wrong" | Near zero with the confirmation, clearly above zero without | Built, runs with the next test |
+
+**The sun sensor in numbers** (our own calculation, checked against the standard solar position library):
+
+| When and where | Sun's elevation | Heading error on a drone |
+|---|---|---|
+| UAV-VisLoc flight, morning in October | 27 degrees | about 0.5 degrees |
+| Taipei today at noon | 61 degrees | about 1.7 degrees |
+| Taipei at noon on 21 June | 88 degrees | about 29 degrees: useless |
+
+On a drone the sensor's own 0.1 degrees hardly matter; the tilt the IMU reports dominates. In Taiwan the sun stands nearly overhead around midday from May to July.
+
+## 5. The clean test
+
+To keep the held-out test honest, we fixed the test flights **before** looking at them: UAV-VisLoc flights 01 (Changjiang, 817 photos) and 04 (Taizhou, 738 photos), downloaded and set aside. Flight 10 was meant to be the third; Google Drive throttles its download. We develop only on ALTO and flight 03. Once the method is frozen, it runs once on 01 and 04, and we report what comes out, good or bad.
+
+## 6. Synthesis: what works and what does not
+
+| Works | Evidence |
+|---|---|
+| Matching camera frames against an aerial map by correlation of brightness patterns | About 14 to 16 m per fix on ALTO (USA) and UAV-VisLoc (China) |
+| A stated uncertainty that holds when the system works | Error within 3 sigma in 97 to 100 percent of frames on ALTO |
+| A search sized by the uncertainty | Recovers after 1,000 m without fixes on ALTO |
+
+| Does not work | Evidence |
+|---|---|
+| Keypoint matching between camera and map | 2 of 100 accepted on ALTO, both wrong; the papers agree |
+| Agreement of frames 14 m apart | They see the same ground and agree on the same wrong place |
+| The score threshold alone, on unseen data | About 11 wrong fixes used on UAV-VisLoc flight 03 |
+| Any check against a map that is wrong as a whole | Two fixes then agree on the same wrong place; needs a second source (documented as a test) |
+
+## 7. What is left, and who does it
+
+Until about 23:00 tonight; code freeze Sunday 10:00, demo 13:00.
+
+| Time | What | Who |
+|---|---|---|
+| until 12:00 | Finish the confirmation test on ALTO and flight 03; freeze the method | Claude |
+| 12:00 to 12:30 | **Held-out run on flights 01 and 04**, the main result table | Claude |
+| 12:30 to 13:30 | Compass against sun sensor; integrity measures; Stanford diagram | Claude |
+| 13:30 to 14:30 | Noise tolerance: darker, blurred, hazy frames; worse heading | Claude |
+| 14:30 to 15:00 | Timing on one CPU core; map storage per square kilometre | Claude |
+| 15:00 to 18:00 | Demo: replay of a flight on the map with estimate, uncertainty circle, fixes used and refused, status | Claude |
+| 18:00 to 21:00 | Slides, README, findings | Dustin and Claude |
+| now | Roles; the one story; ask the organisers what the brief's "suggested dataset" is | Dustin |
+| today | Heading error of the visual-inertial odometry after 30, 60 and 80 s without GNSS; it becomes our compass model | Alessandro |
+| today | One slide each: terrain navigation (Felix), simulator (Dan), integrity review (Ilhan) | team |
+
+**The story for the slides** (proposal): the drone's camera as a GNSS replacement on cheap hardware and free maps. Dead reckoning drifts (Alessandro's visual-inertial odometry, our camera motion). Map fixes reset it. The check keeps it honest, shown on flights from another country that we never tuned on. Next steps: the sun sensor for heading, terrain navigation for forest and night, a thermal camera for night, the water crossing.
+
+## 8. What we will not claim
+
+- Better accuracy than Raptor or VNS01.
+- Night, fog or flight over water.
+- Real-time on drone hardware: measured on a laptop only.
+- Real dead reckoning on UAV-VisLoc: it is simulated there; real on ALTO.
+
+## 9. A note on the laptop
+
+The project folder on the Desktop syncs to iCloud. With the disk 98 percent full, macOS started moving project files into iCloud this morning (535 of them, including part of `.git`), and Python and git stalled waiting for them. What was done:
+
+- **The working copy is now `~/Projects/DefenseHackathon`**, cloned fresh from GitHub, outside iCloud. Open this folder in VS Code from now on. The Desktop folder is left untouched but is no longer up to date.
+- The data stays where it was, in `Desktop/DefenseHackathon/data/raw.nosync` and `processed.nosync` (iCloud does not sync folders ending in `.nosync`); the new copy links to them.
+- The Python environment is in `~/.venvs/defensehackathon`; `.venv` in the new copy links to it.
+- 18 GB of duplicate downloads were deleted; 21 GB are free.

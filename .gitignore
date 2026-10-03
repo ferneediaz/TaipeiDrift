@@ -1,9 +1,14 @@
-# datasets are fetched with scripts/fetch_data.sh, never committed
+# datasets are fetched with scripts/fetch_data.sh, never committed.
+# data/raw and data/processed may be links to *.nosync folders, which iCloud Drive does not sync.
+data/raw
 data/raw/
+data/raw.nosync/
+data/processed
 data/processed/
+data/processed.nosync/
 
 # python
-.venv/
+.venv
 __pycache__/
 *.pyc
 .pytest_cache/

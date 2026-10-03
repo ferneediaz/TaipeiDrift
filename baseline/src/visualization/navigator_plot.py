@@ -71,3 +71,36 @@ def plot_navigation(
     fig.tight_layout()
     fig.savefig(path, dpi=130)
     plt.close(fig)
+
+
+def plot_stanford(errors: dict[str, "NavigationErrors"], alert_limit_m: float, path: Path, title: str = "", sigmas: float = 3.0) -> None:
+    """Stanford-ESA integrity diagram: each frame's error against the bound the navigator stated.
+
+    Below the diagonal the stated bound held. Right of the alert limit the navigator warns. The
+    corner above the alert limit and left of it is hazardous: a large error with an all-clear.
+    """
+    fig, axes = plt.subplots(1, len(errors), figsize=(5.2 * len(errors), 4.8), squeeze=False)
+    for ax, (label, err) in zip(axes[0], errors.items()):
+        protection = np.maximum(sigmas * err.sigma, 0.1)
+        e = np.maximum(err.error, 0.1)
+        top = max(10 * alert_limit_m, float(e.max()) * 1.2, float(protection.max()) * 1.2)
+        bins = np.logspace(-1, np.log10(top), 60)
+        h, xe, ye = np.histogram2d(protection, e, bins=[bins, bins])
+        ax.pcolormesh(xe, ye, np.ma.masked_equal(h.T, 0), cmap="viridis", norm=matplotlib.colors.LogNorm(), shading="auto")
+        ax.plot([0.1, top], [0.1, top], color=MUTED, lw=1)
+        ax.axvline(alert_limit_m, color="#d64a4a", lw=1)
+        ax.axhline(alert_limit_m, color="#d64a4a", lw=1)
+        ax.fill_between([0.1, alert_limit_m], alert_limit_m, top, color="#d64a4a", alpha=0.08, lw=0)
+        ax.text(0.15, top / 1.6, "hazardous:\nlarge error,\nall-clear", fontsize=8, color="#b03030", va="top")
+        ax.text(alert_limit_m * 1.15, 0.15, "navigator warns", fontsize=8, color=MUTED)
+        ax.set_xscale("log"); ax.set_yscale("log")
+        ax.set_xlim(0.1, top); ax.set_ylim(0.1, top)
+        ax.set_xlabel(f"stated bound, {sigmas:g} sigma (m)")
+        ax.set_ylabel("true error (m)")
+        ax.set_title(label, fontsize=10)
+        _style(ax)
+    if title:
+        fig.suptitle(title)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
