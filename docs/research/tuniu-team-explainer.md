@@ -306,6 +306,8 @@ Once ready, we test four combinations to isolate what the 3D brings:
 | Term | Meaning |
 |---|---|
 | **RTK** | High-precision GNSS (centimetre level). Our ground truth. |
+| **Attitude** | Orientation of the drone or camera: roll, pitch and heading angles, from the IMU. Not the height. |
+| **Altitude / height above ground** | How high the drone is. Here: barometer altitude minus terrain height. |
 | **Orthophoto** | A map image corrected so that it looks taken from straight above everywhere. |
 | **Rectify** | Turn a tilted photo into a view from above, using the camera angles and the height. |
 | **ZNCC** | Zero-mean normalised cross-correlation: measures how similar two images are, insensitive to brightness. |
