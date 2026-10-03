@@ -1,6 +1,6 @@
 # Where we stand (the working doc)
 
-**Last updated: Saturday 3 October, 13:05.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
+**Last updated: Saturday 3 October, 13:15.** The one up-to-date document for the team: what we are building, what changed today and why, what is running, and what is left until the code freeze on Sunday at 10:00. It is updated at each milestone. Every number comes from a script on branch `alto-navigator`; the details are in [findings.md](findings.md).
 
 ## Now, in short
 
@@ -223,22 +223,37 @@ Read on Saturday at 12:40 from branch `mid-air-vio` (commits 4d60f38 and 7773c95
 | The score threshold alone, on unseen data | About 11 wrong fixes used on UAV-VisLoc flight 03 |
 | Any check against a map that is wrong as a whole | Two fixes then agree on the same wrong place; needs a second source (documented as a test) |
 
-## 7. What is left, and who does it
+## 7. What is done, what is left, and who does it
 
-Until about 23:00 tonight; code freeze Sunday 10:00, demo 13:00.
+Code freeze Sunday 10:00, demo 13:00. Updated 13:15.
 
-| Time | What | Who |
+**Done** (all on branch `alto-navigator`):
+
+| What | Where |
+|---|---|
+| Map search around the estimate; the leak through the reference images removed | findings 3.8 |
+| Second dataset UAV-VisLoc; heading sensors (compass, sun); fix offset in the drone's frame | section 3 above |
+| Checks against wrong fixes: confirmation of large jumps, Ilhan's quarters rule (option) | section 4 above |
+| **Held-out test** on flights 01 and 04, run once | top of this page |
+| **Limits test** (light, blur, haze) and the fix for the camera losing track | top of this page |
+| **Demo clips**: ALTO and unseen flight 04 | `outputs/replay/` |
+| Comparison with Alessandro's visual-inertial odometry | section 5a |
+| The mentor's phone sun compass: code ready, waiting for photos | `baseline/scripts/phone_sun_compass.py` |
+
+**Left:**
+
+| What | Who | State |
 |---|---|---|
-| until 12:00 | Finish the confirmation test on ALTO and flight 03; freeze the method | Claude |
-| 12:00 to 12:30 | **Held-out run on flights 01 and 04**, the main result table | Claude |
-| 12:30 to 13:30 | Compass against sun sensor; integrity measures; Stanford diagram | Claude |
-| 13:30 to 14:30 | Noise tolerance: darker, blurred, hazy frames; worse heading | Claude |
-| 14:30 to 15:00 | Timing on one CPU core; map storage per square kilometre | Claude |
-| 15:00 to 18:00 | Demo: replay of a flight on the map with estimate, uncertainty circle, fixes used and refused, status | Claude |
-| 18:00 to 21:00 | Slides, README, findings | Dustin and Claude |
-| now | Roles; the one story; ask the organisers what the brief's "suggested dataset" is | Dustin |
-| today | Heading error of the visual-inertial odometry after 30, 60 and 80 s without GNSS; it becomes our compass model | Alessandro |
-| today | One slide each: terrain navigation (Felix), simulator (Dan), integrity review (Ilhan) | team |
+| **Simulator demo:** Dan's simulator with Ilhan's patch (GNSS cut, recorder, IMU leak fixed), the real Wufeng 2020 aerial image as the ground, a flight along the motorway corridor; our navigator searches the 2018 image of the same place. One flight with IMU, camera, barometer and a map: where our fixes and Alessandro's filter can meet | Claude | Started 12:40, branch `sim-demo` (from Dan's `simulations`) |
+| Computing time per fix and per frame, map storage per square kilometre | Claude | Open |
+| README for the submission (one sentence, headline number, how to run, limits, each part, data and licences) | Claude | Open |
+| Fold today's numbers into `findings.md` | Claude | Open |
+| Slides and the one story | Dustin and team | Open; charts from Claude |
+| Which branches go into `main` | team | Open |
+| Rerun the ALTO Train test with the map search (`search: area`) | Ilhan | Asked |
+| The heading drift of the visual-inertial odometry; fix the term he flagged; who adds the fix input to his filter | Alessandro | Asked |
+| One slide on terrain navigation for forest and night | Felix | Asked |
+| Phone photos for the sun compass, while the sun is high | anyone with an iPhone | Asked |
 
 **The story for the slides** (proposal): the drone's camera as a GNSS replacement on cheap hardware and free maps. Dead reckoning drifts (Alessandro's visual-inertial odometry, our camera motion). Map fixes reset it. The check keeps it honest, shown on flights from another country that we never tuned on. Next steps: the sun sensor for heading, terrain navigation for forest and night, a thermal camera for night, the water crossing.
 
