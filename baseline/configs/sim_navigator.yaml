@@ -14,6 +14,23 @@ maps:
   "2020": data/raw/aerial/wufeng_2020-03-23_x4.tif
 seeds: [1, 2, 3]          # each seed draws its own compass error
 alert_limit_m: 50.0
+
+# The simulated flights and their roles, fixed on Saturday 3 October at 15:20, before the new flights were recorded.
+# development: the navigator may be changed after looking at these.
+# held_out: run once with frozen settings; that first result is the one we report, and afterwards the flight counts
+#   as seen. wufeng_south_80m was run at 15:05 with save point 1's settings (only calibration_zooms widened, below).
+# sealed: not run, not looked at, until the improvement loop ends (19:00); then run once, and those are the numbers.
+# All of them fly the same corridor (the only ground both aerial images cover); they differ in height, speed and direction.
+flights:
+  development:
+    wufeng_corridor_100m: sim/scenarios/wufeng_corridor.json     # 100 m, 10 m/s, north first
+    wufeng_north_120m: sim/scenarios/wufeng_north_120m.json      # 120 m, 12 m/s, north first
+    wufeng_south_65m: sim/scenarios/wufeng_south_65m.json        # 65 m, 6.5 m/s, south first
+  held_out:
+    wufeng_south_80m: sim/scenarios/wufeng_south_80m.json        # 80 m, 8 m/s, south first
+  sealed:
+    wufeng_north_90m: sim/scenarios/wufeng_north_90m.json        # 90 m, 9 m/s, north first
+    wufeng_south_110m: sim/scenarios/wufeng_south_110m.json      # 110 m, 8 m/s, south first
 plot: [camera_alone, map_2018, map_2020_fresh]
 
 navigator:                # the settings frozen for the UAV-VisLoc held-out test (confirm_body), GNSS for the first 450 m
@@ -30,6 +47,11 @@ navigator:                # the settings frozen for the UAV-VisLoc held-out test
   offset_frame: body
   camera_motion_floor: 0.3
   motion_fit: rotation_scale  # the fixed camera of a quadcopter tilts in turns; see navigator_core.fit_rotation_scale
+  # The zooms must cover the heights flown: zoom = height / 128 for this camera (512 px, 90 degrees) and the
+  # 0.5 m map, so 0.63 at 80 m and 0.78 at 100 m. The default 0.60 to 1.00 covers only about 77 to 128 m;
+  # 0.45 to 1.05 covers about 58 to 134 m. Widened when flight 2 (80 m) stopped at the zoom check in
+  # calibrate(), before any of its navigation results existed.
+  calibration_zooms: [0.45, 1.05]
 
 heading:                  # src/sensors/heading.py
   compass: {offset_sd_deg: 4.0, noise_sd_deg: 1.0}
