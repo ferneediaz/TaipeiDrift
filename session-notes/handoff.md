@@ -4,6 +4,15 @@ Last updated: Saturday 3 October 2026, 20:18. Code freeze Sunday 10:00, deck due
 
 ## Resume here
 
+**Next steps, as of Saturday 20:18 (read this first; details in the blocks below).**
+
+1. **Pull request 4** (`integration` to `main`, https://github.com/dwn97/TaipeiDrift/pull/4) is open and holds everything. Merge only on Dustin's word.
+2. **Teammates push often.** Before every push: `git fetch --all`, merge what is new into `integration`, run the tests, check `git diff frozen-navigator -- baseline` is empty. Dan copies files into his branches instead of merging: keep our `baseline/` files, take his `sim/` work. All of Ilhan's, Dan's and Alessandro's branches are merged as of 20:18.
+3. **Dan may integrate the fused filter live** (Dustin asked; answer: yes). He needs from `scripts/fused_replay.py`: `soft_update`, the tilt correction (`camera_offset` in `run_filter`), the drift budget on the position covariance, and a start uncertainty of 3 m at the GNSS loss. Missing for a live run: a simulator node that publishes the sun heading, the camera step and the map fix (as his `rf_nav.py` does for the ships).
+4. **Dustin's order: finish the simulation, then the demo.** Simulation state: frozen navigator with sealed result; fused filter with sealed result; stated-error fix found and tested on development flights. Open on the simulation side: the filter steering the map search; the live version; Ilhan's map replacing ours (Dustin: "if Ilhan is able to add his map then we remove ours"; open how: his matcher on our simulated pictures needs torch and `vismatch` here, or a simulator world built from his Tuniu map).
+5. **The demo and the deck** (due Sunday 12:00, a deck with a link to a demo video): not started. Still open with Dustin: the team number, where the deck is uploaded, who writes the business part (three of seven jury criteria).
+6. **Do not** change `baseline/`, rerun anything on the sealed flights, or add assistant attribution to commits. Check `date` before writing a time.
+
 **Saturday 20:10: the fused filter works and has its own sealed result.**
 
 - **`scripts/fused_replay.py`** replays a recorded flight through Alessandro's ESKF as his live adapter runs it, and feeds it our sun heading (yaw update), our camera ground speed (tilt-corrected with the filter's own attitude; `soft_update` weakens a reading that is far from what the filter expects; steps under 0.3 of the cruising step are not fused), the frozen navigator's used map fixes (position update behind a 99 percent gate, reset after three rejections, as Dan's RF fix) and the navigator's uncertainty rule (10 percent of the distance since the last fix, added to the horizontal position covariance). Settings fixed at tag `frozen-fused-replay` (20:06), chosen on the development flights only.
