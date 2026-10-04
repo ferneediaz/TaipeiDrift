@@ -1,7 +1,7 @@
 # Questions the demo video may raise
 
 For whoever stands in front of the jury. Each answer is short enough to say aloud, and every number comes from
-seventeen logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
+eighteen logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
 of the video, tested on twelve flights"). State: Sunday 4 October, 02:50.
 
 ## If there are only twenty seconds
@@ -26,12 +26,13 @@ truth. The last caption of the video says so. Flying on the estimate is the next
 
 **3. One flight can be luck. How often did you fly it?**
 Six times after the settings were fixed, with new random sensor noise each time. Five flights were 4 to 10 m off
-in the median, one was 24 m. The video shows a typical flight (8 m), not the best one (4 m).
+in the median, one was 24 m. The flight in the video (5 m) is an ordinary one for its setup: the three test flights
+before it gave 6 to 9 m.
 If they ask about the 24 m: the heading was 4 degrees off when GNSS went. One degree costs 8 m over this route.
 
 **4. What is the red line?**
 The same flight with only the inertial sensors and the barometer, which every drone has. After about 55 s it is
-150 to 950 m away, depending on that flight's sensor noise; in the video 241 m. After five minutes it is 3.5 km.
+150 to 950 m away, depending on that flight's sensor noise; in the video 207 m. After five minutes it is 3.5 km.
 
 **5. Why does your error jump to 50 or 100 m over the water?**
 Over open water the camera has nothing to track. There the estimate rests on the inertial sensors and the ships'
@@ -73,7 +74,7 @@ ships' radio running before the drone leaves the coast the estimate over water i
 with moments of 45 to 100 m; with the radio starting only at the coast it is 16 to 31 m, with moments up to 120 m.
 
 **12. How long can it go without GNSS?**
-The video shows 53 s and 470 m. The longest flight was 289 s, about 2 km: 11 m off in the median, 44 m at worst,
+The video shows 54 s and 470 m. The longest flight was 289 s, about 2 km: 11 m off in the median, 44 m at worst,
 and the error did not keep growing.
 
 **13. Were the settings tuned on this very flight?**
@@ -132,7 +133,7 @@ arrival.
 |---|---|---|---|---|---|
 | The flight the settings were chosen on | 58 | 8.1 | 36 | 8.1 | 953 |
 | Take 1 | 53 | 8.5 | 66 | 7.0 | 405 |
-| Take 2, the video | 53 | 7.8 | 56 | 9.0 | 241 |
+| Take 2, the first video (old sea) | 53 | 7.8 | 56 | 9.0 | 241 |
 | Repeat 1 | 57 | 8.7 | 60 | 18.7 | 518 |
 | Repeat 2 | 59 | 3.9 | 11 | 28.7 | 153 |
 | Repeat 3 | 58 | 9.7 | 43 | 31.1 | 438 |
@@ -141,4 +142,6 @@ arrival.
 | GNSS lost at 11 s | 75 | 8.2 | 34 | 39.6 | 308 |
 | Sea without texture, matte | 57 | 28.4 | 69 | 37.0 | 201 |
 | Sea without texture, glossy (Alessandro's sea) | 58 | 22.2 | 119 | 27.5 | 507 |
+| The same sea, ships from 20 s: three test flights | 58 | 6.2 to 8.7 | 44 to 102 | 16 to 29 | 290 to 530 |
+| **Take 3, the video** (that sea, ships from 20 s) | 54 | 4.6 | 49 | 4.5 | 207 |
 | To the island and back | 289 | 10.6 | 44 | 94.9 | 3,477 |

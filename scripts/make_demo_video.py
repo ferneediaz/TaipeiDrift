@@ -182,7 +182,7 @@ class Overlay:
                 u, v = pts[k - 1]
                 m.ellipse([u - 5, v - 5, u + 5, v + 5], fill=colour, outline=DARK)
         frame.paste(small, (bx + pad, by + pad))
-        t_shown = t if arrived else math.floor(t * 2) / 2     # numbers change twice a second, not every frame
+        t_shown = t if arrived else math.floor(t * 5) / 5     # numbers change five times a second, not every frame
         rows = (("True path", WHITE),
                 (f"Our estimate: {Flight.error(self.f.ours, t_shown):.0f} m off", GREEN),
                 (f"Inertial sensors alone: {Flight.error(self.f.base, t_shown):.0f} m off", RED))

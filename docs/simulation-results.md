@@ -510,6 +510,7 @@ without texture the ships' position has to be running before the drone reaches t
 | Ships early | 20 s | 10.1 m | 44 m | 8.7 m | 44 m |
 | Ships early | 20 s | 7.1 m | 58 m | 6.2 m | 58 m |
 | Ships early, display at the coast | 20 s | 10.3 m | 102 m | 6.6 m | 102 m |
+| **Take 3, recorded slowly at 09:16: the video** | 20 s | **6.3 m** | 49 m | **4.6 m** | 49 m |
 
 - **Started at the coast, the ships' position is still settling during the crossing** (it needs about 20 s): 16 to
   31 m in the median over the water and moments of 69 to 119 m, counting the matte test of the night. **Started at
@@ -519,7 +520,11 @@ without texture the ships' position has to be running before the drone reaches t
 - **So the video's flight changed:** the ships transmit from 20 s, and the RF display opens at the coast through
   the new launch option `rf_display_after_s` (`ais_start_s:=20 rf_display_after_s:=41` at the recording pace). The
   world's `VERSION` is 4, so every machine builds Alessandro's sea.
-- One further flight of that morning was cut by the laptop going to sleep and is not counted. In all, seventeen
+- **The video is take 3** (`demo/TaipeiDrift_demo_pitch_720p.mp4`, logs `demo/take3_*.gz`): 54 s without GNSS,
+  4.6 m in the median, 49 m at the worst moment (late in the crossing), 7 m over the second helipad; the inertial
+  sensors alone 207 m there; the camera-only filter 4.5 m in the median and 80 m at worst. The first video (take
+  2, old sea) is replaced.
+- One further flight of that morning was cut by the laptop going to sleep and is not counted. In all, eighteen
   flights of the demo route are scored here: our estimate 3.9 to 28.4 m in the median, the inertial sensors alone
   150 to 950 m off at the arrival.
 
