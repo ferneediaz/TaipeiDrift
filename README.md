@@ -9,7 +9,8 @@ result measured on **real drone photos**: a drone keeps its position within a fe
 cut, by matching its own camera pictures against a map stored on board. This README explains that result from
 end to end: the data, the method, how we kept it honest, the numbers, the limits, and how to rerun everything.
 For every building block explained in detail (settings, why each choice, what was ruled out) and the questions a
-jury is likely to ask, read [`docs/research/tuniu-how-it-works.md`](docs/research/tuniu-how-it-works.md).
+jury is likely to ask, read [`docs/research/tuniu-how-it-works.md`](docs/research/tuniu-how-it-works.md)
+([PDF](docs/research/tuniu-how-it-works.pdf)).
 [The rest of the repository](#the-rest-of-the-repository) describes the team's other parts: the simulator, the
 camera navigator, the inertial filter, the laser terrain study and the pitch.
 
