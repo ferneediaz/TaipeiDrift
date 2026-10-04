@@ -50,13 +50,19 @@ def plot_error_vs_time(folder: Path, point: str = "default", fname: str = "error
 
 
 def plot_sweep(folder: Path, key: str, xlabel: str, fname: str, xscale: float = 1.0, title: str = "",
-               filters: list[str] | None = None, xlog: bool = False) -> Path:
-    """Median post-burn-in RMSE (bootstrap 95 % CI) and divergence rate vs. a swept parameter."""
+               filters: list[str] | None = None, xlog: bool = False, fixed: dict | None = None) -> Path:
+    """Median post-burn-in RMSE (bootstrap 95 % CI) and divergence rate vs. a swept parameter.
+
+    ``fixed`` restricts the plot to sweep points with the given values of other swept keys.
+    """
     setup()
     rows = load_rows(folder)
+    if fixed:
+        rows = [r for r in rows if all(str(r[k]) == str(v) for k, v in fixed.items())]
     routes = list(dict.fromkeys(r["route"] for r in rows))
     filters = filters or list(dict.fromkeys(r["filter"] for r in rows))
-    summ = _summary(folder)
+    keep = {r["point"] for r in rows}
+    summ = [s for s in _summary(folder) if s["point"] in keep]
     xs_by_point = {r["point"]: float(r[key]) if not isinstance(r[key], str) else r[key] for r in rows}
     fig, axes = plt.subplots(2, len(routes), figsize=(4.8 * len(routes), 6.2), constrained_layout=True, squeeze=False)
     for j, route in enumerate(routes):
