@@ -485,9 +485,9 @@ How to read it:
   median and 69 m and 119 m at worst, the level of the ships alone. In neither flight was a camera reading used
   over open water, and the filter's speed error over the water rose from about 1 m/s (old sea) to 2 and 4 m/s:
   the ships' fixes hold the position roughly and the speed hardly at all.
-- **Which sea the simulator shows now depends on the machine.** Since commit 18bbbdd the generator builds the plain
-  glossy sea, but the world's version number was not raised: a copy of the islands generated before keeps the old
-  sea with its texture, a fresh checkout gets the new one. The video and the ten other flights used the old sea.
+- **The sea changed during the night.** Commit 18bbbdd made the generator build the plain glossy sea; the world's
+  version number was raised on Sunday morning (to 4), so every machine now builds it. The first video (take 2) and
+  the ten other flights of this table used the old sea with its texture.
 - **It stays bounded over five minutes.** In the 289 s flight our estimate was 6 to 22 m off in every window of
   30 s (44 m at worst), while the camera-only filter reached 95 m in the median and 341 m at worst, and the
   inertial sensors alone 3.5 km.
@@ -498,6 +498,30 @@ How to read it:
 - **The scoring is confirmed.** Dan's `sim/scripts/check_rf_nav.py`, written independently, ran alongside repeat 1:
   9.4 m median and 59.7 m worst for our filter, against 9.6 m and 60.5 m from our log over the same time; the two
   other estimates agree in the same way.
+
+**Sunday morning, 07:44 to 08:31: five more flights with Alessandro's sea, and what they changed.** With a sea
+without texture the ships' position has to be running before the drone reaches the water.
+
+| Flight (Alessandro's sea) | Ships transmit from | Ours over the water: median | worst | Whole stretch: median | worst |
+|---|---|---|---|---|---|
+| The flight of 03:00 | 41 s (the coast) | 27.5 m | 119 m | 22.2 m | 119 m |
+| Repeat | 41 s | 16.4 m | 89 m | 9.2 m | 89 m |
+| Repeat | 41 s | 19.5 m | 114 m | 12.0 m | 114 m |
+| Ships early | 20 s | 10.1 m | 44 m | 8.7 m | 44 m |
+| Ships early | 20 s | 7.1 m | 58 m | 6.2 m | 58 m |
+| Ships early, display at the coast | 20 s | 10.3 m | 102 m | 6.6 m | 102 m |
+
+- **Started at the coast, the ships' position is still settling during the crossing** (it needs about 20 s): 16 to
+  31 m in the median over the water and moments of 69 to 119 m, counting the matte test of the night. **Started at
+  20 s** it is 7 to 10 m in the median, as with the old sea, but the error still climbs late in the crossing, to 44
+  to 102 m for a few seconds, and comes back when the camera sees the second island. Over open water nothing but
+  the inertial sensors and a rough radio fix is left, and that shows.
+- **So the video's flight changed:** the ships transmit from 20 s, and the RF display opens at the coast through
+  the new launch option `rf_display_after_s` (`ais_start_s:=20 rf_display_after_s:=41` at the recording pace). The
+  world's `VERSION` is 4, so every machine builds Alessandro's sea.
+- One further flight of that morning was cut by the laptop going to sleep and is not counted. In all, seventeen
+  flights of the demo route are scored here: our estimate 3.9 to 28.4 m in the median, the inertial sensors alone
+  150 to 950 m off at the arrival.
 
 What this does not show: another coast, other ship positions or fewer than three ships, AIS switched off or
 falsified, real waves, night, a flight steered by the estimate, and sensors other than the assumed ones (the IMU's

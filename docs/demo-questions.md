@@ -1,7 +1,7 @@
 # Questions the demo video may raise
 
 For whoever stands in front of the jury. Each answer is short enough to say aloud, and every number comes from
-twelve logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
+seventeen logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
 of the video, tested on twelve flights"). State: Sunday 4 October, 02:50.
 
 ## If there are only twenty seconds
@@ -33,10 +33,10 @@ If they ask about the 24 m: the heading was 4 degrees off when GNSS went. One de
 The same flight with only the inertial sensors and the barometer, which every drone has. After about 55 s it is
 150 to 950 m away, depending on that flight's sensor noise; in the video 241 m. After five minutes it is 3.5 km.
 
-**5. Why does your error jump to 50 m over the water?**
-Over deep water the camera has nothing to track: in the video's flight every picture failed over the 90 m in the
-middle of the strait. There the estimate rests on the inertial sensors and the ships' radio, and a radio fix is
-rough, about 65 m in that flight. When the camera sees the island again, the error comes back down.
+**5. Why does your error jump to 50 or 100 m over the water?**
+Over open water the camera has nothing to track. There the estimate rests on the inertial sensors and the ships'
+radio, and a radio fix is rough, 30 to 65 m. Late in the crossing the error climbs for a few seconds, to between
+45 and 100 m in our flights, and comes back down when the camera sees the island again.
 
 **6. Then why the radio, if one fix is 30 to 65 m rough?**
 Because its error does not grow with time. The camera's speed is precise, but its small errors add up. In a flight
@@ -68,8 +68,9 @@ tested.
 **11. The sea in the video looks like a still picture. Real waves move.**
 Right. In the simulation the deep sea has almost no texture, so the camera gets nothing there, as over real water.
 Near the shore the seabed shows through and the simulated camera tracks it; real waves and glare would make that
-harder. We flew the hard case twice, a sea without any texture: then the estimate over water is at the radio's
-level, about 30 m off in the median and up to 120 m at worst.
+harder. We then flew the hard case seven times, a sea without any texture, and the new video uses it. With the
+ships' radio running before the drone leaves the coast the estimate over water is about 10 m off in the median,
+with moments of 45 to 100 m; with the radio starting only at the coast it is 16 to 31 m, with moments up to 120 m.
 
 **12. How long can it go without GNSS?**
 The video shows 53 s and 470 m. The longest flight was 289 s, about 2 km: 11 m off in the median, 44 m at worst,
