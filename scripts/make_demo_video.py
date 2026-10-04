@@ -80,9 +80,10 @@ class Flight:
         self.lost = first(o["gnss"] == 0)
         self.coast_a, self.coast_b = first(along > COAST_A_M), first(along > COAST_B_M)
         self.pad = first(along > math.hypot(*PAD_B) - 15.0)
-        # the first position from the ships' bearings after the drone has left island A (else 8 s after the coast)
+        # the first position from the ships' bearings over the water, at the earliest 8 s after the coast, so that
+        # the caption before it can be read
         fixes = [float(x["t"]) for x in rows if x["name"] == ships and float(x["t"]) >= self.coast_a]
-        self.first_fix = min(fixes[0], self.coast_b) if fixes else self.coast_a + 8.0
+        self.first_fix = min(max(fixes[0], self.coast_a + 8.0), self.coast_b) if fixes else self.coast_a + 8.0
         # how far off the ships' bearings alone were over the water, for the caption
         radio = [math.hypot(float(x["est_x"]) - float(x["gt_x"]), float(x["est_y"]) - float(x["gt_y"]))
                  for x in rows if x["name"] == ships and self.coast_a <= float(x["t"]) < self.coast_b]
@@ -105,7 +106,7 @@ class Flight:
             (self.lost, ["GNSS is lost. The drone keeps navigating on its own.",
                          "Over land a downward camera and a range finder measure its speed over the ground"]),
             (self.coast_a, ["Over open water the camera finds little to hold on to",
-                            "The drone listens for the ships' AIS radio: the RF window opens at the top right"]),
+                            "From here the ships' AIS radio carries the position: the RF window at the top right"]),
             (self.first_fix, ["Bearings to three ships give a position that does not drift",
                               "Each fix is rough, " + ("some tens of metres" if self.radio_median is None else
                                                        f"about {self.radio_median:.0f} m here")

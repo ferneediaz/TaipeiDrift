@@ -4,7 +4,9 @@ angles of arrival (AoA) of the packets, the gyro and a Kalman filter, with the b
 Started by `sim.launch.py` with the ships and demo:=true (the strait world), or by hand while the simulator runs:
     python3 sim/nodes/aoa_map.py --world strait
 The window opens when the first ship's bearing arrives, so it appears when the ships start transmitting
-(ais.start_after_s in config/rf.yaml).
+(ais.start_after_s in config/rf.yaml). With --rf-display-after-s T it opens no earlier than sim time T, for a flight
+in which the ships transmit from early on and the display should appear at a chosen moment (the drone leaving the
+coast).
 
 The window has three parts, written for someone who has not seen it before:
 - Left, the map of the strait: the three ships, the line from each ship along its last bearing, the drone's estimated
@@ -345,11 +347,14 @@ class AoaMap(Node):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--world", default="strait", help="for the latitude and longitude of the world origin")
+    ap.add_argument("--rf-display-after-s", type=float, default=0.0,
+                    help="open the window no earlier than this sim time (default: with the first bearing)")
     args, ros_args = ap.parse_known_args()
     rclpy.init(args=ros_args)
     node = AoaMap(args.world)
     try:
-        while not node.last:  # no window until a ship's bearing arrives (the ships start transmitting late)
+        # no window until a ship's bearing arrives (the ships start transmitting late), nor before the chosen time
+        while not node.last or node.truth is None or stamp_of(node.truth) < args.rf_display_after_s:
             rclpy.spin_once(node, timeout_sec=0.5)
         node.open_window()
         while plt.fignum_exists(node.fig.number):

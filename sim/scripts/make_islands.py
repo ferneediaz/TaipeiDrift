@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from make_trees import tree  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "models" / "islands"
-VERSION = "3"  # bump when the scenery changes, so --if-missing rebuilds old copies
+VERSION = "4"  # bump when the scenery changes, so --if-missing rebuilds old copies
 PAD_ASL = 4.0  # m: helipad tops above the sea; the sea surface is at z = -PAD_ASL
 
 # name, centre (x, y) in m, mean radius in m, highest ground in m above the sea,

@@ -6,7 +6,8 @@ Started by `sim.launch.py` with demo:=true, or by hand while the simulator runs:
 Until the first ship is heard there is no RF navigation display, and the window fills the whole right side of the
 desktop, its Overview with the live sensor readings and the AIS receiver's state below the rows. When a ship's
 bearing arrives (the ships start transmitting at ais.start_after_s, config/rf.yaml) the RF navigation display opens
-in the top right (nodes/aoa_map.py) and this window shrinks to the lower-right corner under it.
+in the top right (nodes/aoa_map.py) and this window shrinks to the lower-right corner under it; with
+--rf-display-after-s T both happen no earlier than sim time T.
 
 Tabs
     Overview      GNSS state; each estimator's position error against the truth, its own 2σ and whether the error is
@@ -131,8 +132,9 @@ class Chip(QtWidgets.QLabel):
 
 
 class Dashboard(QtWidgets.QWidget):
-    def __init__(self, feed, headline):
+    def __init__(self, feed, headline, rf_display_after_s=0.0):
         super().__init__()
+        self.rf_display_after_s = rf_display_after_s
         self.feed, self.headline = feed, headline
         self.setWindowTitle("Navigation dashboard")
         self.setStyleSheet(STYLE)
@@ -268,7 +270,8 @@ class Dashboard(QtWidgets.QWidget):
         for _ in range(400):  # drain the ROS queue: the IMU alone is 100 messages per simulated second
             rclpy.spin_once(self.feed, timeout_sec=0.0)
         f = self.feed
-        self.set_tall(not any(r["det"] for r in f.rf.values()))
+        # tall until the RF navigation display opens: with the first ship heard, and not before rf_display_after_s
+        self.set_tall(not any(r["det"] for r in f.rf.values()) or (f.sim_t or 0.0) < self.rf_display_after_s)
         self.update_banner()
         rows = self.navigation_rows()
         self.update_overview(rows)
@@ -408,8 +411,12 @@ class Dashboard(QtWidgets.QWidget):
         if self.tall:
             self.live.setText(html)
             sent = sum(r["sent"] for r in f.rf.values())
-            self.ais_state.setText("Listening on 161.975 and 162.025 MHz · no ship heard yet" +
-                                   (f" ({sent} packets too weak to decode)" if sent else ""))
+            heard = sum(1 for r in f.rf.values() if r["det"])
+            if heard:  # tall although ships are heard: the RF display waits for rf_display_after_s
+                self.ais_state.setText(f"{heard} ship{'s' if heard != 1 else ''} heard on 161.975 and 162.025 MHz")
+            else:
+                self.ais_state.setText("Listening on 161.975 and 162.025 MHz · no ship heard yet" +
+                                       (f" ({sent} packets too weak to decode)" if sent else ""))
 
     def update_ais(self):
         f = self.feed
@@ -436,10 +443,12 @@ def main():
     ap.add_argument("--world", default="strait", help="the world that runs, for the GPS origin")
     ap.add_argument("--headline", default="eskf_rf", choices=[k for k, *_ in ESTIMATORS],
                     help="the estimator the Overview leads with")
+    ap.add_argument("--rf-display-after-s", type=float, default=0.0,
+                    help="the RF navigation display opens no earlier than this sim time (as given to aoa_map.py)")
     args, ros_args = ap.parse_known_args()
     rclpy.init(args=ros_args)
     app = QtWidgets.QApplication([])
-    window = Dashboard(Feed(args.world), args.headline)
+    window = Dashboard(Feed(args.world), args.headline, args.rf_display_after_s)
     window.show()
     try:
         app.exec_()

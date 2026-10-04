@@ -17,8 +17,10 @@ ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_tra
          and shows the drone's down camera floating over the top left of the chase view;
          default (auto): in the strait world only
 ais_start_s   sim time when the ships start transmitting; the RF navigation display opens with their first
-         bearing. Default (config): ais.start_after_s of config/rf.yaml. The video's flight uses 41, the moment
-         the drone leaves island A
+         bearing. Default (config): ais.start_after_s of config/rf.yaml (20 s)
+rf_display_after_s   the RF navigation display opens no earlier than this sim time (default 0: with the first
+         bearing). The video's flight uses 41, the moment the drone leaves island A, with the ships transmitting
+         from 20 s: over a sea without texture their position has to settle before the water
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
          the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera then floats
          over the Gazebo window)
@@ -342,6 +344,7 @@ def setup(context):
     rf_when_flow_blind_s = float(LaunchConfiguration("rf_when_flow_blind_s").perform(context))
     flow_max_dt_s = float(LaunchConfiguration("flow_max_dt_s").perform(context))
     flow_soft_limit = float(LaunchConfiguration("flow_soft_limit").perform(context))
+    rf_display_after_s = str(float(LaunchConfiguration("rf_display_after_s").perform(context)))
     ais_start_s = LaunchConfiguration("ais_start_s").perform(context).strip().lower()
     if ais_start_s != "config":
         ais_start_s = str(float(ais_start_s))
@@ -518,12 +521,14 @@ def setup(context):
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
             # down camera floats over the Gazebo window and this slot shows the RF navigation display.
             TimerAction(period=20.0, actions=[
-                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem],
+                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem,
+                                    "--rf-display-after-s", rf_display_after_s],
                                output="screen", respawn=True, respawn_delay=2.0) if ships else
                 Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
             # the lower-right corner of the 1920 x 1080 desktop, under the RF navigation display: the navigation
             # dashboard window (monitor:=window) or the same information in a terminal (-0-0: right, bottom)
-            ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/nav_dashboard.py"), "--world", world.stem],
+            ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/nav_dashboard.py"), "--world", world.stem,
+                                "--rf-display-after-s", rf_display_after_s],
                            output="screen", respawn=True, respawn_delay=2.0) if monitor == "window" else
             ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "118x42-0-0", "-fa", "Monospace", "-fs", "8",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
@@ -562,6 +567,9 @@ def generate_launch_description():
         DeclareLaunchArgument("rf_when_flow_blind_s", default_value="0.0"),
         DeclareLaunchArgument("flow_max_dt_s", default_value="0.2"),
         DeclareLaunchArgument("flow_soft_limit", default_value="0.0"),
+        DeclareLaunchArgument("rf_display_after_s", default_value="0.0",
+                              description="the RF navigation display opens no earlier than this sim time "
+                                          "(default: with the first ship's bearing)"),
         DeclareLaunchArgument("ais_start_s", default_value="config",
                               description="sim time when the ships start transmitting (the RF display opens then); "
                                           "config: ais.start_after_s of config/rf.yaml"),
