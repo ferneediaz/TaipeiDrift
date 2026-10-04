@@ -12,16 +12,23 @@
 #                                                                world built before commit 18bbbdd, whose sea has a
 #                                                                texture; since then the generator builds it plain)
 #   DAN_CHECK_S=230 scripts/demo_flight_batch.sh r1              also run sim/scripts/check_rf_nav.py that long
+#   RECORD=1 scripts/demo_flight_batch.sh take3                  a take for the video: the simulator is slowed to
+#                                                                0.12 of real time (else the 3D view stutters) and
+#                                                                the desktop is captured into NAME/frames; about
+#                                                                16 minutes. Watch it at http://localhost:6080.
+#                                                                Then: python scripts/make_demo_video.py
+#                                                                outputs/demo/batch/take3 --out VIDEO.mp4 ...
 #
-# Logs go to outputs/demo/batch/NAME (estimators.csv, status.jsonl, sim.log); score them with
-# scripts/score_demo_flights.py. A flight ends when the drone has landed or after WALL_LIMIT_S seconds (default
-# 480). The simulator runs at its normal pace, about 0.4 of real time. A start that crashes (Gazebo's window does
-# now and then) is tried once more.
+# Logs go to outputs/demo/batch/NAME (estimators.csv, status.jsonl, sim.log); a folder of that name is replaced.
+# Score them with scripts/score_demo_flights.py. A flight ends when the drone has landed or after WALL_LIMIT_S
+# seconds (default 480; 1500 with RECORD=1). The simulator runs at its normal pace, about 0.4 of real time. A start that crashes or hangs (Gazebo
+# does both now and then) is tried once more.
 set -uo pipefail
 cd "$(dirname "$0")/../sim"
 NAME=$1
 EXTRA=${2:-}
-LIMIT=${3:-480}
+RECORD=${RECORD:-0}
+if [ "$RECORD" = 1 ]; then LIMIT=${3:-1500}; CLIMB_BY=420; else LIMIT=${3:-480}; CLIMB_BY=150; fi
 OUT=outputs/demo/batch/$NAME      # from the repository root, on the host and in the container
 DEMO="gnss_cutoff_s:=26 route:=crossing land:=true metric_flow:=true flow_min_range_m:=10 flow_update_every_n:=2 flow_max_dt_s:=0.5 flow_soft_limit:=9.21 vision_rotation:=false vision_direction:=false ais_start_s:=41"
 ORIGIN="-p gps_origin_latitude:=23.65 -p gps_origin_longitude:=119.85 -p gps_origin_elevation:=4.0"
@@ -52,19 +59,27 @@ fly() {
   if [ -n "${DAN_CHECK_S:-}" ]; then
     docker compose exec -d sim bash -ic "python3 sim/scripts/check_rf_nav.py $DAN_CHECK_S --out $OUT/dan_check > /tmp/check.log 2>&1"
   fi
+  # the world is up when the drone has been placed in it; Gazebo's server sometimes hangs before that
+  for _ in $(seq 1 60); do sim grep -q "Entity creation successful" /tmp/sim.log 2>/dev/null && break; sleep 1; done
+  if ! sim grep -q "Entity creation successful" /tmp/sim.log 2>/dev/null; then failed; return 1; fi
+  if [ "$RECORD" = 1 ]; then
+    sim bash -ic 'gz service -s /world/strait/set_physics --reqtype gz.msgs.Physics --reptype gz.msgs.Boolean --timeout 3000 --req "max_step_size: 0.001, real_time_factor: 0.12"' >/dev/null 2>&1
+    docker compose exec -d sim bash -ic "python3 sim/scripts/capture_desktop.py --out $OUT/frames --fps 60 --max-s 1500 > /tmp/capture.log 2>&1"
+    say "recording: the simulator runs at 0.12 of real time, the desktop is captured into $OUT/frames"
+  fi
   local start=$SECONDS
   while [ $((SECONDS - start)) -lt "$LIMIT" ]; do
     sleep 10
     if sim grep -q "landed" /tmp/sim.log 2>/dev/null; then break; fi
     if sim grep -q "Segmentation fault\|Traceback" /tmp/sim.log 2>/dev/null; then failed; return 1; fi
-    if [ $((SECONDS - start)) -gt 150 ] && ! sim grep -q "at height" /tmp/sim.log 2>/dev/null; then failed; return 1; fi
+    if [ $((SECONDS - start)) -gt "$CLIMB_BY" ] && ! sim grep -q "at height" /tmp/sim.log 2>/dev/null; then failed; return 1; fi
   done
-  sleep 8
+  if [ "$RECORD" = 1 ]; then sleep 30; else sleep 8; fi      # a few seconds on the ground at the end
   if [ -n "${DAN_CHECK_S:-}" ]; then
     for _ in $(seq 1 30); do sim pgrep -f "[c]heck_rf_nav.py" >/dev/null 2>&1 || break; sleep 5; done
     sim cat /tmp/check.log > "../$OUT/dan_check.txt" 2>/dev/null
   fi
-  sim bash -c 'pkill -INT -f "[l]og_two_estimators.py"; pkill -INT -f "[l]og_estimator_status.py"; sleep 2'
+  sim bash -c 'pkill -INT -f "[c]apture_desktop.py"; pkill -INT -f "[l]og_two_estimators.py"; pkill -INT -f "[l]og_estimator_status.py"; sleep 2'
   sim cat /tmp/sim.log > "../$OUT/sim.log" 2>/dev/null
   return 0
 }
@@ -80,4 +95,4 @@ if ! fly; then
   fly || say "FAILED twice"
 fi
 restart
-say "done: $(wc -l < "../$OUT/estimators.csv" 2>/dev/null | tr -d ' ') log rows, $(grep -o 'landed, [0-9.]* m from the pad centre' "../$OUT/sim.log" 2>/dev/null || echo 'no landing')"
+say "done: $(wc -l < "../$OUT/estimators.csv" 2>/dev/null | tr -d ' ') log rows, $(grep -o 'landed, [0-9.]* m from the pad centre' "../$OUT/sim.log" 2>/dev/null || echo 'no landing')$([ "$RECORD" = 1 ] && echo ", $(ls "../$OUT/frames" 2>/dev/null | wc -l | tr -d ' ') frames")"
