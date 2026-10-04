@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated: Sunday 4 October 2026, 08:58. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
+Last updated: Sunday 4 October 2026, 09:05. Code freeze Sunday 10:00, deck due Sunday 12:00, pitch 13:00.
 
 ## Resume here
 
@@ -9,7 +9,7 @@ Last updated: Sunday 4 October 2026, 08:58. Code freeze Sunday 10:00, deck due S
 - **Dustin records the new video himself** (decided 03:10): `RECORD=1 scripts/demo_flight_batch.sh take3` (about 16 minutes, lid open, laptop awake), then the cut command in the block below with `outputs/demo/batch/take3`. The setup changed after five more test flights (table in `docs/simulation-results.md`): Alessandro's sea without texture (world `VERSION` 4), the ships transmitting from 20 s, the RF display opening at the coast (`rf_display_after_s:=41`, new launch option; default of the runner). Expect 7 to 10 m over water in the median and a peak of 45 to 100 m late in the crossing. After the take: update `docs/pitch-offline/assets/demo.mp4`, `demo/TaipeiDrift_demo_pitch_720p.mp4` and the numbers in the deck's demo notes.
 - **The deck** is Dustin's Slides artifact, https://claude.ai/artifact/RLNDUb3edxoLJz9gdJyDdW (private). On his word that morning Claude cut it to one story (mentor: pick one thing, do it well, say what comes next and what it takes): the one thing is navigation by camera on land, the water crossing by ships' radio is the outlook. Main pitch, 8 slides: cover, problem, solution, demo card, demo video, results on land (3 km against 12 and 32 m, one line for the 3.3 m replay), next and what it takes, close (ask and business line). Backup: limits, the replay on real photos, the four bars, cost, alternatives, market, competition, position, computing; "dependence" removed. Still open in the deck: the new video and its numbers, and a link to the video (the organisers require one; where it is hosted is undecided).
 - **To check with Alessandro:** his NTU VIRAL transfer run (Nanyang, Singapore; forward camera only) has no numbers in the repository; do not put that dataset on a slide without them.
-- **Pull request 8** (`integration` into `main`) is still open and waits for Dustin's word; it now carries Alessandro's sea with the version raised, the display option and the test results.
+- **Pull request 8 is merged** (Sunday 09:04, on Dustin's word; merge commit 4972424): `main` holds everything up to then, with Alessandro's sea and the version raised, the display option, the test flights and the question list. 304 tests and the 23 simulator tests passed on its head. The video in `main` (`demo/` and `docs/pitch-offline/assets/demo.mp4`) is still the first take, with the old sea; the new take replaces it. Work continues on `integration`; the next pull request again needs Dustin's word.
 - The laptop sleeping (lid closed) freezes the simulator: one test flight was lost that way.
 
 **THE DEMO VIDEO IS DONE AND TESTED, as of Sunday 4 October 03:05 (read this first). Dustin builds the presentation himself: do not touch `PPT/` unless he asks.**
