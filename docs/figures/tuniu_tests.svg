@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="760" viewBox="0 0 1500 760" font-family="Helvetica, Arial, sans-serif" font-size="19">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#111"/>
+    </marker>
+  </defs>
+  <rect width="1500" height="760" fill="#fff"/>
+  <g fill="#fff" stroke="#111" stroke-width="2">
+    <rect x="40" y="170" width="260" height="90" rx="6"/>
+    <rect x="380" y="40" width="420" height="90" rx="6"/>
+    <rect x="380" y="170" width="420" height="90" rx="6"/>
+    <rect x="380" y="300" width="420" height="90" rx="6" stroke-dasharray="7 5"/>
+    <rect x="880" y="105" width="250" height="90" rx="6" stroke-width="3"/>
+    <rect x="1190" y="105" width="270" height="90" rx="6"/>
+    <rect x="880" y="300" width="250" height="90" rx="6" stroke-dasharray="7 5"/>
+    <rect x="1190" y="300" width="270" height="90" rx="6"/>
+  </g>
+  <g fill="#111" text-anchor="middle">
+    <text x="170" y="208" font-weight="bold">Real flight</text>
+    <text x="170" y="234" font-size="16">271 photos + RTK GPS</text>
+    <text x="590" y="76" font-weight="bold">Photos 1–46 · GPS on</text>
+    <text x="590" y="102" font-size="16">→ calibration: camera mounting, map</text>
+    <text x="590" y="121" font-size="16">offset, noise of every measurement</text>
+    <text x="590" y="206" font-weight="bold">Photos 47–271 · GPS off</text>
+    <text x="590" y="232" font-size="16">→ the test: 4 km, nothing tuned on it</text>
+    <text x="590" y="336" font-weight="bold">The drone's RTK GPS = the truth</text>
+    <text x="590" y="362" font-size="16">set aside, never given to the system</text>
+    <text x="1005" y="143" font-weight="bold">Our system</text>
+    <text x="1005" y="169" font-size="16">the loop</text>
+    <text x="1325" y="143" font-weight="bold">Position estimates</text>
+    <text x="1325" y="169" font-size="16">one per photo</text>
+    <text x="1005" y="338" font-weight="bold">Referee</text>
+    <text x="1005" y="364" font-size="16">compares, afterwards</text>
+    <text x="1325" y="331" font-weight="bold">Metrics</text>
+    <text x="1325" y="355" font-size="15">median error · wrong fixes</text>
+    <text x="1325" y="374" font-size="15">(&gt; 10 m) · map lost</text>
+  </g>
+  <g stroke="#111" stroke-width="2" fill="none" marker-end="url(#a)">
+    <path d="M300,215 L340,215 L340,85 L376,85"/>
+    <line x1="300" y1="215" x2="376" y2="215"/>
+    <path d="M340,215 L340,345 L376,345"/>
+    <path d="M800,85 L840,85 L840,130 L876,130"/>
+    <path d="M800,215 L840,215 L840,170 L876,170"/>
+    <line x1="1130" y1="150" x2="1186" y2="150"/>
+    <path d="M1325,195 L1325,250 L1005,250 L1005,296"/>
+    <line x1="800" y1="345" x2="876" y2="345"/>
+    <line x1="1130" y1="345" x2="1186" y2="345"/>
+  </g>
+
+  <text x="40" y="455" font-size="21" font-weight="bold" fill="#111">The safeguards: each one answers an objection</text>
+  <g fill="#fff" stroke="#111" stroke-width="2">
+    <rect x="40" y="480" width="460" height="120" rx="6"/>
+    <rect x="520" y="480" width="460" height="120" rx="6"/>
+    <rect x="1000" y="480" width="460" height="120" rx="6"/>
+    <rect x="40" y="620" width="460" height="120" rx="6"/>
+    <rect x="520" y="620" width="460" height="120" rx="6"/>
+    <rect x="1000" y="620" width="460" height="120" rx="6"/>
+  </g>
+  <g fill="#111" font-size="16">
+    <text x="58" y="510" font-size="18" font-weight="bold">Rules in git BEFORE the test</text>
+    <text x="58" y="536" font-style="italic">“You tuned it on the answers”</text>
+    <text x="58" y="562">method, thresholds and pass criteria dated</text>
+    <text x="58" y="584">by git before the first result</text>
+
+    <text x="538" y="510" font-size="18" font-weight="bold">20 repeats (seeds)</text>
+    <text x="538" y="536" font-style="italic">“It was luck”</text>
+    <text x="538" y="562">barometer noise drawn 20 times:</text>
+    <text x="538" y="584">20 of 20 hold, 3.3 m median</text>
+
+    <text x="1018" y="510" font-size="18" font-weight="bold">Decoys</text>
+    <text x="1018" y="536" font-style="italic">“It always says it found the place”</text>
+    <text x="1018" y="562">each photo also tried on 3 areas more than</text>
+    <text x="1018" y="584">300 m away: 4 accepted out of 12,825</text>
+
+    <text x="58" y="650" font-size="18" font-weight="bold">Baselines</text>
+    <text x="58" y="676" font-style="italic">“3.3 m compared with what?”</text>
+    <text x="58" y="702">without map fixes: 54 m · chance: 32 m</text>
+    <text x="58" y="724">(same photos, same code)</text>
+
+    <text x="538" y="650" font-size="18" font-weight="bold">Anti-cheat tests</text>
+    <text x="538" y="676" font-style="italic">“It secretly sees the truth”</text>
+    <text x="538" y="702">truth removed → same result · map shifted</text>
+    <text x="538" y="724">30 m → position too · wrong map → 0 fixes</text>
+
+    <text x="1018" y="650" font-size="18" font-weight="bold">Independent audit + rerun</text>
+    <text x="1018" y="676" font-style="italic">“Your numbers are wrong”</text>
+    <text x="1018" y="702">another script recomputes everything from the</text>
+    <text x="1018" y="724">raw log: ALL PASS · seed 0 rerun: 0.0 m apart</text>
+  </g>
+</svg>

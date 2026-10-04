@@ -8,6 +8,8 @@ This branch (`research/offline-nav-evidence`) holds the whole team's work, merge
 result measured on **real drone photos**: a drone keeps its position within a few metres over 4 km after GNSS is
 cut, by matching its own camera pictures against a map stored on board. This README explains that result from
 end to end: the data, the method, how we kept it honest, the numbers, the limits, and how to rerun everything.
+For every building block explained in detail (settings, why each choice, what was ruled out) and the questions a
+jury is likely to ask, read [`docs/research/tuniu-how-it-works.md`](docs/research/tuniu-how-it-works.md).
 [The rest of the repository](#the-rest-of-the-repository) describes the team's other parts: the simulator, the
 camera navigator, the inertial filter, the laser terrain study and the pitch.
 
@@ -326,7 +328,8 @@ All real-flight code is in `experiments/`, one script per stage. Run from the re
 | `x10_tuniu_splats_prep.py` | Exports the reconstruction for Gaussian-splat training (Brush) |
 | `x10_jury_replay.py` | The replay video and its number check |
 
-Results documents, all in [`docs/research/`](docs/research/): `tuniu-team-explainer.md` (plain-language overview),
+Results documents, all in [`docs/research/`](docs/research/): `tuniu-how-it-works.md` (every block explained, test
+protocol, jury questions), `tuniu-team-explainer.md` (plain-language overview of step 1),
 `tuniu-step1-results.md`, `tuniu-level2-results.md`, `tuniu-anti-cheat.md`, `tuniu-twin-results.md`, and their
 pre-registrations `tuniu-consensus-prereg.md`, `tuniu-level2-prereg.md`, `tuniu-level2-odm-prereg.md`,
 `tuniu-twin-prereg.md`.

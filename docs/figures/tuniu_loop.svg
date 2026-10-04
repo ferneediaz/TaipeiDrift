@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="800" viewBox="0 0 1500 800" font-family="Helvetica, Arial, sans-serif" font-size="19">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#111"/>
+    </marker>
+  </defs>
+  <rect width="1500" height="800" fill="#fff"/>
+  <g fill="#fff" stroke="#111" stroke-width="2">
+    <rect x="40" y="50" width="250" height="80" rx="6"/>
+    <rect x="380" y="50" width="440" height="80" rx="6"/>
+    <rect x="40" y="210" width="440" height="80" rx="6"/>
+    <rect x="600" y="210" width="420" height="80" rx="6"/>
+    <rect x="1100" y="210" width="340" height="80" rx="6" stroke-dasharray="7 5"/>
+    <rect x="40" y="370" width="440" height="80" rx="6"/>
+    <rect x="600" y="370" width="195" height="80" rx="6"/>
+    <rect x="825" y="370" width="195" height="80" rx="6"/>
+    <polygon points="810,495 1000,570 810,645 620,570"/>
+    <rect x="1100" y="530" width="340" height="80" rx="6" stroke-dasharray="7 5"/>
+    <rect x="40" y="700" width="1000" height="80" rx="6" stroke-width="3"/>
+  </g>
+  <g fill="#111" text-anchor="middle">
+    <text x="165" y="86" font-weight="bold">Photo n</text>
+    <text x="165" y="111" font-size="16">one every 2.8 s</text>
+    <text x="600" y="83" font-weight="bold">1. Flatten the photo</text>
+    <text x="600" y="107" font-size="16">top-down view, north up, 0.5 m per pixel</text>
+    <text x="600" y="125" font-size="14">DJI camera angles · height = barometer − terrain</text>
+    <text x="260" y="243" font-weight="bold">2. Visual odometry</text>
+    <text x="260" y="269" font-size="16">ZNCC between photo n and photo n−1 → motion</text>
+    <text x="260" y="403" font-weight="bold">Prediction</text>
+    <text x="260" y="429" font-size="16">previous position + motion · uncertainty ↑</text>
+    <text x="810" y="243" font-weight="bold">3. Cut out the map</text>
+    <text x="810" y="269" font-size="16">around OUR estimate · 45 to 120 m</text>
+    <text x="1270" y="243" font-weight="bold">Map on board</text>
+    <text x="1270" y="269" font-size="16">another flight, Dec 2019</text>
+    <text x="697" y="406" font-weight="bold">ZNCC</text>
+    <text x="697" y="430" font-size="15">pixel correlation</text>
+    <text x="922" y="406" font-weight="bold">XFeat</text>
+    <text x="922" y="430" font-size="15">keypoints (small network)</text>
+    <text x="810" y="563" font-weight="bold">4. Agree within</text>
+    <text x="810" y="586" font-weight="bold">4 m?</text>
+    <text x="810" y="608" font-size="14">+ consistent (χ² gate 99 %)</text>
+    <text x="1270" y="563" font-size="17" font-weight="bold">No map fix</text>
+    <text x="1270" y="588" font-size="16">keep the prediction alone</text>
+    <text x="540" y="733" font-weight="bold">5. Kalman filter → position estimate n</text>
+    <text x="540" y="759" font-size="16">prediction and fix weighted by their uncertainties · also estimates the heading error</text>
+  </g>
+  <g stroke="#111" stroke-width="2" fill="none" marker-end="url(#a)">
+    <line x1="290" y1="90" x2="376" y2="90"/>
+    <path d="M500,130 L500,170 L260,170 L260,206"/>
+    <path d="M700,130 L700,170 L810,170 L810,206"/>
+    <line x1="260" y1="290" x2="260" y2="366"/>
+    <line x1="1100" y1="270" x2="1024" y2="270"/>
+    <path d="M760,290 L760,330 L697,330 L697,366"/>
+    <path d="M860,290 L860,330 L922,330 L922,366"/>
+    <line x1="697" y1="450" x2="739" y2="521"/>
+    <line x1="922" y1="450" x2="881" y2="521"/>
+    <line x1="1000" y1="570" x2="1096" y2="570"/>
+    <line x1="810" y1="645" x2="810" y2="696"/>
+    <line x1="260" y1="450" x2="260" y2="696"/>
+  </g>
+  <g stroke="#111" stroke-width="2" fill="none" stroke-dasharray="8 6" marker-end="url(#a)">
+    <path d="M1040,740 L1480,740 L1480,185 L1060,185 L1060,230 L1024,230"/>
+    <path d="M1480,185 L1480,25 L165,25 L165,46"/>
+  </g>
+  <g fill="#111" font-size="15">
+    <text x="1010" y="560">no</text>
+    <text x="820" y="678">yes: map fix</text>
+    <text x="270" y="680">always</text>
+    <text x="1110" y="178">centre of the next search window</text>
+    <text x="720" y="19">next photo (n+1)</text>
+  </g>
+</svg>
