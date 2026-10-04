@@ -18,6 +18,8 @@ ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_tra
          default (auto): in the strait world only
 ais_start_s   sim time when the ships start transmitting; the RF navigation display opens with their first
          bearing. Default (config): ais.start_after_s of config/rf.yaml (20 s)
+dashboard_rows   all (default): the dashboard's Overview shows the fused estimate, the ships alone and the filter
+         without the ships; headline: only the fused estimate, as in the video
 rf_display_after_s   the RF navigation display opens no earlier than this sim time (default 0: with the first
          bearing). The video's flight uses 41, the moment the drone leaves island A, with the ships transmitting
          from 20 s: over a sea without texture their position has to settle before the water
@@ -345,6 +347,9 @@ def setup(context):
     flow_max_dt_s = float(LaunchConfiguration("flow_max_dt_s").perform(context))
     flow_soft_limit = float(LaunchConfiguration("flow_soft_limit").perform(context))
     rf_display_after_s = str(float(LaunchConfiguration("rf_display_after_s").perform(context)))
+    dashboard_rows = LaunchConfiguration("dashboard_rows").perform(context).strip().lower()
+    if dashboard_rows not in ("all", "headline"):
+        sys.exit("dashboard_rows must be all or headline")
     ais_start_s = LaunchConfiguration("ais_start_s").perform(context).strip().lower()
     if ais_start_s != "config":
         ais_start_s = str(float(ais_start_s))
@@ -528,7 +533,8 @@ def setup(context):
             # the lower-right corner of the 1920 x 1080 desktop, under the RF navigation display: the navigation
             # dashboard window (monitor:=window) or the same information in a terminal (-0-0: right, bottom)
             ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/nav_dashboard.py"), "--world", world.stem,
-                                "--rf-display-after-s", rf_display_after_s],
+                                "--rf-display-after-s", rf_display_after_s,
+                                *(["--only-headline"] if dashboard_rows == "headline" else [])],
                            output="screen", respawn=True, respawn_delay=2.0) if monitor == "window" else
             ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "118x42-0-0", "-fa", "Monospace", "-fs", "8",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
@@ -567,6 +573,9 @@ def generate_launch_description():
         DeclareLaunchArgument("rf_when_flow_blind_s", default_value="0.0"),
         DeclareLaunchArgument("flow_max_dt_s", default_value="0.2"),
         DeclareLaunchArgument("flow_soft_limit", default_value="0.0"),
+        DeclareLaunchArgument("dashboard_rows", default_value="all",
+                              description="all: one row per estimator on the dashboard's Overview; headline: only the "
+                                          "fused estimate's row (the video)"),
         DeclareLaunchArgument("rf_display_after_s", default_value="0.0",
                               description="the RF navigation display opens no earlier than this sim time "
                                           "(default: with the first ship's bearing)"),

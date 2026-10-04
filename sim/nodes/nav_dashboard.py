@@ -132,9 +132,10 @@ class Chip(QtWidgets.QLabel):
 
 
 class Dashboard(QtWidgets.QWidget):
-    def __init__(self, feed, headline, rf_display_after_s=0.0):
+    def __init__(self, feed, headline, rf_display_after_s=0.0, only_headline=False):
         super().__init__()
         self.rf_display_after_s = rf_display_after_s
+        self.only_headline = only_headline      # the Overview shows the headline estimator's row alone
         self.feed, self.headline = feed, headline
         self.setWindowTitle("Navigation dashboard")
         self.setStyleSheet(STYLE)
@@ -205,7 +206,9 @@ class Dashboard(QtWidgets.QWidget):
                 g.setColumnMinimumWidth(col, width)
             g.setColumnStretch(len(ROW_COLUMNS) - 1, 1)
             self.cards[key] = c
-            lay.addWidget(frame, 1)
+            lay.addWidget(frame, 0 if self.only_headline else 1)
+            if self.only_headline and key != self.headline:
+                frame.hide()
         chips = QtWidgets.QHBoxLayout()
         self.chips = {k: Chip() for k in ("imu", "baro", "cam", "gps", "ais")}
         for c in self.chips.values():
@@ -225,6 +228,8 @@ class Dashboard(QtWidgets.QWidget):
         self.extra = card(label("AIS RECEIVER", "caption"), self.ais_state, label("", "caption"),
                           label("LIVE SENSORS", "caption"), self.live, stretch=True)
         lay.addWidget(self.extra, 4)
+        if self.only_headline:
+            lay.addStretch(1)                   # the one row stays compact; the free room is below
         return page
 
     def table_tab(self):
@@ -445,10 +450,12 @@ def main():
                     help="the estimator the Overview leads with")
     ap.add_argument("--rf-display-after-s", type=float, default=0.0,
                     help="the RF navigation display opens no earlier than this sim time (as given to aoa_map.py)")
+    ap.add_argument("--only-headline", action="store_true",
+                    help="the Overview shows only the headline estimator's row (the other two stay in the Navigation tab)")
     args, ros_args = ap.parse_known_args()
     rclpy.init(args=ros_args)
     app = QtWidgets.QApplication([])
-    window = Dashboard(Feed(args.world), args.headline, args.rf_display_after_s)
+    window = Dashboard(Feed(args.world), args.headline, args.rf_display_after_s, args.only_headline)
     window.show()
     try:
         app.exec_()
