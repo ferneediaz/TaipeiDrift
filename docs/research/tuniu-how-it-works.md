@@ -49,9 +49,13 @@ and the question it is likely to raise.
 | Terrain | Real | Copernicus GLO-30: one height every 30 m. |
 | Map on board | Real, another flight | OpenAerialMap orthophoto of 12 December 2019, made from another **drone** flight, not a satellite (3.5 cm per pixel, CC BY 4.0), resampled to 0.5 m per pixel. Its georeference is about 2 m off (+2.0 m east, −0.3 m north); that offset is measured on the first 46 photos. |
 
-**Likely question: "Why not a satellite image?"** Free satellite images are too coarse (Sentinel-2: 10 m per pixel,
-our whole error budget) or do not cover Taiwan. Working at 0.5 m per pixel matches a good commercial satellite, but
-our map comes from a drone and is sharper: a real satellite image would be harder. Not tested yet.
+**Likely question: "Where would the map come from in a real mission? A satellite?"** For Taiwan, no satellite is
+needed: the national surveying agency (NLSC) publishes an aerial orthophoto of the whole island, about 0.27 m per
+pixel, as an open tile service, with its website data under the Open Government Data License (OGDL-Taiwan 1.0).
+Whether bulk offline use of those tiles is covered still has to be confirmed. Free satellite images are too coarse
+(Sentinel-2: 10 m per pixel, our whole error budget). Our test map is a drone orthophoto, 8 months after the flight,
+used at 0.5 m per pixel. The national orthophoto is finer, but older and taken from a plane in other light, so it
+may be harder. Not tested yet.
 
 ### Block 1 · Flatten the photo
 
