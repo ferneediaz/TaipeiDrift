@@ -33,7 +33,7 @@ EXTRA=${2:-}
 RECORD=${RECORD:-0}
 if [ "$RECORD" = 1 ]; then LIMIT=${3:-1500}; CLIMB_BY=420; else LIMIT=${3:-480}; CLIMB_BY=150; fi
 OUT=outputs/demo/batch/$NAME      # from the repository root, on the host and in the container
-DEMO="gnss_cutoff_s:=26 route:=crossing land:=true metric_flow:=true flow_min_range_m:=10 flow_update_every_n:=2 flow_max_dt_s:=0.5 flow_soft_limit:=9.21 vision_rotation:=false vision_direction:=false ais_start_s:=20 rf_display_after_s:=41"
+DEMO="gnss_cutoff_s:=26 route:=crossing land:=true metric_flow:=true flow_min_range_m:=10 flow_update_every_n:=2 flow_max_dt_s:=0.5 flow_soft_limit:=9.21 vision_rotation:=false vision_direction:=false ais_start_s:=20 rf_display_after_s:=41 dashboard_rows:=headline"
 ORIGIN="-p gps_origin_latitude:=23.65 -p gps_origin_longitude:=119.85 -p gps_origin_elevation:=4.0"
 SEA=models/islands/materials/textures/sea.jpg
 
