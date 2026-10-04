@@ -298,23 +298,28 @@ truth. Details: [`tuniu-anti-cheat.md`](tuniu-anti-cheat.md).
 
 ## 5. Jury questions, with answers
 
-| Question | Answer |
+How to answer in 20 seconds: a number first ("We measured it: …"), one sentence of explanation, then the limit in
+our own words ("That's a limit we state ourselves: …"). If it was not tested, say so: "We haven't tested that yet;
+the next step is …".
+
+| Question | Answer to give |
 |---|---|
-| How do you know it is not faked? | Hide the truth: same result. Shift the map 30 m: our position shifts 30 m. Wrong map: zero map fixes. |
-| Why a 2019 flight and not your own? | We have no drone of our own. A published flight with centimetre RTK is a reference anyone can check. |
-| 3.3 m compared with what? | The same system with map fixes switched off: 54 m. Chance: 32 m. |
-| The heading comes from DJI's GPS? | Yes, our main limit. With a simulated heading drift of up to 7° we stay at 3.2 m, but three wrong map fixes get through. |
-| Your barometer is simulated: how do we know it isn't fake? | It is simulated, and labelled so; its noise is fitted on a real barometer log. With a barometer 3 times worse we get 4.5 m instead of 3.2 m; 5 times worse breaks it (9 m, the map lost in 3 seeds of 5). |
-| What about the forest? | Up to 81 s without a map fix, 20 to 40 m of drift, then it locks back on, with no wrong fix. |
-| And the turns? | Our worst case (14.5 m median in turns against 2.7 m on straight legs). Gyroscopes are the obvious fix, not tested yet. |
-| Does it run in real time? | The two map matchers take 0.27 s per photo on one laptop core, with a photo every 2.8 s. Not measured on an onboard computer yet. |
-| Why two methods? | XFeat alone accepts 65 wrong positions; requiring both methods to agree leaves 1 in 1,290. |
-| Why a Kalman filter? | After the cut the position is known to 1 m, so there is one hypothesis to track: simple, fast, and it gives the uncertainty that sizes the search. |
-| 0 wrong out of 1,646, really? | Yes, but it is the same photos replayed 20 times, so the real guarantee is weaker than the number suggests. |
-| Does the drone steer with your position? | No, it is a replay: our system says where the drone is, it does not fly it. Steering in the digital twin is the next step. |
-| Does it work elsewhere? | Not tested yet. A second site with frozen settings is the next test. |
-| What is your simulation for? | We checked it against the real flight (2.8 m against 3.2 m), so we know how far to trust it for what one flight cannot vary: more photos, another altitude, and soon steering. |
-| How do you compare with the team's simulator result (18 m)? | We do not compare them: different data. They are two different demonstrations. |
+| How do you know it isn't faked? | We built three tests a cheater would fail. We removed the truth files: same result. We shifted the map 30 metres east: our position moved 30 metres east. We gave it the wrong map: zero map fixes. So the position comes from the map, not from hidden GPS. |
+| Why a 2019 flight and not your own data? | We had no drone of our own, so we used a real flight published by its pilot, with centimetre-level RTK GPS. Anyone can download it and check our numbers. |
+| 3.3 metres compared with what? | Compared with the same system with map fixes switched off: 54 metres, and 163 metres at the end of the flight. A random guess gives 32 metres. |
+| Your barometer is simulated. How do we know it isn't fake? | It is simulated, and we label it everywhere, because the DJI photos don't store the raw barometer. Its noise is fitted on a real barometer log. We also stress-tested it: with a barometer three times worse we get 4.5 metres instead of 3.2; it only breaks at five times worse. |
+| The heading comes from DJI, with GPS on. Isn't that cheating? | That's a limit we state ourselves, our main one. With a simulated heading drift of up to 7 degrees we stay at 3.2 metres and never lose the map, but three wrong fixes get through, the worst about 17 metres off. |
+| Where would the map come from in a real mission? A satellite? | Our test map is a drone orthophoto from another flight, eight months later. For Taiwan, the national surveying agency publishes an aerial orthophoto of the whole island at about 0.27 metres per pixel, under an open licence. It is finer than what we use, but older, and we haven't tested it yet. |
+| What happens over forest? | Trees all look alike, so there are gaps of up to 81 seconds without a map fix. The error grows to 20 or 40 metres, then the system locks back on when it sees roads or roofs. It never accepted a wrong fix there. |
+| What about turns? | Turns are our worst case: 14.5 metres median in turns against 2.7 on straight legs, because two photos barely overlap when the camera rotates. Gyroscopes are the obvious fix; we haven't tested that yet. |
+| Does it run in real time, on board? | We measured 0.25 seconds per photo for the whole loop on one laptop CPU core, with a photo every 2.8 seconds. We haven't measured it on an onboard computer like a Jetson yet. |
+| Why two matching methods? | One alone makes too many mistakes: the neural matcher alone accepted 65 wrong positions. The two methods fail for different reasons, so requiring them to agree within 4 metres brought it down to 1 in 1,290. |
+| Why a Kalman filter, not a particle filter or end-to-end deep learning? | When GPS is lost we know where we are to within a metre, so there is a single hypothesis to track. A Kalman filter is simple, fast and explainable, and it gives the uncertainty that sizes the search on the map. The only learned part is a small off-the-shelf matcher, used as is. |
+| Zero wrong fixes out of 1,646. Really? | Yes, but to be fair it is the same photos replayed twenty times, and they overlap, so the real guarantee is weaker than the number suggests. It needs more flights. |
+| Does the drone actually steer with your position? | No. This is a replay: our system says where the drone is; it doesn't fly it. Closing that loop is the next step, in the digital twin, because a recording can't react. |
+| Would it work anywhere else? | We don't know yet: one flight, one site, daylight. The next test is a second site with every setting frozen. |
+| What is your simulation for, if you have real data? | We replayed the same flight in a 3D model of the site, with the same code, and it matched reality on four criteria fixed in advance: 2.8 metres against 3.2. So we know how far to trust it for what one recorded flight can't vary: more photos per second, another altitude, and soon steering. |
+| How does this compare with the 18 metres of your simulator? | They are not comparable: different data, different flights, different camera. They are two separate demonstrations. |
 
 ## 6. Glossary
 
