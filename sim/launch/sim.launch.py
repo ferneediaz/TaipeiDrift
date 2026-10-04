@@ -14,13 +14,19 @@ stereo_baseline_m   right camera offset along body -Y, in metres
 wind                SPEED_MPS,FROM_DEG, for example 6,20: 6 m/s from the north-north-east, with gusts
 ships    true sails the AIS-transmitting ships of config/rf.yaml (nodes/ship_traffic.py), runs the drone's
          AIS receiver and direction finder (nodes/rf_sensor.py) and the triangulation navigator (nodes/rf_nav.py),
-         adds a fixed overview camera, shown as a panel beside the chase view in the Gazebo window, and a red
-         beacon over the drone so the overview shows where it is;
+         and shows the drone's down camera floating over the top left of the chase view;
          default (auto): in the strait world only
+ais_start_s   sim time when the ships start transmitting; the RF navigation display opens with their first
+         bearing. Default (config): ais.start_after_s of config/rf.yaml (20 s)
+rf_display_after_s   the RF navigation display opens no earlier than this sim time (default 0: with the first
+         bearing). The video's flight uses 41, the moment the drone leaves island A, with the ships transmitting
+         from 20 s: over a sea without texture their position has to settle before the water
 demo     true flies the drone (circles; island to island in islands and strait, nodes/demo_flight.py), and opens
-         the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera is then a panel
-         in the Gazebo window)
+         the down-camera view (with the ships: the RF navigation display, nodes/aoa_map.py; the down camera then floats
+         over the Gazebo window)
          and the navigation dashboard (nodes/nav_dashboard.py) on the desktop
+route    with demo: auto (pads in islands and strait: to island B and back, again and again), crossing (to island B
+         once), survey; land:=true then settles onto island B's helipad (the demo flight for the video)
 monitor  with demo: window (default) opens the navigation dashboard; terminal opens the same information in a
          terminal (nodes/sensor_monitor.py)
 gnss_cutoff_s     seconds after the first raw GPS fix when the GNSS gate closes (nodes/gnss_gate.py); negative: never
@@ -102,10 +108,8 @@ def windy_world(world: Path, speed_mps: float, from_deg: float) -> Path:
     return out
 
 
-# The strait world's overview camera, shown as a panel in the Gazebo window (a gz topic, not bridged to ROS)
-OVERVIEW_TOPIC = "/views/overview"
-# Fixed camera high in the south, looking north over the triangle of ships and the drone's route
-OVERVIEW_POSE = (425.0, -1700.0, 1100.0, 0.0, 0.53, 1.5708)
+# Where the down camera floats over the Gazebo 3D view (x, y, width, height in pixels, from its top-left corner)
+INSET_DOWN = (10, 10, 230, 230)
 
 
 def df_antenna_sdf(rf_cfg: dict) -> list:
@@ -145,7 +149,7 @@ def df_antenna_sdf(rf_cfg: dict) -> list:
     return [ET.fromstring(v) for v in parts]
 
 
-def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: float = 0.30, views: bool = False,
+def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: float = 0.30,
               wind: bool = False, rf_cfg: dict = None, range_min_m: float = 0.20, range_max_m: float = 100.0,
               range_noise_std_m: float = 0.02) -> Path:
     tree = ET.parse(SIM / "models/midair_quad/model.sdf")
@@ -171,13 +175,6 @@ def drone_sdf(cam_res: int, gps: bool, stereo: bool = False, stereo_baseline_m: 
         right.find("topic").text = "camera/down_right/image_raw"
         right.find("gz_frame_id").text = "camera_down_right"
         link.append(right)
-    if views:
-        # A red ball high above the drone, visual only, so the drone can be found in the overview, which is
-        # kilometres wide. The down camera looks the other way and never sees it.
-        link.append(ET.fromstring(
-            '<visual name="beacon"><pose>0 0 30 0 0 0</pose><geometry><sphere><radius>15</radius></sphere>'
-            '</geometry><material><ambient>1 0.1 0.1 1</ambient><diffuse>1 0.1 0.1 1</diffuse>'
-            '<emissive>0.6 0 0 1</emissive></material></visual>'))
     if rf_cfg:
         base = tree.find(".//link[@name='base_link']")
         for element in df_antenna_sdf(rf_cfg):
@@ -194,53 +191,34 @@ def geodetic_origin(world_path: Path):
                  ("latitude_deg", "longitude_deg", "elevation"))
 
 
-def overview_camera_sdf() -> Path:
-    """A fixed camera over the strait world, for the overview panel."""
-    path = Path("/tmp/taipeidrift_overview_camera.sdf")
-    path.write_text(f"""<?xml version="1.0"?>
-<sdf version="1.10">
-  <model name="overview_camera">
-    <static>true</static>
-    <link name="link">
-      <sensor name="overview" type="camera">
-        <topic>{OVERVIEW_TOPIC}</topic>
-        <update_rate>5</update_rate>
-        <always_on>true</always_on>
-        <camera>
-          <horizontal_fov>1.2</horizontal_fov>
-          <image><width>800</width><height>450</height></image>
-          <clip><near>1</near><far>20000</far></clip>
-        </camera>
-      </sensor>
-    </link>
-  </model>
-</sdf>
-""")
-    return path
-
-
 def views_gui_config() -> Path:
-    """The Gazebo window for the strait world: the 3rd-person chase view of the drone, with two panels beside it:
-    the overview of the ships and the drone's down camera (the desktop's top-right slot holds
-    the RF navigation display instead, nodes/aoa_map.py). The far clip is raised so ships kilometres away
-    are drawn (the default cuts them off)."""
+    """The Gazebo window for the strait world: the 3rd-person chase view of the drone, with the drone's down camera
+    floating over its top-left corner, like a game's minimap (the desktop's top-right slot holds the RF navigation
+    display, nodes/aoa_map.py). The far clip is raised so ships
+    kilometres away are drawn (the default cuts them off)."""
     text = (SIM / "config/gui.config").read_text()
     text = text.replace("<camera_pose>-6 0 6 0 0.5 0</camera_pose>",
                         "<camera_pose>-6 0 6 0 0.5 0</camera_pose>\n"
                         "  <camera_clip><near>0.25</near><far>30000</far></camera_clip>")
-    panel = lambda title, topic: f"""
+    def inset(title, topic, x, y, width, height):
+        return f"""
 <plugin filename="ImageDisplay" name="{title}">
   <gz-gui>
     <title>{title}</title>
-    <property type="bool" key="showTitleBar">true</property>
-    <property type="string" key="state">docked</property>
+    <property type="string" key="state">floating</property>
+    <property type="double" key="x">{x}</property>
+    <property type="double" key="y">{y}</property>
+    <property type="double" key="width">{width}</property>
+    <property type="double" key="height">{height}</property>
+    <property type="bool" key="showTitleBar">false</property>
+    <property type="string" key="cardBackground">#202020</property>
+    <property type="bool" key="resizable">false</property>
   </gz-gui>
   <topic>{topic}</topic>
   <topic_picker>false</topic_picker>
 </plugin>
 """
-    text += panel("Overview: ships and drone (red ball)", OVERVIEW_TOPIC) + panel("Drone view: down camera",
-                                                                                 "/camera/down/image_raw")
+    text += inset("Down camera", "/camera/down/image_raw", *INSET_DOWN)
     path = Path("/tmp/taipeidrift_gui_views.config")
     path.write_text(text)
     return path
@@ -338,6 +316,10 @@ def setup(context):
     gui = LaunchConfiguration("gui").perform(context).lower() == "true"
     world = SIM / "worlds" / f"{LaunchConfiguration('world').perform(context)}.sdf"
     demo = LaunchConfiguration("demo").perform(context).lower() == "true"
+    route = LaunchConfiguration("route").perform(context).strip().lower()
+    land = LaunchConfiguration("land").perform(context).lower() == "true"
+    if route not in ("auto", "pads", "crossing", "survey"):
+        sys.exit("route must be auto, pads, crossing or survey")
     monitor = LaunchConfiguration("monitor").perform(context).lower()
     if monitor not in ("window", "terminal"):
         sys.exit("monitor must be window or terminal")
@@ -358,6 +340,14 @@ def setup(context):
     range_max_m = float(LaunchConfiguration("range_max_m").perform(context))
     range_noise_std_m = float(LaunchConfiguration("range_noise_std_m").perform(context))
     flow_update_every_n = max(1, int(LaunchConfiguration("flow_update_every_n").perform(context)))
+    flow_min_range_m = float(LaunchConfiguration("flow_min_range_m").perform(context))
+    rf_when_flow_blind_s = float(LaunchConfiguration("rf_when_flow_blind_s").perform(context))
+    flow_max_dt_s = float(LaunchConfiguration("flow_max_dt_s").perform(context))
+    flow_soft_limit = float(LaunchConfiguration("flow_soft_limit").perform(context))
+    rf_display_after_s = str(float(LaunchConfiguration("rf_display_after_s").perform(context)))
+    ais_start_s = LaunchConfiguration("ais_start_s").perform(context).strip().lower()
+    if ais_start_s != "config":
+        ais_start_s = str(float(ais_start_s))
     if not (0 < range_min_m < range_max_m and range_noise_std_m >= 0):
         sys.exit("range_min_m/range_max_m/noise must satisfy 0 < min < max and noise >= 0")
     if not world.exists():
@@ -378,7 +368,7 @@ def setup(context):
         except ValueError:
             sys.exit(f"wind must be SPEED_MPS,FROM_DEG (for example 6,20), not {wind!r}")
         world_file = windy_world(world, speed, from_deg)
-    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, views=ships, wind=world_file != world,
+    model = drone_sdf(cam_res, gps, stereo, stereo_baseline_m, wind=world_file != world,
                       rf_cfg=yaml.safe_load(RF_CONFIG.read_text()) if ships else None,
                       range_min_m=range_min_m, range_max_m=range_max_m, range_noise_std_m=range_noise_std_m)
     gui_config = views_gui_config() if ships else SIM / "config/gui.config"
@@ -426,7 +416,7 @@ def setup(context):
         "metric_flow": {"enabled": metric_flow, "algorithm": "Shi-Tomasi/LK + homography RANSAC + ESKF-attitude derotation",
                         "range_min_m": range_min_m, "range_max_m": range_max_m,
                         "range_noise_std_m": range_noise_std_m, "range_topic": "/range/down",
-                        "update_every_n_images": flow_update_every_n,
+                        "update_every_n_images": flow_update_every_n, "min_range_used_m": flow_min_range_m,
                         "update_rate_qualifier": "consecutive image-pair temporal correlation decimation"},
         "gnss_local_enu_origin": {"latitude_deg": gps_origin[0], "longitude_deg": gps_origin[1],
                                    "elevation_m": gps_origin[2]},
@@ -462,6 +452,10 @@ def setup(context):
                  "-p", f"metric_flow:={str(metric_flow).lower()}",
                  "-p", f"flow_range_std_m:={range_noise_std_m}",
                  "-p", f"flow_update_every_n:={flow_update_every_n}",
+                 "-p", f"flow_min_range_m:={flow_min_range_m}",
+                 "-p", f"rf_when_flow_blind_s:={rf_when_flow_blind_s}",
+                 "-p", f"flow_max_dt_s:={flow_max_dt_s}",
+                 "-p", f"flow_soft_limit:={flow_soft_limit}",
                  "-p", f"gps_origin_latitude:={gps_origin[0]}",
                  "-p", f"gps_origin_longitude:={gps_origin[1]}",
                  "-p", f"gps_origin_elevation:={gps_origin[2]}"]
@@ -499,10 +493,6 @@ def setup(context):
                             "-z", str(rf["sea_level_z"])])
             for ship in rf["ships"]
         ]
-        x, y, z, roll, pitch, yaw = OVERVIEW_POSE
-        actions.append(Node(package="ros_gz_sim", executable="create", output="screen", arguments=[
-            "-world", world.stem, "-file", str(overview_camera_sdf()), "-name", "overview_camera",
-            "-x", str(x), "-y", str(y), "-z", str(z), "-R", str(roll), "-P", str(pitch), "-Y", str(yaw)]))
         actions += [
             # set_pose's name holds the world, so it is bridged here rather than in config/bridge.yaml
             Node(package="ros_gz_bridge", executable="parameter_bridge", name="set_pose_bridge", output="screen",
@@ -510,7 +500,8 @@ def setup(context):
             ExecuteProcess(output="screen", cmd=[sys.executable, str(SIM / "nodes/ship_traffic.py"),
                                                  "--world", world.stem, "--config", str(RF_CONFIG)]),
             ExecuteProcess(output="screen", cmd=[sys.executable, str(SIM / "nodes/rf_sensor.py"),
-                                                 "--world", world.stem, "--config", str(RF_CONFIG)]),
+                                                 "--world", world.stem, "--config", str(RF_CONFIG),
+                                                 *(["--start-after-s", ais_start_s] if ais_start_s != "config" else [])]),
             # the drone's position from the ships' bearings, without GNSS
             ExecuteProcess(output="screen", cmd=[sys.executable, str(SIM / "nodes/rf_nav.py"), "--world", world.stem]),
             # the same estimator, also fusing the ships' position fix: keeps navigating after the GNSS cutoff
@@ -523,17 +514,21 @@ def setup(context):
             # Give the Gazebo window time to open before asking it to follow the drone
             TimerAction(period=15.0, actions=[
                 ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/demo_flight.py"), "--world", world.stem,
-                                    *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else [])],
+                                    *(["--route", "city_loop", "--height", "80"] if world.stem == "city" else
+                                      ["--route", route] if route != "auto" else []),
+                                    *(["--land"] if land else [])],
                                output="screen")]),
             # Started late: opened before the camera topic exists, the viewer can stay blank. With the ships, the
-            # down camera is a panel in the Gazebo window and this slot shows the RF navigation display.
+            # down camera floats over the Gazebo window and this slot shows the RF navigation display.
             TimerAction(period=20.0, actions=[
-                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem],
+                ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/aoa_map.py"), "--world", world.stem,
+                                    "--rf-display-after-s", rf_display_after_s],
                                output="screen", respawn=True, respawn_delay=2.0) if ships else
                 Node(package="rqt_image_view", executable="rqt_image_view", arguments=["/camera/down/image_raw"])]),
             # the lower-right corner of the 1920 x 1080 desktop, under the RF navigation display: the navigation
             # dashboard window (monitor:=window) or the same information in a terminal (-0-0: right, bottom)
-            ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/nav_dashboard.py"), "--world", world.stem],
+            ExecuteProcess(cmd=[sys.executable, str(SIM / "nodes/nav_dashboard.py"), "--world", world.stem,
+                                "--rf-display-after-s", rf_display_after_s],
                            output="screen", respawn=True, respawn_delay=2.0) if monitor == "window" else
             ExecuteProcess(cmd=["xterm", "-T", "Sensor monitor", "-geometry", "118x42-0-0", "-fa", "Monospace", "-fs", "8",
                                 "-bg", "black", "-fg", "white", "-e", sys.executable,
@@ -550,6 +545,8 @@ def generate_launch_description():
         DeclareLaunchArgument("gui", default_value="true"),
         DeclareLaunchArgument("world", default_value="terrain"),
         DeclareLaunchArgument("demo", default_value="false"),
+        DeclareLaunchArgument("route", default_value="auto"),
+        DeclareLaunchArgument("land", default_value="false"),
         DeclareLaunchArgument("monitor", default_value="window", description="with demo: the dashboard window, or terminal"),
         DeclareLaunchArgument("stereo", default_value="false"),
         DeclareLaunchArgument("stereo_baseline_m", default_value="0.30"),
@@ -566,6 +563,16 @@ def generate_launch_description():
         DeclareLaunchArgument("range_max_m", default_value="100.0"),
         DeclareLaunchArgument("range_noise_std_m", default_value="0.02"),
         DeclareLaunchArgument("flow_update_every_n", default_value="5"),
+        DeclareLaunchArgument("flow_min_range_m", default_value="0.2"),
+        DeclareLaunchArgument("rf_when_flow_blind_s", default_value="0.0"),
+        DeclareLaunchArgument("flow_max_dt_s", default_value="0.2"),
+        DeclareLaunchArgument("flow_soft_limit", default_value="0.0"),
+        DeclareLaunchArgument("rf_display_after_s", default_value="0.0",
+                              description="the RF navigation display opens no earlier than this sim time "
+                                          "(default: with the first ship's bearing)"),
+        DeclareLaunchArgument("ais_start_s", default_value="config",
+                              description="sim time when the ships start transmitting (the RF display opens then); "
+                                          "config: ais.start_after_s of config/rf.yaml"),
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
         OpaqueFunction(function=setup),
     ])

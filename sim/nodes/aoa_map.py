@@ -3,6 +3,10 @@ angles of arrival (AoA) of the packets, the gyro and a Kalman filter, with the b
 
 Started by `sim.launch.py` with the ships and demo:=true (the strait world), or by hand while the simulator runs:
     python3 sim/nodes/aoa_map.py --world strait
+The window opens when the first ship's bearing arrives, so it appears when the ships start transmitting
+(ais.start_after_s in config/rf.yaml). With --rf-display-after-s T it opens no earlier than sim time T, for a flight
+in which the ships transmit from early on and the display should appear at a chosen moment (the drone leaving the
+coast).
 
 The window has three parts, written for someone who has not seen it before:
 - Left, the map of the strait: the three ships, the line from each ship along its last bearing, the drone's estimated
@@ -56,7 +60,7 @@ SIM = Path(__file__).resolve().parents[1]
 WORLDS = SIM / "worlds"
 RF_CONFIG = SIM / "config" / "rf.yaml"
 MIN_SHIPS = 3             # three bearings for three unknowns (x, y, heading)
-AREA = (-1100.0, 2000.0, -900.0, 1250.0)  # x0, x1, y0, y1 of the map, world metres
+AREA = (-850.0, 1300.0, -750.0, 1050.0)  # x0, x1, y0, y1 of the map, world metres
 ZOOM_M = 250.0            # half-width of the close-up, metres; widened when the ellipse or the truth is farther out
 MIN_RANGE_M = 10.0        # below this a ship's range is clamped in the bearing sigma
 GYRO_HISTORY_S = 2 * START_WINDOW_S  # integrated gyro yaw kept for referring bearings to one time
@@ -101,6 +105,8 @@ class AoaMap(Node):
                              reliability=QoSReliabilityPolicy.RELIABLE)
         self.create_subscription(Bool, "/nav/gnss_available", self.on_gnss, latched)
 
+    def open_window(self):
+        """Opened by main() once the first ship is heard: there is nothing to show before the RF is on."""
         plt.ion()
         self.fig = plt.figure(figsize=(7.2, 4.7), dpi=100)
         outer = self.fig.add_gridspec(1, 2, width_ratios=[1.45, 1], left=0.085, right=0.985, top=0.95, bottom=0.03,
@@ -301,7 +307,7 @@ class AoaMap(Node):
                    ("SOURCE", "AIS AoA + GYRO", "0.15", False),
                    ("STATUS", "ACQUIRING", "tab:orange", True),
                    ("SHIPS HEARD", f"{len(self.last)} / {MIN_SHIPS} needed", "0.15", False)],
-                  f"First fix: bearings to {MIN_SHIPS} ships within {START_WINDOW_S:.0f} s (position and heading)")
+                  f"First fix: bearings to {MIN_SHIPS} ships within {START_WINDOW_S:.0f} s\n(position and heading)")
 
     @staticmethod
     def frame(ax, area, small=False):
@@ -317,14 +323,21 @@ class AoaMap(Node):
     def show(self):
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
-        if self.placed < PLACE_DRAWS:  # the first draws: the window manager may move the window after it appears
+        try:
+            w = self.fig.canvas.manager.window
+            # matplotlib turns on Qt's high-DPI scaling and the dashboard does not: size in screen pixels, so the
+            # two windows are the same width (at a 1.04 scale, 720 Qt pixels drew 750 on the screen)
+            size = [round(n / w.devicePixelRatioF()) for n in WINDOW]
+            drifted = [w.width(), w.height()] != size
+        except AttributeError:
+            return
+        if self.placed < PLACE_DRAWS or drifted:  # the first draws: the window manager may move it after it appears
             self.placed += 1
             try:  # the top-right corner of the browser desktop, whatever the window manager adds around it
-                w = self.fig.canvas.manager.window
                 screen = w.screen().availableGeometry()
                 # never larger than the screen: a maximise once asked Qt for a 65535 x 65535 canvas (17 GB)
                 w.setMaximumSize(screen.width(), screen.height())
-                w.resize(*WINDOW)
+                w.resize(*size)
                 frame = w.frameGeometry()
                 w.move(screen.right() - frame.width() + 1, screen.top())
             except AttributeError:
@@ -334,10 +347,16 @@ class AoaMap(Node):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--world", default="strait", help="for the latitude and longitude of the world origin")
+    ap.add_argument("--rf-display-after-s", type=float, default=0.0,
+                    help="open the window no earlier than this sim time (default: with the first bearing)")
     args, ros_args = ap.parse_known_args()
     rclpy.init(args=ros_args)
     node = AoaMap(args.world)
     try:
+        # no window until a ship's bearing arrives (the ships start transmitting late), nor before the chosen time
+        while not node.last or node.truth is None or stamp_of(node.truth) < args.rf_display_after_s:
+            rclpy.spin_once(node, timeout_sec=0.5)
+        node.open_window()
         while plt.fignum_exists(node.fig.number):
             for _ in range(500):  # the IMU alone is 100 Hz of sim time: drain the queue each frame
                 rclpy.spin_once(node, timeout_sec=0.0)

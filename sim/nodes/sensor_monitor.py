@@ -111,7 +111,10 @@ class Monitor(Node):
         self.wall0 = self.sim0 = None
         sd = qos_profile_sensor_data
         self.create_subscription(Clock, "/clock", self.on_clock, 10)
-        self.create_subscription(Imu, "/imu/data", lambda m: self.keep("imu", m), sd)
+        # the IMU sends 100 messages per simulated second and the window reads its queue only a few times a second:
+        # with the sensor profile's queue of 5 the rest were dropped and the rate read about 60 Hz (shown as unhealthy)
+        self.create_subscription(Imu, "/imu/data", lambda m: self.keep("imu", m),
+                                 QoSProfile(depth=400, reliability=QoSReliabilityPolicy.BEST_EFFORT))
         self.create_subscription(FluidPressure, "/air_pressure", self.on_baro, sd)
         self.create_subscription(NavSatFix, "/gps/fix", lambda m: self.keep("gps", m), sd)
         self.create_subscription(Odometry, "/ground_truth/odom", lambda m: self.keep("truth", m), sd)

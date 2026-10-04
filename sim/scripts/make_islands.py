@@ -1,7 +1,9 @@
 """Build the islands world's scenery: sim/models/islands/.
 
 Two small, low islands with open sea between them, in the style of the Penghu islands in the
-Taiwan Strait. Island A holds the start pad; island B lies about 700 m of open water to the east.
+Taiwan Strait. Island A holds the start pad on its west side; island B lies about 230 m of open water to
+the east (moved closer on Saturday 3 October for the demo flight: about 190 m of land after the pad, then
+30 s of water at 8 m/s, then island B).
 
 - Islands: 3D terrain meshes with irregular coastlines, beaches, dry grass, scrub and rock, up to
   about 14 m above the sea. They are solid.
@@ -30,14 +32,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from make_trees import tree  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "models" / "islands"
-VERSION = "2"  # bump when the scenery changes, so --if-missing rebuilds old copies
+VERSION = "4"  # bump when the scenery changes, so --if-missing rebuilds old copies
 PAD_ASL = 4.0  # m: helipad tops above the sea; the sea surface is at z = -PAD_ASL
 
 # name, centre (x, y) in m, mean radius in m, highest ground in m above the sea,
 # helipad (x, y), tree count, house count, lighthouse
 ISLANDS = [
-    dict(name="a", centre=(-70.0, 0.0), radius=150.0, top=14.0, pad=(0.0, 0.0), trees=160, houses=7, lighthouse=False),
-    dict(name="b", centre=(900.0, 150.0), radius=110.0, top=11.0, pad=(850.0, 140.0), trees=90, houses=3, lighthouse=True),
+    dict(name="a", centre=(40.0, 0.0), radius=150.0, top=14.0, pad=(0.0, 0.0), trees=160, houses=7, lighthouse=False),
+    dict(name="b", centre=(530.0, 120.0), radius=110.0, top=11.0, pad=(480.0, 110.0), trees=90, houses=3, lighthouse=True),
 ]
 GRID = 257          # terrain vertices per side
 COLLISION_STEP = 4  # every 4th vertex for the collision mesh
@@ -220,17 +222,17 @@ MODEL = """<?xml version="1.0"?>
         <pose>{sx:.1f} {sy:.1f} {sea_z:.2f} 0 0 0</pose>
         <geometry><plane><normal>0 0 1</normal><size>{sea:.0f} {sea:.0f}</size></plane></geometry>
         <material>
-          <ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse><specular>0.3 0.3 0.3 1</specular>
+          <!-- Open water: no static albedo features for the downward camera to track. -->
+          <ambient>0.015 0.08 0.16 1</ambient><diffuse>0.025 0.16 0.32 1</diffuse><specular>0.85 0.9 0.95 1</specular>
           <pbr><metal>
-            <albedo_map>model://islands/materials/textures/sea.jpg</albedo_map>
-            <roughness>0.55</roughness><metalness>0.0</metalness>
+            <roughness>0.08</roughness><metalness>0.0</metalness>
           </metal></pbr>
         </material>
       </visual>
       <visual name="ocean">
         <pose>{sx:.1f} {sy:.1f} {ocean_z:.2f} 0 0 0</pose>
         <geometry><plane><normal>0 0 1</normal><size>40000 40000</size></plane></geometry>
-        <material><ambient>0.055 0.22 0.42 1</ambient><diffuse>0.055 0.22 0.42 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+        <material><ambient>0.015 0.08 0.16 1</ambient><diffuse>0.025 0.16 0.32 1</diffuse><specular>0.85 0.9 0.95 1</specular></material>
       </visual>{body}
     </link>
   </model>

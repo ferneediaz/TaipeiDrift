@@ -422,6 +422,117 @@ eskf=/nav/odom eskf_rf=/nav_rf/odom rf=/rf_nav/odom`. The run folder is not in g
   the flat-ground run above, where the flow speed removed it; over open water the downward camera has nothing to
   track, so that remedy was not tried here.
 
+## The demo flight of the video, tested on twelve flights
+
+Sunday 4 October, 00:30 to 03:05. The question: are the numbers in the demo video typical, do they hold when the
+conditions change, and is the scoring right?
+
+**The flight.** The strait world with the islands 236 m apart. Take-off on island A, GNSS switched off 26 s after
+its first fix, 183 m of land, 236 m of water, landing on island B: 470 m and about 55 s without GNSS. Started with
+
+    sim/run.sh strait gnss_cutoff_s:=26 route:=crossing land:=true metric_flow:=true flow_min_range_m:=10 \
+        flow_update_every_n:=2 flow_max_dt_s:=0.5 flow_soft_limit:=9.21 vision_rotation:=false \
+        vision_direction:=false ais_start_s:=41
+
+**The estimates,** all scored on the same flight against the simulator's true position at the same instant
+(horizontal error, from the loss of GNSS to the arrival over the second helipad; the landing is the autopilot's
+part, and the autopilot flies on the truth in every flight):
+
+- **ours:** Alessandro's filter with the IMU, the barometer, the camera's speed over ground (downward camera and
+  range finder) and the ships' position fix (`/nav_rf/odom`, the dashboard's first row);
+- **camera only:** the same filter without the ships (`/nav/odom`);
+- **ships only:** Dan's navigator on the ships' bearings (`/rf_nav/odom`);
+- **inertial only:** a copy of the filter with the IMU and the barometer alone: what the drone has without us.
+
+| Flight | Without GNSS | Ours: median | worst | at arrival | Camera only: median | Ships only: median | Inertial only at arrival |
+|---|---|---|---|---|---|---|---|
+| The flight the settings were chosen on (ships from 20 s) | 58 s | 8.1 m | 36 m | 14 m | 8.1 m | 43 m | 953 m |
+| Take 1, recorded slowly (ships from 20 s) | 53 s | 8.5 m | 66 m | 6 m | 7.0 m | 17 m | 405 m |
+| **Take 2, recorded slowly: the video** | 53 s | **7.8 m** | 56 m | 14 m | 9.0 m | 50 m | 241 m |
+| Repeat 1 | 57 s | 8.7 m | 60 m | 11 m | 18.7 m | 29 m | 518 m |
+| Repeat 2 | 59 s | 3.9 m | 11 m | 6 m | 28.7 m | 52 m | 153 m |
+| Repeat 3 | 58 s | 9.7 m | 43 m | 11 m | 31.1 m | 50 m | 438 m |
+| Repeat 4 | 59 s | 24.3 m | 64 m | 24 m | 33.7 m | 35 m | 350 m |
+| Wind, 6 m/s with gusts (`wind:=6,20`) | 62 s | 5.0 m | 23 m | 3 m | 54.4 m | 50 m | 379 m |
+| GNSS lost at 11 s, during the climb (`gnss_cutoff_s:=10`) | 75 s | 8.2 m | 34 m | 12 m | 39.6 m | 37 m | 308 m |
+| The sea without any texture, matte (our test) | 57 s | 28.4 m | 69 m | 32 m | 37.0 m | 20 m | 201 m |
+| The sea without any texture, glossy (Alessandro's sea, commit 18bbbdd) | 58 s | 22.2 m | 119 m | 24 m | 27.5 m | 29 m | 507 m |
+| To island B and back, no landing (`route:=pads land:=false`) | 289 s | 10.6 m | 44 m | 23 m | 94.9 m | 47 m | 3,477 m |
+
+Every flight draws new random sensor noise. The two takes were flown with the simulator slowed to 0.12 of real
+time for the recording, all others at its normal pace.
+
+How to read it:
+
+- **It repeats, with one outlier.** In the six flights flown after the settings were fixed (the two takes and the
+  four repeats) our estimate was 3.9 to 9.7 m off in the median five times and 24.3 m once; on the flight the
+  settings were chosen on it was 8.1 m. The video shows a typical flight (7.8 m), not the best one.
+- **The outlier is a heading error.** In repeat 4 the filter's heading was 4 degrees off at the moment GNSS went
+  (0 to 3 degrees in the other flights) and stayed 3 to 5 degrees off. One degree puts the estimate off by 1.7
+  percent of the distance flown, 8 m over this route. The live filter has no compass and no sun sensor: its heading
+  starts from the true value (the drone stands facing east and the filter assumes that), follows the gyroscope, is
+  corrected by the GNSS course while GNSS is there, and by the ships' bearings afterwards.
+- **The three sources together beat each one alone.** At the normal pace the camera-only filter drifts (19 to 54 m
+  in the median, 47 to 132 m by the helipad) and the ships alone are rough (20 to 52 m); our estimate is better
+  than both in every one of those flights except the one with the textureless sea, where it matches the ships. In
+  the two slow takes the camera-only filter did about as well as ours, so the video understates what the ships add.
+- **Over open water the camera has nothing.** In take 2 every picture pair failed over the 90 m in the middle of
+  the strait (too few points to track); the readings it did get over water came from the shallows near both
+  coasts, where the seabed shows through, and from the coast still in the picture.
+- **With a sea without any texture the result is three times worse.** This is the hard and the realistic case:
+  real waves give a camera nothing stable. Two flights, one with a plain matte sea and one with the plain glossy
+  sea of Alessandro's commit 18bbbdd (Sunday 02:43): our estimate over the water was 31 m and 28 m off in the
+  median and 69 m and 119 m at worst, the level of the ships alone. In neither flight was a camera reading used
+  over open water, and the filter's speed error over the water rose from about 1 m/s (old sea) to 2 and 4 m/s:
+  the ships' fixes hold the position roughly and the speed hardly at all.
+- **The sea changed during the night.** Commit 18bbbdd made the generator build the plain glossy sea; the world's
+  version number was raised on Sunday morning (to 4), so every machine now builds it. The first video (take 2) and
+  the ten other flights of this table used the old sea with its texture.
+- **It stays bounded over five minutes.** In the 289 s flight our estimate was 6 to 22 m off in every window of
+  30 s (44 m at worst), while the camera-only filter reached 95 m in the median and 341 m at worst, and the
+  inertial sensors alone 3.5 km.
+- **Wind and an earlier loss did not hurt:** 5.0 m and 8.2 m in the median. One flight each.
+- **The filter's own error bound cannot be trusted.** The true error was inside its stated 2 sigma between 0 and
+  100 percent of the time, depending on the flight. It treats the camera's and the ships' errors as random from one
+  reading to the next, and they are not.
+- **The scoring is confirmed.** Dan's `sim/scripts/check_rf_nav.py`, written independently, ran alongside repeat 1:
+  9.4 m median and 59.7 m worst for our filter, against 9.6 m and 60.5 m from our log over the same time; the two
+  other estimates agree in the same way.
+
+**Sunday morning, 07:44 to 08:31: five more flights with Alessandro's sea, and what they changed.** With a sea
+without texture the ships' position has to be running before the drone reaches the water.
+
+| Flight (Alessandro's sea) | Ships transmit from | Ours over the water: median | worst | Whole stretch: median | worst |
+|---|---|---|---|---|---|
+| The flight of 03:00 | 41 s (the coast) | 27.5 m | 119 m | 22.2 m | 119 m |
+| Repeat | 41 s | 16.4 m | 89 m | 9.2 m | 89 m |
+| Repeat | 41 s | 19.5 m | 114 m | 12.0 m | 114 m |
+| Ships early | 20 s | 10.1 m | 44 m | 8.7 m | 44 m |
+| Ships early | 20 s | 7.1 m | 58 m | 6.2 m | 58 m |
+| Ships early, display at the coast | 20 s | 10.3 m | 102 m | 6.6 m | 102 m |
+
+- **Started at the coast, the ships' position is still settling during the crossing** (it needs about 20 s): 16 to
+  31 m in the median over the water and moments of 69 to 119 m, counting the matte test of the night. **Started at
+  20 s** it is 7 to 10 m in the median, as with the old sea, but the error still climbs late in the crossing, to 44
+  to 102 m for a few seconds, and comes back when the camera sees the second island. Over open water nothing but
+  the inertial sensors and a rough radio fix is left, and that shows.
+- **So the video's flight changed:** the ships transmit from 20 s, and the RF display opens at the coast through
+  the new launch option `rf_display_after_s` (`ais_start_s:=20 rf_display_after_s:=41` at the recording pace). The
+  world's `VERSION` is 4, so every machine builds Alessandro's sea.
+- One further flight of that morning was cut by the laptop going to sleep and is not counted. In all, seventeen
+  flights of the demo route are scored here: our estimate 3.9 to 28.4 m in the median, the inertial sensors alone
+  150 to 950 m off at the arrival.
+
+What this does not show: another coast, other ship positions or fewer than three ships, AIS switched off or
+falsified, real waves, night, a flight steered by the estimate, and sensors other than the assumed ones (the IMU's
+noise bounds are our assumption, `sim/config/sensor_noise.yaml`). The settings were chosen on five test flights on
+this same route on Saturday evening; every flight after that (the two takes and the nine flights of the batch)
+used them unchanged.
+
+Run again: `scripts/demo_flight_batch.sh NAME ["EXTRA ARGS"]` flies one flight and logs it,
+`scripts/score_demo_flights.py RUN ...` prints the table. The simulator's window crashed at the start in 2 of
+about 18 starts that night (a segmentation fault in Gazebo's Qt code); the batch script starts again by itself.
+
 ## A second navigator on the same flights: Ilhan's matcher, checked by us
 
 Saturday 3 October 2026, 21:35 to 22:08. Ilhan's branch `ilhan/sim-demo` (commits 629af5c and ff83733; **not

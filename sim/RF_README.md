@@ -20,8 +20,8 @@ docker compose exec sim bash -ic "python3 sim/scripts/check_rf.py"           # c
 | Where | What |
 |---|---|
 | Gazebo window, main view | the drone from behind (3rd person) |
-| Gazebo window, right-hand panels | overview of the ships (red ball = drone), the drone's down camera |
-| Top right | the RF navigation display: rf_nav's estimate, its 95 % region, the lines of position and a readout |
+| Gazebo window, top left | the drone's down camera, floating over the chase view |
+| Top right | the RF navigation display: rf_nav's estimate, its 95 % region, the lines of position and a readout. It opens when the first ship is heard (the ships start at 20 s) |
 | Bottom right | the navigation dashboard: Overview (GNSS state, each estimator's position error, 2σ bound, heading and height error, sensor health), Navigation, Sensors, AIS (each ship's range, angle of arrival and its error, packets) |
 
 ## 1. The radio: AIS
@@ -34,6 +34,7 @@ AIS (Automatic Identification System) is the radio every large ship carries. Eve
 | Modulation | GMSK, BT 0.4, 9600 bit/s, 25 kHz channel, 256-bit packets. GMSK has no spreading factor (that is LoRa) |
 | Transmit power | Class A (large ships, all three warships here) 12.5 W = 41 dBm; Class B (small craft) 2 W = 33 dBm |
 | How often | Class A every 10 s up to 14 knots, 6 s up to 23 knots |
+| Start | the ships start transmitting 20 s into the simulation (`ais.start_after_s` in `config/rf.yaml`) |
 | Drone receiver | noise floor −124 dBm, sensitivity −110 dBm |
 | Range | out to the radio horizon, about 48 km from a drone at 40 m |
 

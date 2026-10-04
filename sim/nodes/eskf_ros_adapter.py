@@ -73,6 +73,19 @@ class FrozenEskfAdapter(Node):
         self.flow_range_std_m = float(self.declare_parameter("flow_range_std_m", 0.02).value)
         self.flow_max_range_jump_m = float(self.declare_parameter("flow_max_range_jump_m", 0.75).value)
         self.flow_update_every_n = max(1, int(self.declare_parameter("flow_update_every_n", 5).value))
+        # readings below this range are not used: close to the ground the picture moves many pixels per frame and the
+        # tracks are poor; a reading taken at 6 m during lift-off locked GNSS out of the filter in a demo flight
+        self.flow_min_range_m = float(self.declare_parameter("flow_min_range_m", 0.2).value)
+        # > 0: the ships' fix is fused only while the camera has given no accepted speed reading for this long
+        # (camera over land, radio over water). The fix is itself tens of metres off, and fused all the time it
+        # dragged a filter the camera held within 5 m to 16 to 38 m (demo flight, Saturday 23:10). 0: always.
+        self.rf_when_flow_blind_s = float(self.declare_parameter("rf_when_flow_blind_s", 0.0).value)
+        # the longest time between the two pictures of a pair. When the node receives fewer than 5 pictures a second
+        # most pairs are further apart than 0.2 s and were dropped (demo flight: 34 of 76 pairs over land).
+        self.flow_max_dt_s = float(self.declare_parameter("flow_max_dt_s", 0.20).value)
+        # > 0: a reading far from what the filter expects is weakened instead of refused (see flow_update)
+        self.flow_soft_limit = float(self.declare_parameter("flow_soft_limit", 0.0).value)
+        self.last_flow_accept_stamp = None
         camera = self.vio_cfg["cameras"][self.fc["camera"]]
         self.R_bc = gazebo_optical_to_flu()
         self.camera = CameraSetup.from_config(self.vio_cfg, self.fc["camera"])
@@ -244,6 +257,9 @@ class FrozenEskfAdapter(Node):
         if self.filter is None:
             self.try_initialize_from_measurements()
             return
+        if (self.rf_when_flow_blind_s > 0 and self.last_flow_accept_stamp is not None
+                and t - self.last_flow_accept_stamp < self.rf_when_flow_blind_s):
+            return  # the camera is giving speed readings: the ships' fix waits until it is blind
         H = np.zeros((2, self.filter.n))
         H[:, P_.start:P_.start + 2] = np.eye(2)
         gate = self.rf_cfg["gate_prob"]
@@ -395,7 +411,8 @@ class FrozenEskfAdapter(Node):
                     flow = estimate_metric_velocity(pair, Rab, ncam,
                         self.down_range * vertical_cos if range_fresh else math.nan, dt,
                         float(self.down_camera_K[0, 0]), self.down_flow_cfg,
-                        self.flow_range_std_m * vertical_cos)
+                        self.flow_range_std_m * vertical_cos, min_range=self.flow_min_range_m,
+                        max_dt=self.flow_max_dt_s)
                     diag.update({"range_m": self.down_range if range_fresh else math.nan,
                                  "flow_u_px_s": flow["flow_u_px_s"], "flow_v_px_s": flow["flow_v_px_s"],
                                  "flow_spread_px_s": flow["flow_spread_px_s"],
@@ -408,10 +425,11 @@ class FrozenEskfAdapter(Node):
                         diag["reason"] = flow["reason"]
                     if flow["valid"]:
                         if flow_update_due(self.down_flow_frame, self.flow_update_every_n):
-                            res = self.filter.update_camera_velocity_xy(flow["velocity"], Rbc,
-                                flow["covariance"], self.fc["gate_prob"])
+                            res = self.flow_update(flow["velocity"], Rbc, flow["covariance"])
                             diag.update(accepted=res.accepted, update_attempted=True,
                                         nis=res.nis, reason=res.reason)
+                            if res.accepted:
+                                self.last_flow_accept_stamp = stamp
                         else:
                             diag.update(accepted=None, reason="correlated image-pair update decimated")
                 self.down_flow_frame += 1
@@ -419,6 +437,25 @@ class FrozenEskfAdapter(Node):
                 diag["reason"] = "image/IMU timestamp not bracketed"
         self.status_pub.publish(String(data=json.dumps(diag)))
         self.down_prev_gray, self.down_prev_stamp = gray, stamp
+
+    def flow_update(self, z, R_bc, Rm):
+        """The camera speed reading into the filter: its own gated update, or with flow_soft_limit > 0 a weakened
+        one. A reading whose squared innovation (in sigmas) is above the limit gets its noise raised until it sits
+        on the limit, and is then used. A gate refuses good readings once the filter's own speed is off and it is
+        too sure of it, and then it never recovers (scripts/fused_replay.py soft_update; the flat-ground run of
+        Saturday 21:00 refused 18 good readings in a row)."""
+        if self.flow_soft_limit <= 0:
+            return self.filter.update_camera_velocity_xy(z, R_bc, Rm, self.fc["gate_prob"])
+        M = (R_bc.T @ self.filter.R.as_matrix().T)[:2]
+        r = np.asarray(z, dtype=float) - M @ self.filter.v
+        H = np.zeros((2, self.filter.n))
+        H[:, V_] = M
+        H[:, TH] = M @ skew(self.filter.v)
+        S = H @ self.filter.P @ H.T + Rm
+        nis = float(r @ np.linalg.solve(S, r))
+        if nis > self.flow_soft_limit:
+            Rm = Rm + S * (nis / self.flow_soft_limit - 1.0)
+        return self.filter.update(r, H, Rm, None)
 
     def publish_sensor_transforms(self):
         transforms = []
