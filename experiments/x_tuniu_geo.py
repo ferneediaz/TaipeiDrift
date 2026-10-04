@@ -106,15 +106,17 @@ def dem_ellipsoidal(x, y) -> np.ndarray:
 
 # ----------------------------------------------------------------------------- barometer
 
-def simulated_baro(t_s: np.ndarray, alt_true: np.ndarray, seed: int, cut_s: float) -> np.ndarray:
+def simulated_baro(t_s: np.ndarray, alt_true: np.ndarray, seed: int, cut_s: float,
+                   noise_scale: float = 1.0) -> np.ndarray:
     """SIMULATED barometer: truth + white + random walk + per-flight ramp. The constant offset is
-    calibrated on pre-cut samples (allowed: RTK available before the cut)."""
+    calibrated on pre-cut samples (allowed: RTK available before the cut). `noise_scale` multiplies the white
+    noise, the random walk and the ramp together (stress tests only; 1 = the model fitted on real barometers)."""
     rng = np.random.default_rng(seed)
     t = np.asarray(t_s, float)
     dt = np.diff(t, prepend=t[0])
-    rw = np.cumsum(rng.normal(0, 1, len(t)) * BARO_RW_M_SQRT_S * np.sqrt(np.maximum(dt, 0)))
-    ramp = rng.normal(0, BARO_RAMP_SD_M_S) * t
-    raw = alt_true + rng.normal(0, BARO_WHITE_M, len(t)) + rw + ramp + rng.normal(0, 50)  # unknown offset
+    rw = np.cumsum(rng.normal(0, 1, len(t)) * BARO_RW_M_SQRT_S * noise_scale * np.sqrt(np.maximum(dt, 0)))
+    ramp = rng.normal(0, BARO_RAMP_SD_M_S * noise_scale) * t
+    raw = alt_true + rng.normal(0, BARO_WHITE_M * noise_scale, len(t)) + rw + ramp + rng.normal(0, 50)  # unknown offset
     pre = t < cut_s
     return raw - np.mean(raw[pre] - alt_true[pre])
 

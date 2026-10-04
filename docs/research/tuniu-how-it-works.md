@@ -81,9 +81,15 @@ terrain. Only the ground up to 100 m ahead of the drone is kept; further away, d
 **Takeaways.** The camera angles are essential. The terrain matters a lot: over the whole flight, with flat ground,
 the system loses the map in 20 runs out of 20. The barometer helps and is almost as good as a perfect height.
 
-**Likely question: "The barometer is simulated: does that change everything?"** No. With no barometer at all,
-recognition drops from 28 % to 22 %; with a perfect height it rises to 29 %. The noise model comes from real
-barometer logs.
+**Likely question: "How do we know the barometer isn't fake?"** It *is* simulated, and we say so everywhere: the
+DJI photos only carry an altitude already fused with GPS, not the raw barometer. What is not made up is its error:
+the noise model is fitted on a real barometer log (45 min, Pixhawk, Zurich Urban MAV dataset) and reproduces its
+measured drift. And the result does not hinge on it:
+
+- photo by photo, with no barometer at all, recognition drops from 28 % to 22 %; with a perfect height it is 29 %;
+- over the whole flight (exploratory stress test, 5 seeds), a barometer 3 times noisier than the real one gives
+  4.5 m instead of 3.2 m, and one seed loses the map once; 5 times noisier gives 9.0 m and 3 seeds of 5 lose it.
+  Details: [`tuniu-level2-results.md`](tuniu-level2-results.md).
 
 ### Block 2 · Visual odometry (the motion)
 
@@ -298,6 +304,7 @@ truth. Details: [`tuniu-anti-cheat.md`](tuniu-anti-cheat.md).
 | Why a 2019 flight and not your own? | We have no drone of our own. A published flight with centimetre RTK is a reference anyone can check. |
 | 3.3 m compared with what? | The same system with map fixes switched off: 54 m. Chance: 32 m. |
 | The heading comes from DJI's GPS? | Yes, our main limit. With a simulated heading drift of up to 7° we stay at 3.2 m, but three wrong map fixes get through. |
+| Your barometer is simulated: how do we know it isn't fake? | It is simulated, and labelled so; its noise is fitted on a real barometer log. With a barometer 3 times worse we get 4.5 m instead of 3.2 m; 5 times worse breaks it (9 m, the map lost in 3 seeds of 5). |
 | What about the forest? | Up to 81 s without a map fix, 20 to 40 m of drift, then it locks back on, with no wrong fix. |
 | And the turns? | Our worst case (14.5 m median in turns against 2.7 m on straight legs). Gyroscopes are the obvious fix, not tested yet. |
 | Does it run in real time? | The two map matchers take 0.27 s per photo on one laptop core, with a photo every 2.8 s. Not measured on an onboard computer yet. |
