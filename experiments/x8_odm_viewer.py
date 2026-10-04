@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """Look around the OpenDroneMap 3D model of the Tuniu reach (survey flight 2019-09-16).
 
-The model is OpenDroneMap's own textured 2.5D mesh (stage mvs_texturing):
+Default model: OpenDroneMap's own textured 2.5D mesh (stage mvs_texturing):
   data/processed/x_tuniu_survey_odm/odm_texturing_25d/odm_textured_model_geo.{obj,mtl} + 30 textures 8192 px.
-Nothing is rebuilt here. `prepare` only makes a display copy whose textures are downscaled (default 2048 px),
-because 30 x 8192^2 textures do not fit comfortably in memory; the geometry and texture coordinates are unchanged.
+Other model, same OpenDroneMap layout: `--src <project>/odm_texturing`, e.g. the full 3D high-quality mesh
+data/processed/x_tuniu_survey_odm_server/tuniu/odm_texturing (5.8 M faces, 725 textures 8192 px: use --tex-px 1024).
+Nothing is rebuilt here. `prepare` only makes a display copy (in <project>/<--dir>) whose textures are downscaled
+(default 2048 px), because 8192^2 textures do not fit comfortably in memory; the geometry and texture coordinates
+are unchanged.
 
-The April 2019 test flight (RTK) is drawn on top: white line = camera positions, yellow = where the camera
-looked (30 deg ahead of nadir), so you can see what the real photos saw.
+The April 2019 test flight (RTK) is drawn on top as a white line through the camera positions.
 
     uv run --with pyvista python experiments/x8_odm_viewer.py prepare
     uv run --with pyvista python experiments/x8_odm_viewer.py view            # interactive window
     uv run --with pyvista python experiments/x8_odm_viewer.py view --shot out.png --off-screen
+    S=data/processed/x_tuniu_survey_odm_server/tuniu/odm_texturing            # full 3D model
+    uv run --with pyvista python experiments/x8_odm_viewer.py prepare --src $S --dir viewer_1024 --tex-px 1024
+    uv run --with pyvista python experiments/x8_odm_viewer.py view --src $S --dir viewer_1024
 
 Mouse in the window: left drag = rotate around the focus, right drag or wheel = zoom, middle drag / shift +
 left = pan; key `f` with the mouse over a point = fly to it; `r` = reset view; `q` = quit.
@@ -95,16 +100,10 @@ def cmd_view(args) -> None:
         _finish(pl, cams, args)
         return
     pl.add_mesh(pv.lines_from_points(cams), color="white", line_width=3, label="April 2019 flight (RTK)")
-    # where each photo centre hits the ground, 30 deg ahead of nadir (display only: ground assumed 90 m below)
-    h = np.full(len(cams), 90.0)
-    ahead = h * np.tan(np.radians(90.0 + fl.pitch_deg.to_numpy()))
-    yaw = np.radians(fl.yaw_deg.to_numpy())
-    look = np.column_stack([cams[:, 0] + ahead * np.sin(yaw), cams[:, 1] + ahead * np.cos(yaw), cams[:, 2] - h])
-    pl.add_points(look[::3], color="yellow", point_size=6, render_points_as_spheres=True,
-                  label="photo centre on the ground (every 3rd)")
-    pl.add_legend(bcolor=(0.1, 0.1, 0.1), size=(0.5, 0.1), loc="lower right")
-    pl.add_text("Tuniu River, OpenDroneMap 3D (survey 2019-09-16)\nleft drag rotate | wheel zoom | shift+drag pan | "
-                "f fly to point | r reset | q quit", font_size=10, color="white")
+    pl.add_text(f"Tuniu River, OpenDroneMap 3D (survey 2019-09-16): {SRC.parent.name}/{SRC.name}\n"
+                "white line = April 2019 flight, camera positions from the drone's RTK log\n"
+                "left drag: rotate   wheel: zoom   shift+drag: pan   f: fly to point   r: reset   q: quit",
+                font_size=10, color="white")
     _finish(pl, cams, args)
 
 
@@ -120,12 +119,14 @@ def _finish(pl, cams, args) -> None:
 
 
 def main() -> None:
+    global SRC, ODM, OUT
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("prepare", "view"):
         s = sub.add_parser(name)
+        s.add_argument("--src", default=str(SRC), help="OpenDroneMap texturing folder (OBJ + MTL + textures)")
         s.add_argument("--dir", default="viewer",
-                       help="display folder under data/processed/x_tuniu_survey_odm (e.g. viewer_4096)")
+                       help="display folder, next to the --src folder (e.g. viewer_4096)")
         if name == "prepare":
             s.add_argument("--tex-px", type=int, default=2048)
         else:
@@ -133,7 +134,8 @@ def main() -> None:
             s.add_argument("--off-screen", action="store_true")
             s.add_argument("--no-flight", action="store_true", help="hide the April flight overlay")
     a = ap.parse_args()
-    global OUT
+    SRC = Path(a.src).resolve()
+    ODM = SRC.parent
     OUT = ODM / a.dir
     {"prepare": cmd_prepare, "view": cmd_view}[a.cmd](a)
 
