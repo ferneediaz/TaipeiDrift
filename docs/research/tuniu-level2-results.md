@@ -99,6 +99,32 @@ back to 1–3 m at the first accepted fix.
   ones. The step-1 agreement rule did the real filtering (8 wrong fixes out of about 4,300 accepted over all
   configs, all ≤ 17.3 m).
 
+## Exploratory (not pre-registered): how much does the simulated barometer matter?
+
+Run on 2026-10-04, after a mentor asked how we know the barometer is not what makes the result. Same config as
+the pre-registered one (`dji` + `dem_lifted`, closed loop), seeds 0–4, filter calibration unchanged
+(`calibration_main.json`, made with the nominal barometer). The simulated barometer noise (white noise, random walk
+and ramp together) is multiplied with `--baro-noise-scale`. Runs: `runs/stress_baro_x3/`, `runs/stress_baro_x5/`.
+
+| Barometer | Height error after the cut (median / p95 / max) | Position error, pooled median / p90 | Fixes accepted | Wrong (> 10 m) | Seeds never losing the map |
+|---|---|---|---|---|---|
+| Nominal (model fitted on a real barometer) | 1.6 / 3.7 / 5.3 m | 3.15 / 17.9 m | 411 | 0 | 5 / 5 |
+| 3 × noisier | 4.7 / 11.0 / 16.0 m | 4.46 / 21.5 m | 361 | 1 (11.5 m) | 4 / 5 |
+| 5 × noisier | 7.8 / 18.4 / 26.6 m | 9.00 / 36.7 m | 258 | 1 (10.5 m) | 2 / 5 |
+
+- Where the nominal model comes from: [`sensor-fusion.md`](sensor-fusion.md) section 2. It is fitted on 45 min of a
+  real Pixhawk barometer (Zurich Urban MAV) against photogrammetry, and reproduces the measured 95th-percentile
+  drift at 60 / 300 / 600 / 1,200 s (1.91 / 4.11 / 6.17 / 9.63 m against 1.96 / 3.98 / 6.01 / 8.83 m measured).
+  Not modelled: dynamic pressure at speed, weather changes during the flight, the 7 % scale error measured there.
+- Reading: the result degrades gradually. A barometer three times worse than the measured one costs about 1.3 m in
+  median, and one seed of five loses the map once. Five times worse breaks it. The filter was not retuned for the
+  noisier barometer. Exploratory, 5 seeds.
+
+```bash
+.venv/bin/python experiments/x5_tuniu_closed_loop.py run --mode loop --heading dji --ground dem_lifted \
+    --seeds 0 1 2 3 4 --tag stress_baro_x3 --baro-noise-scale 3
+```
+
 ## Limits
 
 - One flight, one small site (~0.4 × 0.3 km), daylight. The noise model comes from 46 pre-cut photos: 3

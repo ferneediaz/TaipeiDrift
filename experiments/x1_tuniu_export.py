@@ -14,6 +14,9 @@ and data/processed/x_tuniu/stage0_protocol.json (legs, cut, test photos).
 Legs are segmented on the RTK track only to define the protocol cut (first two straight legs);
 nothing derived from RTK after the cut is written to an estimator-side file.
 
+Photos: the ODMdata set `tuniu_tw_1` (https://github.com/OpenDroneMap/ODMdata), unzipped under data/raw/tuniu_tw_1/,
+or any folder given in the TUNIU_TW1 environment variable (the folder holding the JPGs and the .MRK log).
+
 Run: .venv/bin/python experiments/x1_tuniu_export.py
 """
 from __future__ import annotations
@@ -21,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +33,8 @@ from PIL import Image
 from pyproj import Transformer
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = Path("/Users/ilhan.neuville/Downloads/20190411_Miaoli_Toufeng_Tuniu-River_5.75K/100_0005")
+SOURCE = Path(os.environ.get(
+    "TUNIU_TW1", ROOT / "data/raw/tuniu_tw_1/20190411_Miaoli_Toufeng_Tuniu-River_5.75K/100_0005"))
 OUT = ROOT / "data/processed/t_replay/tuniu_tw_1"
 XOUT = ROOT / "data/processed/x_tuniu"
 LEG_HEADING_TOL_DEG = 20.0   # a straight leg: track heading within this of the leg's median heading

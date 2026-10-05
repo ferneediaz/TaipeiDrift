@@ -346,7 +346,8 @@ def unit_for(seed, heading, ground, mode, args, calib, offset) -> dict:
     tr = G.truth_xy()
     last_pre = prot["precut_frames"][-1]
     frames = [last_pre] + list(prot["test_frames"])
-    baro = G.simulated_baro(tr.t_s.to_numpy(), tr.alt_ell.to_numpy(), seed_of("baro", seed), prot["cut_s"])
+    baro = G.simulated_baro(tr.t_s.to_numpy(), tr.alt_ell.to_numpy(), seed_of("baro", seed), prot["cut_s"],
+                            noise_scale=getattr(args, "baro_noise_scale", 1.0))
     idx = np.array(frames) - 1
     t_s = tr.t_s.to_numpy()[idx]
     p_last, p_prev = tr.iloc[last_pre - 1], tr.iloc[last_pre - 2]
@@ -550,6 +551,8 @@ def main():
     r.add_argument("--ground", nargs="+", choices=["dem_prior", "dem_lifted"], default=["dem_lifted"])
     r.add_argument("--seeds", nargs="+", type=int, default=list(range(20)))
     r.add_argument("--workers", type=int, default=2)
+    r.add_argument("--baro-noise-scale", type=float, default=1.0,
+                   help="multiply the SIMULATED barometer noise (stress test; 1 = model fitted on real barometers)")
     pm = sub.add_parser("prepare-map")
     pm.add_argument("src")
     pm.add_argument("out")

@@ -1,5 +1,9 @@
 # Pre-registration addendum: Level 2 with the OpenDroneMap survey products
 
+> **Status (2026-10-03 19:55): NOT RUN.** The team dropped the survey-flight 3D map from the project scope
+> (the realistic setup, existing orthophoto + Copernicus terrain, already passes). No run with these products
+> was started, so there is no unreported result.
+
 Written 2026-10-03 ~19:50 Taipei, before any run with these products. Same estimator, fix rule, gates,
 seeds (0–19), metrics and pass criteria as [`tuniu-level2-prereg.md`](tuniu-level2-prereg.md); only the map
 and/or the terrain change. Purpose: measure what a survey-flight 3D map adds over the realistic setup
