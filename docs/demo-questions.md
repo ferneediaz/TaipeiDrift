@@ -1,7 +1,7 @@
 # Questions the demo video may raise
 
 For whoever stands in front of the jury. Each answer is short enough to say aloud, and every number comes from
-eighteen logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
+nineteen logged flights of the demo route (table and method: `docs/simulation-results.md`, section "The demo flight
 of the video, tested on twelve flights"). State: Sunday 4 October, 02:50.
 
 ## If there are only twenty seconds
@@ -26,15 +26,15 @@ truth. The last caption of the video says so. Flying on the estimate is the next
 
 **3. One flight can be luck. How often did you fly it?**
 Six times after the settings were fixed, with new random sensor noise each time. Five flights were 4 to 10 m off
-in the median, one was 24 m. The flight in the video (5 m) is an ordinary one for its setup: the three test flights
-before it gave 6 to 9 m.
+in the median, one was 24 m. The flight in the video (10 m) is an ordinary one for its setup: the four flights
+before it gave 5 to 9 m.
 If they ask about the 24 m: the heading was 4 degrees off when GNSS went. One degree costs 8 m over this route.
 
 **4. What is the red line?**
 The same flight with only the inertial sensors and the barometer, which every drone has. After about 55 s it is
-150 to 950 m away, depending on that flight's sensor noise; in the video 207 m. After five minutes it is 3.5 km.
+150 to 950 m away, depending on that flight's sensor noise; in the video 263 m. After five minutes it is 3.5 km.
 
-**5. Why does your error jump to 50 or 100 m over the water?**
+**5. Why does your error climb to 40 m and more over the water?**
 Over open water the camera has nothing to track. There the estimate rests on the inertial sensors and the ships'
 radio, and a radio fix is rough, 30 to 65 m. Late in the crossing the error climbs for a few seconds, to between
 45 and 100 m in our flights, and comes back down when the camera sees the island again.
@@ -45,7 +45,7 @@ of almost five minutes, back and forth over the strait, our estimate stayed betw
 without the radio drifted to 95 m in the median and 340 m at worst. In six of the seven crossing flights at the
 normal pace our estimate over water was better than the camera alone and better than the ships alone.
 
-**7. The dashboard shows "EXCEEDED" in orange. What is that?**
+**7. The dashboard sometimes shows "EXCEEDED" in orange. What is that?**
 The filter also says how sure it is, and that statement is too optimistic. Over the flights the true error was
 inside its stated bound anywhere between never and always. It treats the camera's and the radio's errors as random
 from one reading to the next, and they are not. The map navigator on the slides does hold its bound on the sealed
@@ -143,5 +143,6 @@ arrival.
 | Sea without texture, matte | 57 | 28.4 | 69 | 37.0 | 201 |
 | Sea without texture, glossy (Alessandro's sea) | 58 | 22.2 | 119 | 27.5 | 507 |
 | The same sea, ships from 20 s: three test flights | 58 | 6.2 to 8.7 | 44 to 102 | 16 to 29 | 290 to 530 |
-| **Take 3, the video** (that sea, ships from 20 s) | 54 | 4.6 | 49 | 4.5 | 207 |
+| Take 3 (that sea, ships from 20 s) | 54 | 4.6 | 49 | 4.5 | 207 |
+| **Take 4, the video** (the same setup) | 54 | 10.3 | 38 | 4.3 | 263 |
 | To the island and back | 289 | 10.6 | 44 | 94.9 | 3,477 |
